@@ -20,15 +20,16 @@ const schema = {
   properties: {
     action: {
       type: SchemaType.STRING,
-      enum: ["search", "readURL", "rewrite", "answer", "reflect"],
+      enum: ["search", "readURL", "answer", "reflect"],
       description: "Must match exactly one action type"
     },
     questionsToAnswer: {
       type: SchemaType.ARRAY,
       items: {
-        type: SchemaType.STRING
+        type: SchemaType.STRING,
+        description: "each question must be a single line, concise and clear. not composite or compound, less than 20 words.",
       },
-      description: "Only required when choosing 'reflect' action, must be a list of of important questions that need to be answered first",
+      description: "Only required when choosing 'reflect' action, list of most important questions to answer to fill the knowledge gaps.",
       maxItems: 2
     },
     searchKeywords: {
@@ -45,10 +46,6 @@ const schema = {
         type: SchemaType.STRING
       },
       description: "Only required when choosing 'readURL' action, must be an array of URLs"
-    },
-    rewriteQuery: {
-      type: SchemaType.STRING,
-      description: "Only required when choosing 'rewrite' action, must be a new query that might lead to better or more relevant information",
     },
     answer: {
       type: SchemaType.STRING,
@@ -106,33 +103,43 @@ const model = genAI.getGenerativeModel({
   }
 });
 
-function getPrompt(question: string, context?: string) {
+function getPrompt(question: string, context?: string, allowReflect:boolean = false) {
   let contextIntro = ``;
   if (!!context) {
-    contextIntro = `You have the following context:
+    contextIntro = `
+You have the following actions records in your context:
+
     ${context}
      `;
   }
+
+  let reflectAction = '';
+  if (allowReflect) {
+    reflectAction = `
+If you are not 100% confident in your answer, then identify the gaps in your knowledge with "reflect" action:
+
+**reflect**:
+- Challenge existing knowledge with what-if or divide-and-conquer thinking.
+- Reflect on the gaps in your knowledge and ask for most important questions to fill those gaps.
+- You use this action when you feel like you need to first answer those questions before proceeding with the current one.
+- Should not similar to the original question or existing questionsToAnswer in the context.
+- Each question must be concise and clear less than 20 words and not composite or compound.
+    
+    `
+  }
+
+
 
   return `You are an AI research analyst capable of multi-step reasoning.
 
 ${contextIntro}
 
-Based on the context and the knowledge in your training data, you must answer the following question with 100% confidence:
+Based on the previous actions and the knowledge in your training data, you must answer the following question with 100% confidence:
 
 ${question}
 
-If you are not 100% confident in your answer, you should first take a reflection to identify the gaps in your knowledge:
-
-**reflect**:
-- Challenge existing knowledge with what-if thinking.
-- Fill in the gaps with divide-and-conquer type of questions.
-- Reflect on the gaps in your knowledge and ask for more questions to fill those gaps.
-- You use this action when you feel like you need to first answer those questions before proceeding with the current one.
-- This action has higher priority than all other actions.
-- Should not similar to the original question or existing questionsToAnswer in the context.
-
-If you are still not confident after reflecting, you can take one of the following actions:
+${reflectAction}
+Or you can take one of the following actions:
 
 **search**:
 - Search external real-world information via a public search engine.
@@ -143,11 +150,6 @@ If you are still not confident after reflecting, you can take one of the followi
 - Provide a specific URL to fetch and read its content in detail.
 - Any URL must come from the current context.
 - You use this action when you feel like that particular URL might have the information you need to answer the question.
-
-**rewrite**:
-- Propose a new or modified query (in a different phrasing, more details, or from another angle) that might lead to better or more relevant information.
-- This rewritten query can help the search engine find more accurate results, thereby improving your confidence in answering the original question.
-- You use this action when you think the current query is too vague, broad, or ambiguous; or the search engine results are not satisfactory.
 
 **answer**:
 - Provide your answer to the user, **only** if you are completely sure.
@@ -170,8 +172,9 @@ async function getResponse(question: string) {
   let step = 0;
   let gaps: string[] = [];
   while (totalTokens < tokenBudget) {
+    const allowReflect = gaps.length === 0;
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
-    const prompt = getPrompt(currentQuestion, context);
+    const prompt = getPrompt(currentQuestion, context, allowReflect);
     console.log('Prompt length:', prompt.length);
     console.log('Context:', context.length);
     console.log('Gaps:', gaps.length);
