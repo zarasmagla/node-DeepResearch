@@ -25,7 +25,7 @@ type ResponseSchema = {
       enum: string[];
       description: string;
     };
-    searchQuery: {
+    keywordsQuery: {
       type: SchemaType.STRING;
       description: string;
     };
@@ -99,7 +99,7 @@ function getSchema(allowReflect: boolean): ResponseSchema {
         description: "Only required when choosing 'reflect' action, list of most important questions to answer to fill the knowledge gaps.",
         maxItems: 2
       } : undefined,
-      searchQuery: {
+      keywordsQuery: {
         type: SchemaType.STRING,
         description: "Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand.",
       },
@@ -163,8 +163,8 @@ When uncertain or needing additional information, select one of these actions:
 
 **search**:
 - Query external sources using a public search engine
-- Optimize for concise, keyword-based searches
-- Use for recent information (post-training data) or missing domain knowledge
+- Focus on solving one specific aspect of the question
+- Only give keywords search query, not full sentences
 
 **readURL**:
 - Access the full content behind specific URLs
@@ -256,8 +256,8 @@ async function getResponse(question: string) {
 
     // Rest of the action handling remains the same
     try {
-      if (action.action === 'search' && action.searchQuery) {
-        const results = await search(action.searchQuery, jinaToken);
+      if (action.action === 'search' && action.keywordsQuery) {
+        const results = await search(action.keywordsQuery, jinaToken);
         context.push({
           step,
           question: currentQuestion,
