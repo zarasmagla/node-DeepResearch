@@ -189,6 +189,13 @@ async function getResponse(question: string) {
     if (action.action === 'answer') {
       if (currentQuestion === question) {
         return action;  // Exit only for original question's answer not the gap question
+      } else {
+        const contextRecord = JSON.stringify({
+          step,
+          ...action,
+          question: currentQuestion
+        });
+        context = `${context}\n${contextRecord}`;
       }
     }
 
