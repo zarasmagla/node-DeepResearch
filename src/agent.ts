@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import {ProxyAgent, setGlobalDispatcher} from "undici";
 import {readUrl} from "./tools/read";
 import {search} from "./tools/search";
+import fs from 'fs/promises';
 
 // Proxy setup remains the same
 if (process.env.https_proxy) {
@@ -139,16 +140,18 @@ function getSchema(allowReflect: boolean): ResponseSchema {
         type: SchemaType.NUMBER,
         minimum: 0.0,
         maximum: 1.0,
-        description: "Represents the confidence level of in answering the question BEFORE taking the action. Must be a float between 0.0 and 1.0",
+        description: "Represents the confidence level of in answering the question BEFORE taking the action.",
       }
     },
     required: ["action", "reasoning", "confidence"],
   };
 }
 
-function getPrompt(question: string, context?: string, allowReflect: boolean = false) {
-  const contextIntro = context ?
-    `\nYour current context contains these previous actions:\n\n    ${context}\n`
+function getPrompt(question: string, context?: any[], allQuestions?: string[], allowReflect: boolean = false) {
+  const contextIntro = context?.length ?
+    `Your current context contains these previous actions and knowledge:
+    ${JSON.stringify(context, null, 2)}
+    `
     : '';
 
   let actionsDescription = `
@@ -164,9 +167,9 @@ When uncertain or needing additional information, select one of these actions:
 - Use for recent information (post-training data) or missing domain knowledge
 
 **readURL**:
-- Access content from specific URLs found in current context
+- Access the full content behind specific URLs
 - Requires existing URLs from previous actions
-- Use when confident a contextual URL contains needed information
+- Use when you think URL contains needed information
 
 **answer**:
 - Provide final response only when 100% certain
@@ -181,7 +184,9 @@ ${allowReflect ? `- If doubts remain, use "reflect" instead` : ''}`;
   - Original (not variations of existing questions)
   - Focused on single concepts
   - Under 20 words
-  - Non-compound/non-complex`;
+  - Non-compound/non-complex
+${allQuestions?.length ? `Existing questions you have asked, make sure to not repeat them:\n ${allQuestions.join('\n')}` : ''}
+  `;
   }
 
   return `You are an advanced AI research analyst specializing in multi-step reasoning.${contextIntro}${actionsDescription}
@@ -198,16 +203,19 @@ Critical Requirements:
 async function getResponse(question: string) {
   let tokenBudget = 30000000;
   let totalTokens = 0;
-  let context = '';
+  let context = [];
   let step = 0;
   let gaps: string[] = [question];  // All questions to be answered including the orginal question
+  let allQuestions = [question];
 
   while (totalTokens < tokenBudget) {
+    step++;
+    console.log('===STEPS===', step)
     console.log('Gaps:', gaps)
     const allowReflect = gaps.length <= 1;
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
-    const prompt = getPrompt(currentQuestion, context, allowReflect);
-    console.log('Prompt:', prompt.length)
+    const prompt = getPrompt(currentQuestion, context, allQuestions, allowReflect);
+    console.log('Prompt len:', prompt.length)
 
     const model = genAI.getGenerativeModel({
       model: modelName,
@@ -221,7 +229,6 @@ async function getResponse(question: string) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const usage = response.usageMetadata;
-    step++;
 
     totalTokens += usage?.totalTokenCount || 0;
     console.log(`Tokens: ${totalTokens}/${tokenBudget}`);
@@ -233,34 +240,30 @@ async function getResponse(question: string) {
       if (currentQuestion === question) {
         return action;
       } else {
-        context = `${context}\n${JSON.stringify({
+        context.push({
           step,
+          question: currentQuestion,
           ...action,
-          question: currentQuestion
-        })}`;
+        });
       }
     }
 
     if (action.action === 'reflect' && action.questionsToAnswer) {
       gaps.push(...action.questionsToAnswer);
+      allQuestions.push(...action.questionsToAnswer);
       gaps.push(question);  // always keep the original question in the gaps
-      context = `${context}\n${JSON.stringify({
-        step,
-        ...action,
-        question: currentQuestion
-      })}`;
     }
 
     // Rest of the action handling remains the same
     try {
       if (action.action === 'search' && action.searchQuery) {
         const results = await search(action.searchQuery, jinaToken);
-        context = `${context}\n${JSON.stringify({
+        context.push({
           step,
-          ...action,
           question: currentQuestion,
+          ...action,
           result: results.data
-        })}`;
+        });
         totalTokens += results.data.reduce((sum, r) => sum + r.usage.tokens, 0);
       } else if (action.action === 'readURL' && action.URLTargets?.length) {
         const urlResults = await Promise.all(
@@ -269,18 +272,26 @@ async function getResponse(question: string) {
             return {url, result: response};
           })
         );
-
-        context = `${context}\n${JSON.stringify({
+        context.push({
           step,
-          ...action,
           question: currentQuestion,
+          ...action,
           result: urlResults
-        })}`;
+        });
         totalTokens += urlResults.reduce((sum, r) => sum + r.result.data.usage.tokens, 0);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
     }
+    await storeContext(context);
+  }
+}
+
+async function storeContext(context: any[]) {
+  try {
+    await fs.writeFile('context.json', JSON.stringify(context, null, 2));
+  } catch (error) {
+    console.error('Failed to store context:', error);
   }
 }
 
@@ -289,7 +300,7 @@ const jinaToken = process.env.JINA_API_KEY as string;
 if (!apiKey) throw new Error("GEMINI_API_KEY not found");
 if (!jinaToken) throw new Error("JINA_API_KEY not found");
 
-const modelName = 'gemini-1.5-flash';
+const modelName = 'gemini-2.0-flash-exp';
 const genAI = new GoogleGenerativeAI(apiKey);
 
 const question = process.argv[2] || "";
