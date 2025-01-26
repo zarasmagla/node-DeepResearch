@@ -23,12 +23,12 @@ const schema = {
       enum: ["search", "readURL", "rewrite", "answer", "reflect"],
       description: "Must match exactly one action type"
     },
-    remainedGaps: {
+    questionsToAnswer: {
       type: SchemaType.ARRAY,
       items: {
         type: SchemaType.STRING
       },
-      description: "Only required when choosing 'reflect' action, must be an array of gaps in the knowledge",
+      description: "Only required when choosing 'reflect' action, must be a list of of important questions that need to be answered first"
     },
     searchKeywords: {
       type: SchemaType.ARRAY,
@@ -124,6 +124,7 @@ If you are not 100% confident in your answer, you should first take a reflection
 
 **reflect**:
 - Challenge existing knowledge with what-if thinking.
+- Fill in the gaps with divide-and-conquer type of questions.
 - Reflect on the gaps in your knowledge and ask for more questions to fill those gaps.
 - You use this action when you feel like you need to first answer those questions before proceeding with the current one.
 - This action has higher priority than all other actions.
@@ -160,17 +161,17 @@ When you decide on your action, respond **only** in valid JSON format according 
 
 
 async function getResponse(question: string) {
-  let tokenBudget = 300000;
+  let tokenBudget = 30000000;
   let totalTokens = 0;
-  let context = '';
+  let context = '';  // global context to store all the actions records
   let step = 0;
   let gaps: string[] = [];
-  let hasAnswer = false;
-
-  while (totalTokens < tokenBudget && !hasAnswer) {
+  while (totalTokens < tokenBudget) {
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
     const prompt = getPrompt(currentQuestion, context);
     console.log('Prompt length:', prompt.length);
+    console.log('Context:', context.length);
+    console.log('Gaps:', gaps.length);
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const usage = response.usageMetadata;
@@ -180,22 +181,22 @@ async function getResponse(question: string) {
     console.log(`Tokens: ${totalTokens}/${tokenBudget}`);
 
     const action = JSON.parse(response.text());
-    console.log('Action:', action);
+    console.log('Question-Action:', currentQuestion, action);
 
     if (action.action === 'answer') {
-      hasAnswer = true;
-      continue;
+      if (currentQuestion === question) {
+        return action;  // Exit only for original question's answer not the gap question
+      }
     }
 
-    if (action.action === 'reflect' && action.remainedGaps) {
-      gaps.push(...action.remainedGaps);
+    if (action.action === 'reflect' && action.questionsToAnswer) {
+      gaps.push(...action.questionsToAnswer);
       const contextRecord = JSON.stringify({
         step,
         ...action,
         question: currentQuestion
       });
       context = `${context}\n${contextRecord}`;
-      continue;
     }
 
     try {
