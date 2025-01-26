@@ -28,14 +28,16 @@ const schema = {
       items: {
         type: SchemaType.STRING
       },
-      description: "Only required when choosing 'reflect' action, must be a list of of important questions that need to be answered first"
+      description: "Only required when choosing 'reflect' action, must be a list of of important questions that need to be answered first",
+      maxItems: 2
     },
     searchKeywords: {
       type: SchemaType.ARRAY,
       items: {
         type: SchemaType.STRING
       },
-      description: "Only required when choosing 'search' action, must be an array of keywords"
+      description: "Only required when choosing 'search' action, must be an array of keywords",
+      maxItems: 3
     },
     URLTargets: {
       type: SchemaType.ARRAY,
@@ -128,6 +130,7 @@ If you are not 100% confident in your answer, you should first take a reflection
 - Reflect on the gaps in your knowledge and ask for more questions to fill those gaps.
 - You use this action when you feel like you need to first answer those questions before proceeding with the current one.
 - This action has higher priority than all other actions.
+- Should not similar to the original question or existing questionsToAnswer in the context.
 
 If you are still not confident after reflecting, you can take one of the following actions:
 
