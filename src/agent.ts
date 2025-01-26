@@ -55,7 +55,6 @@ type ResponseSchema = {
         };
         required: string[];
       };
-      minItems: number;
       description: string;
     };
     reasoning: {
@@ -130,7 +129,6 @@ function getSchema(allowReflect: boolean): ResponseSchema {
           },
           required: ["title", "url"]
         },
-        minItems: 1,
         description: "Only required when choosing 'answer' action, must be an array of references"
       },
       reasoning: {
