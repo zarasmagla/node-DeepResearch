@@ -1,5 +1,6 @@
 ```bash
 export GOOGLE_API_KEY=...
 export JINA_API_KEY=jina_...
+npm install
 npm run dev -- "what is the twitter account of jina ai's founder"
 ```
