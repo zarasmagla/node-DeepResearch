@@ -18,7 +18,6 @@ npm run dev "what should be jina ai strategy for 2025?"
 ```
 
 ```mermaid
-
 flowchart TD
     subgraph Inputs[System Inputs]
         OrigQuestion[Original Question]
@@ -32,6 +31,8 @@ flowchart TD
         BadStore[Failed Attempts]
         QuestionStore[Question History]
         KeywordStore[Keyword History]
+        KnowledgeStore[Knowledge Base]
+        URLStore[URL Map]
     end
 
     subgraph Outputs[System Outputs]
@@ -48,10 +49,12 @@ flowchart TD
     ActionType -->|is search| SearchOp[Search Results]
     SearchOp -->|store| ContextStore
     SearchOp -->|add| KeywordStore
+    SearchOp -->|update| URLStore
     SearchOp -->|continue| TokenBudget
     
-    ActionType -->|is read| URLData[URL Content]
+    ActionType -->|is visit| URLData[URL Content]
     URLData -->|store| ContextStore
+    URLStore -->|provide| URLData
     URLData -->|continue| TokenBudget
     
     ActionType -->|is reflect| NewQuestions[Questions]
@@ -64,6 +67,7 @@ flowchart TD
     ActionType -->|is answer| AnswerCheck{Original Question}
     AnswerCheck -->|compare with| OrigQuestion
     AnswerCheck -->|is not| ContextStore
+    AnswerCheck -->|store valid| KnowledgeStore
     ContextStore -->|continue| TokenBudget
     
     AnswerCheck -->|is| Evaluation[Answer Quality]
@@ -77,7 +81,7 @@ flowchart TD
     classDef state fill:#e1f5fe,stroke:#01579b
     classDef input fill:#e8f5e9,stroke:#2e7d32
     classDef output fill:#fce4ec,stroke:#c2185b
-    class GapQueue,ContextStore,BadStore,QuestionStore,KeywordStore state
+    class GapQueue,ContextStore,BadStore,QuestionStore,KeywordStore,KnowledgeStore,URLStore state
     class OrigQuestion,TokenBudget input
     class FinalAnswer output
 ```
