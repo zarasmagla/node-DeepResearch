@@ -101,7 +101,7 @@ export async function dedupQueries(newQueries: string[], existingQueries: string
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const json = JSON.parse(response.text()) as DedupResponse;
-    console.log('Analysis:', json);
+    console.log('Dedup:', json);
     return json.unique_queries;
   } catch (error) {
     console.error('Error in deduplication analysis:', error);

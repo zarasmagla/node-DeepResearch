@@ -7,6 +7,7 @@ import {SafeSearchType, search} from "duck-duck-scrape";
 import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
+import {buildURLMap} from "./tools/getURLIndex";
 
 // Proxy setup remains the same
 if (process.env.https_proxy) {
@@ -164,32 +165,55 @@ function getSchema(allowReflect: boolean): ResponseSchema {
   };
 }
 
-function getPrompt(question: string, context?: any[], allQuestions?: string[], allowReflect: boolean = false, badContext?: any[]) {
+function getPrompt(question: string, context?: any[], allQuestions?: string[], allowReflect: boolean = false, badContext?: any[], knowledge?: any[], allURLs?: Record<string, string>) {
+  // console.log('Context:', context);
+  // console.log('All URLs:', JSON.stringify(allURLs, null, 2));
+
+  const knowledgeIntro = knowledge?.length ?
+    `
+## Knowledge
+You have successfully gathered some knowledge from the following questions:
+
+${JSON.stringify(knowledge, null, 2)}
+
+`
+    : '';
+
   const badContextIntro = badContext?.length ?
-    `Your last unsuccessful answer contains these previous actions and knowledge:
-    ${JSON.stringify(badContext, null, 2)}
+    `
+## Unsuccessful Answer Analysis
+Your last unsuccessful answer are:
+
+${JSON.stringify(badContext, null, 2)}
     
-    Learn to avoid these mistakes and think of a new approach, from a different angle, e.g. search for different keywords, read different URLs, or ask different questions.
+Learn to avoid these mistakes and think of a new approach, from a different angle, e.g. search for different keywords, read different URLs, or ask different questions.
     `
     : '';
 
   const contextIntro = context?.length ?
-    `Your current context contains these previous actions and knowledge:
-    ${JSON.stringify(context, null, 2)}
     `
+## Context
+You have conducted the following actions:
+
+${JSON.stringify(context, null, 2)}
+
+`
     : '';
 
   let actionsDescription = `
-Using your training data and prior lessons learned, answer the following question with absolute certainty:
-
-${question}
+## Actions
 
 When uncertain or needing additional information, select one of these actions:
 
+${allURLs ? `
 **read**:
-- Access external URLs to gather more information
+- Access any URLs from below to gather external knowledge
+
+${JSON.stringify(allURLs, null, 2)}
+
 - When you have enough search result in the context and want to deep dive into specific URLs
-- It allows you access the full content behind specific URLs
+- It allows you access the full content behind any URLs
+` : ''}
 
 **search**:
 - Query external sources using a public search engine
@@ -202,7 +226,8 @@ When uncertain or needing additional information, select one of these actions:
 ${allowReflect ? `- If doubts remain, use "reflect" instead` : ''}`;
 
   if (allowReflect) {
-    actionsDescription += `\n\n**reflect**:
+    actionsDescription += `
+**reflect**:
 - Perform critical analysis through hypothetical scenarios or systematic breakdowns
 - Identify knowledge gaps and formulate essential clarifying questions
 - Questions must be:
@@ -210,13 +235,18 @@ ${allowReflect ? `- If doubts remain, use "reflect" instead` : ''}`;
   - Focused on single concepts
   - Under 20 words
   - Non-compound/non-complex
-`;
+`.trim();
   }
 
   return `
-You are an advanced AI research analyst specializing in multi-step reasoning.
+You are an advanced AI research analyst specializing in multi-step reasoning. Using your training data and prior lessons learned, answer the following question with absolute certainty:
+
+## Question
+${question}
 
 ${contextIntro.trim()}
+
+${knowledgeIntro.trim()}
 
 ${badContextIntro.trim()}
 
@@ -240,7 +270,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
   let allKeywords = [];
   let allKnowledge = [];  // knowledge are intermedidate questions that are answered
   let badContext = [];
-
+  let allURLs: Record<string, string> = {};
   while (totalTokens < tokenBudget) {
     // add 1s delay to avoid rate limiting
     await sleep(1000);
@@ -249,7 +279,16 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
     console.log('Gaps:', gaps)
     const allowReflect = gaps.length <= 1;
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
-    const prompt = getPrompt(currentQuestion, context, allQuestions, allowReflect, badContext);
+    // update all urls with buildURLMap
+    allURLs = {...allURLs, ...buildURLMap(context)};
+    const prompt = getPrompt(
+      currentQuestion,
+      context,
+      allQuestions,
+      allowReflect,
+      badContext,
+      allKnowledge,
+      allURLs);
     console.log('Prompt len:', prompt.length)
 
     const model = genAI.getGenerativeModel({
@@ -283,7 +322,11 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
         if (evaluation.is_valid_answer) {
           return action;
         } else {
-          badContext.push({...context, "Why this is a bad answer?": evaluation.reasoning});
+          badContext.push({
+            question: currentQuestion,
+            answer: action.answer,
+            "Why this is a bad answer?": evaluation.reasoning
+          });
           context = [];
         }
       } else if (evaluation.is_valid_answer) {
@@ -296,9 +339,18 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
       if (allQuestions.length) {
         newGapQuestions = await dedupQueries(newGapQuestions, allQuestions)
       }
-      gaps.push(...newGapQuestions);
-      allQuestions.push(...newGapQuestions);
-      gaps.push(question);  // always keep the original question in the gaps
+      if (newGapQuestions.length > 0) {
+        gaps.push(...newGapQuestions);
+        allQuestions.push(...newGapQuestions);
+        gaps.push(question);  // always keep the original question in the gaps
+      } else {
+        console.log('No new questions to ask');
+        context.push({
+          step,
+          ...action,
+          result: 'I have tried all possible questions and found no useful information. I must think out of the box or different angle!!!'
+        });
+      }
     }
 
     // Rest of the action handling remains the same
@@ -310,27 +362,37 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
         if (allKeywords.length) {
           keywordsQueries = await dedupQueries(keywordsQueries, allKeywords)
         }
-        const searchResults = [];
-        for (const query of keywordsQueries) {
-          const results = await search(query, {
-            safeSearch: SafeSearchType.STRICT
-          });
-          const minResults = results.results.map(r => ({
-            title: r.title,
-            url: r.url,
-            description: r.description,
-          }));
-          searchResults.push({query, results: minResults});
-          allKeywords.push(query);
-          await sleep(5000);
-        }
+        if (keywordsQueries.length > 0) {
+          const searchResults = [];
+          for (const query of keywordsQueries) {
+            console.log('Searching:', query);
+            const results = await search(query, {
+              safeSearch: SafeSearchType.STRICT
+            });
+            const minResults = results.results.map(r => ({
+              title: r.title,
+              url: r.url,
+              description: r.description,
+            }));
+            searchResults.push({query, results: minResults});
+            allKeywords.push(query);
+            await sleep(5000);
+          }
 
-        context.push({
-          step,
-          question: currentQuestion,
-          ...action,
-          result: searchResults
-        });
+          context.push({
+            step,
+            question: currentQuestion,
+            ...action,
+            result: searchResults
+          });
+        } else {
+          console.log('No new queries to search');
+          context.push({
+            step,
+            ...action,
+            result: 'I have tried all possible queries and found no new information. I must think out of the box or different angle!!!'
+          });
+        }
       } else if (action.action === 'read' && action.URLTargets?.length) {
         const urlResults = await Promise.all(
           action.URLTargets.map(async (url: string) => {

@@ -45,7 +45,7 @@ const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({
   model: modelName,
   generationConfig: {
-    temperature: 0.1,
+    temperature: 0,
     responseMimeType: "application/json",
     responseSchema: responseSchema
   }
@@ -59,7 +59,7 @@ Core Evaluation Criteria:
 2. Clarity: Answer should be clear and unambiguous
 3. Informativeness: Answer must provide substantial, useful information
 4. Specificity: Generic or vague responses are not acceptable
-5. Definitiveness: "I don't know" or highly uncertain responses are not valid
+5. Definitiveness: "I don't know", "lack of information" or highly uncertain responses are not valid
 6. Relevance: Answer must be directly related to the question topic
 7. Accuracy: Information provided should be factually sound (if verifiable)
 
@@ -77,6 +77,13 @@ Answer: "Python 3.9 requires: Windows 7 or later, macOS 10.11 or later, or Linux
 Evaluation: {
   "is_valid_answer": true,
   "reasoning": "The answer is comprehensive, specific, and covers all key system requirements across different operating systems. It provides concrete numbers and necessary additional components."
+}
+
+Question: "what is the twitter account of jina ai's founder?"
+Answer: "The provided text does not contain the Twitter account of Jina AI's founder."
+Evaluation: {
+  "is_valid_answer": false,
+  "reasoning": "The answer is not definitive and fails to provide the requested information. Don't know, can't derive, lack of information is unacceptable,"
 }
 
 Now evaluate this pair:

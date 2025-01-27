@@ -111,6 +111,7 @@ export async function rewriteQuery(query: string): Promise<string[]> {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const json = JSON.parse(response.text()) as KeywordsResponse;
+    console.log('Rewriter:', json)
     return json.keywords;
   } catch (error) {
     console.error('Error in query rewriting:', error);
