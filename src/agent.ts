@@ -59,7 +59,7 @@ type ResponseSchema = {
       type: SchemaType.STRING;
       description: string;
     };
-    URLTargets: {
+    URLTargets?: {
       type: SchemaType.ARRAY;
       items: {
         type: SchemaType.STRING;
@@ -105,13 +105,20 @@ type ResponseSchema = {
   required: string[];
 };
 
-function getSchema(allowReflect: boolean): ResponseSchema {
+function getSchema(allowReflect: boolean, allowRead: boolean): ResponseSchema {
+  let actions = ["search", "answer"];
+  if (allowReflect) {
+    actions.push("reflect");
+  }
+  if (allowRead) {
+    actions.push("read");
+  }
   return {
     type: SchemaType.OBJECT,
     properties: {
       action: {
         type: SchemaType.STRING,
-        enum: allowReflect ? ["search", "read", "answer", "reflect"] : ["search", "read", "answer"],
+        enum: actions,
         description: "Must match exactly one action type"
       },
       questionsToAnswer: allowReflect ? {
@@ -127,13 +134,13 @@ function getSchema(allowReflect: boolean): ResponseSchema {
         type: SchemaType.STRING,
         description: "Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand.",
       },
-      URLTargets: {
+      URLTargets: allowRead ? {
         type: SchemaType.ARRAY,
         items: {
           type: SchemaType.STRING
         },
         description: "Only required when choosing 'deep dive' action, must be an array of URLs"
-      },
+      } : undefined,
       answer: {
         type: SchemaType.STRING,
         description: "Only required when choosing 'answer' action, must be the final answer in natural language"
@@ -227,6 +234,7 @@ ${allowReflect ? `- If doubts remain, use "reflect" instead` : ''}`;
 
   if (allowReflect) {
     actionsDescription += `
+
 **reflect**:
 - Perform critical analysis through hypothetical scenarios or systematic breakdowns
 - Identify knowledge gaps and formulate essential clarifying questions
@@ -235,7 +243,7 @@ ${allowReflect ? `- If doubts remain, use "reflect" instead` : ''}`;
   - Focused on single concepts
   - Under 20 words
   - Non-compound/non-complex
-`.trim();
+`;
   }
 
   return `
@@ -281,6 +289,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
     // update all urls with buildURLMap
     allURLs = {...allURLs, ...buildURLMap(context)};
+    const allowRead = Object.keys(allURLs).length > 0;
     const prompt = getPrompt(
       currentQuestion,
       context,
@@ -296,7 +305,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
       generationConfig: {
         temperature: 0.7,
         responseMimeType: "application/json",
-        responseSchema: getSchema(allowReflect)
+        responseSchema: getSchema(allowReflect, allowRead)
       }
     });
 
