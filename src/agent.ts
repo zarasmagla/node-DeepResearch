@@ -110,7 +110,7 @@ function getSchema(allowReflect: boolean): ResponseSchema {
     properties: {
       action: {
         type: SchemaType.STRING,
-        enum: allowReflect ? ["search", "readURL", "answer", "reflect"] : ["search", "readURL", "answer"],
+        enum: allowReflect ? ["search", "deep dive", "answer", "reflect"] : ["search", "deep dive", "answer"],
         description: "Must match exactly one action type"
       },
       questionsToAnswer: allowReflect ? {
@@ -131,7 +131,7 @@ function getSchema(allowReflect: boolean): ResponseSchema {
         items: {
           type: SchemaType.STRING
         },
-        description: "Only required when choosing 'readURL' action, must be an array of URLs"
+        description: "Only required when choosing 'deep dive' action, must be an array of URLs"
       },
       answer: {
         type: SchemaType.STRING,
@@ -164,7 +164,7 @@ function getSchema(allowReflect: boolean): ResponseSchema {
   };
 }
 
-function getPrompt(question: string, context?: any[], allQuestions?: string[], allowReflect: boolean = false, badContext?: any[] ) {
+function getPrompt(question: string, context?: any[], allQuestions?: string[], allowReflect: boolean = false, badContext?: any[]) {
   const badContextIntro = badContext?.length ?
     `Your last unsuccessful answer contains these previous actions and knowledge:
     ${JSON.stringify(badContext, null, 2)}
@@ -191,9 +191,9 @@ When uncertain or needing additional information, select one of these actions:
 - Focus on solving one specific aspect of the question
 - Only give keywords search query, not full sentences
 
-**readURL**:
-- Access the full content behind specific URLs in the search result
-- Use when you think certain URLs may contain the information you need
+**deep dive**:
+- When you have enough search result and want to deep dive into specific URLs
+- It allows you access the full content behind specific URLs
 
 **answer**:
 - Provide final response only when 100% certain
@@ -224,7 +224,7 @@ Critical Requirements:
 - Maintain strict JSON syntax`;
 }
 
-async function getResponse(question: string, tokenBudget: number=30000000) {
+async function getResponse(question: string, tokenBudget: number = 30000000) {
   let totalTokens = 0;
   let context = [];
   let step = 0;
@@ -265,10 +265,10 @@ async function getResponse(question: string, tokenBudget: number=30000000) {
 
     if (action.action === 'answer') {
       context.push({
-          step,
-          question: currentQuestion,
-          ...action,
-        });
+        step,
+        question: currentQuestion,
+        ...action,
+      });
       if (currentQuestion === question) {
         const evaluation = await evaluateAnswer(currentQuestion, action.answer);
         if (evaluation) {
@@ -309,7 +309,7 @@ async function getResponse(question: string, tokenBudget: number=30000000) {
             url: r.url,
             description: r.description,
           }));
-          searchResults.push({query, minResults});
+          searchResults.push({query, results: minResults});
           allKeywords.push(query);
           await sleep(5000);
         }
@@ -320,7 +320,7 @@ async function getResponse(question: string, tokenBudget: number=30000000) {
           ...action,
           result: searchResults
         });
-      } else if (action.action === 'readURL' && action.URLTargets?.length) {
+      } else if (action.action === 'deep dive' && action.URLTargets?.length) {
         const urlResults = await Promise.all(
           action.URLTargets.map(async (url: string) => {
             const response = await readUrl(url, jinaToken);
@@ -338,13 +338,15 @@ async function getResponse(question: string, tokenBudget: number=30000000) {
     } catch (error) {
       console.error('Error fetching data:', error);
     }
-    await storeContext(context);
+    await storeContext(context, allKeywords, allQuestions);
   }
 }
 
-async function storeContext(context: any[]) {
+async function storeContext(context: any[], keywords: string[], questions: string[]) {
   try {
     await fs.writeFile('context.json', JSON.stringify(context, null, 2));
+    await fs.writeFile('keywords.json', JSON.stringify(keywords, null, 2));
+    await fs.writeFile('questions.json', JSON.stringify(questions, null, 2));
   } catch (error) {
     console.error('Failed to store context:', error);
   }

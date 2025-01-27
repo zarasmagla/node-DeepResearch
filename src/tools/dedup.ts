@@ -61,12 +61,11 @@ Core Rules:
 1. Consider semantic meaning and query intent, not just lexical similarity
 2. Account for different phrasings of the same information need
 3. A query is considered duplicate if its core information need is already covered by:
-   - ANY earlier query in set A (earlier = appears before in the array)
+   - any query in set A
    - OR any query in set B
-4. Be conservative - only mark as duplicate if very similar
-5. Different aspects or perspectives of the same topic are not duplicates
+4. Be aggressive - mark as duplicate as long as they are reasonably similar
+5. Different aspects or perspectives of the same object are not duplicates
 6. Consider query specificity - a more specific query might not be a duplicate of a general one
-7. For duplicates within set A, always keep the FIRST occurrence and mark later ones as duplicates
 
 Examples:
 
