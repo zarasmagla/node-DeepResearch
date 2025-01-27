@@ -84,14 +84,14 @@ Question: ${JSON.stringify(question)}
 Answer: ${JSON.stringify(answer)}`;
 }
 
-export async function evaluateAnswer(question: string, answer: string): Promise<boolean> {
+export async function evaluateAnswer(question: string, answer: string): Promise<EvaluationResponse> {
   try {
     const prompt = getPrompt(question, answer);
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const json = JSON.parse(response.text()) as EvaluationResponse;
     console.log('Evaluation:', json);
-    return json.is_valid_answer;
+    return json;
   } catch (error) {
     console.error('Error in answer evaluation:', error);
     throw error;

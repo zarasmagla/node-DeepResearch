@@ -110,7 +110,7 @@ function getSchema(allowReflect: boolean): ResponseSchema {
     properties: {
       action: {
         type: SchemaType.STRING,
-        enum: allowReflect ? ["search", "deep dive", "answer", "reflect"] : ["search", "deep dive", "answer"],
+        enum: allowReflect ? ["search", "read", "answer", "reflect"] : ["search", "read", "answer"],
         description: "Must match exactly one action type"
       },
       questionsToAnswer: allowReflect ? {
@@ -186,14 +186,15 @@ ${question}
 
 When uncertain or needing additional information, select one of these actions:
 
+**read**:
+- Access external URLs to gather more information
+- When you have enough search result in the context and want to deep dive into specific URLs
+- It allows you access the full content behind specific URLs
+
 **search**:
 - Query external sources using a public search engine
 - Focus on solving one specific aspect of the question
 - Only give keywords search query, not full sentences
-
-**deep dive**:
-- When you have enough search result and want to deep dive into specific URLs
-- It allows you access the full content behind specific URLs
 
 **answer**:
 - Provide final response only when 100% certain
@@ -209,11 +210,17 @@ ${allowReflect ? `- If doubts remain, use "reflect" instead` : ''}`;
   - Focused on single concepts
   - Under 20 words
   - Non-compound/non-complex
-${allQuestions?.length ? `Existing questions you have asked, make sure to not repeat them:\n ${allQuestions.join('\n')}` : ''}
-  `;
+`;
   }
 
-  return `You are an advanced AI research analyst specializing in multi-step reasoning.${contextIntro}${badContextIntro}${actionsDescription}
+  return `
+You are an advanced AI research analyst specializing in multi-step reasoning.
+
+${contextIntro.trim()}
+
+${badContextIntro.trim()}
+
+${actionsDescription.trim()}
 
 Respond exclusively in valid JSON format matching exact JSON schema.
 
@@ -221,7 +228,7 @@ Critical Requirements:
 - Include ONLY ONE action type
 - Never add unsupported keys
 - Exclude all non-JSON text, markdown, or explanations
-- Maintain strict JSON syntax`;
+- Maintain strict JSON syntax`.trim();
 }
 
 async function getResponse(question: string, tokenBudget: number = 30000000) {
@@ -231,6 +238,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
   let gaps: string[] = [question];  // All questions to be answered including the orginal question
   let allQuestions = [question];
   let allKeywords = [];
+  let allKnowledge = [];  // knowledge are intermedidate questions that are answered
   let badContext = [];
 
   while (totalTokens < tokenBudget) {
@@ -241,7 +249,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
     console.log('Gaps:', gaps)
     const allowReflect = gaps.length <= 1;
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
-    const prompt = getPrompt(currentQuestion, context, allQuestions, allowReflect);
+    const prompt = getPrompt(currentQuestion, context, allQuestions, allowReflect, badContext);
     console.log('Prompt len:', prompt.length)
 
     const model = genAI.getGenerativeModel({
@@ -269,14 +277,17 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
         question: currentQuestion,
         ...action,
       });
+      const evaluation = await evaluateAnswer(currentQuestion, action.answer);
+
       if (currentQuestion === question) {
-        const evaluation = await evaluateAnswer(currentQuestion, action.answer);
-        if (evaluation) {
+        if (evaluation.is_valid_answer) {
           return action;
         } else {
-          badContext.push(...context);
+          badContext.push({...context, "Why this is a bad answer?": evaluation.reasoning});
           context = [];
         }
+      } else if (evaluation.is_valid_answer) {
+        allKnowledge.push({question: currentQuestion, answer: action.answer});
       }
     }
 
@@ -320,7 +331,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
           ...action,
           result: searchResults
         });
-      } else if (action.action === 'deep dive' && action.URLTargets?.length) {
+      } else if (action.action === 'read' && action.URLTargets?.length) {
         const urlResults = await Promise.all(
           action.URLTargets.map(async (url: string) => {
             const response = await readUrl(url, jinaToken);
@@ -338,15 +349,18 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
     } catch (error) {
       console.error('Error fetching data:', error);
     }
-    await storeContext(context, allKeywords, allQuestions);
+    await storeContext(prompt, [context, allKeywords, allQuestions, allKnowledge], step);
   }
 }
 
-async function storeContext(context: any[], keywords: string[], questions: string[]) {
+async function storeContext(prompt: string, memory: any[][], step: number) {
   try {
+    await fs.writeFile(`prompt-${step}.txt`, prompt);
+    const [context, keywords, questions, knowledge] = memory;
     await fs.writeFile('context.json', JSON.stringify(context, null, 2));
     await fs.writeFile('keywords.json', JSON.stringify(keywords, null, 2));
     await fs.writeFile('questions.json', JSON.stringify(questions, null, 2));
+    await fs.writeFile('knowledge.json', JSON.stringify(knowledge, null, 2));
   } catch (error) {
     console.error('Failed to store context:', error);
   }
