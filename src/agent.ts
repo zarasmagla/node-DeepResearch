@@ -6,6 +6,7 @@ import fs from 'fs/promises';
 import {SafeSearchType, search} from "duck-duck-scrape";
 import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
+import {evaluateAnswer} from "./tools/evaluator";
 
 // Proxy setup remains the same
 if (process.env.https_proxy) {
@@ -90,12 +91,6 @@ type ResponseSchema = {
       type: SchemaType.STRING;
       description: string;
     };
-    confidence: {
-      type: SchemaType.NUMBER;
-      minimum: number;
-      maximum: number;
-      description: string;
-    };
     questionsToAnswer?: {
       type: SchemaType.ARRAY;
       items: {
@@ -164,18 +159,20 @@ function getSchema(allowReflect: boolean): ResponseSchema {
         type: SchemaType.STRING,
         description: "Explain why choose this action?"
       },
-      confidence: {
-        type: SchemaType.NUMBER,
-        minimum: 0.0,
-        maximum: 1.0,
-        description: "Represents the confidence level of in answering the question BEFORE taking the action.",
-      }
     },
-    required: ["action", "reasoning", "confidence"],
+    required: ["action", "reasoning"],
   };
 }
 
-function getPrompt(question: string, context?: any[], allQuestions?: string[], allowReflect: boolean = false) {
+function getPrompt(question: string, context?: any[], allQuestions?: string[], allowReflect: boolean = false, badContext?: any[] ) {
+  const badContextIntro = badContext?.length ?
+    `Your last unsuccessful answer contains these previous actions and knowledge:
+    ${JSON.stringify(badContext, null, 2)}
+    
+    Learn to avoid these mistakes and think of a new approach, from a different angle, e.g. search for different keywords, read different URLs, or ask different questions.
+    `
+    : '';
+
   const contextIntro = context?.length ?
     `Your current context contains these previous actions and knowledge:
     ${JSON.stringify(context, null, 2)}
@@ -183,7 +180,7 @@ function getPrompt(question: string, context?: any[], allQuestions?: string[], a
     : '';
 
   let actionsDescription = `
-Using your training data and prior context, answer the following question with absolute certainty:
+Using your training data and prior lessons learned, answer the following question with absolute certainty:
 
 ${question}
 
@@ -216,7 +213,7 @@ ${allQuestions?.length ? `Existing questions you have asked, make sure to not re
   `;
   }
 
-  return `You are an advanced AI research analyst specializing in multi-step reasoning.${contextIntro}${actionsDescription}
+  return `You are an advanced AI research analyst specializing in multi-step reasoning.${contextIntro}${badContextIntro}${actionsDescription}
 
 Respond exclusively in valid JSON format matching exact JSON schema.
 
@@ -227,14 +224,14 @@ Critical Requirements:
 - Maintain strict JSON syntax`;
 }
 
-async function getResponse(question: string) {
-  let tokenBudget = 30000000;
+async function getResponse(question: string, tokenBudget: number=30000000) {
   let totalTokens = 0;
   let context = [];
   let step = 0;
   let gaps: string[] = [question];  // All questions to be answered including the orginal question
   let allQuestions = [question];
   let allKeywords = [];
+  let badContext = [];
 
   while (totalTokens < tokenBudget) {
     // add 1s delay to avoid rate limiting
@@ -267,14 +264,19 @@ async function getResponse(question: string) {
     console.log('Question-Action:', currentQuestion, action);
 
     if (action.action === 'answer') {
-      if (currentQuestion === question) {
-        return action;
-      } else {
-        context.push({
+      context.push({
           step,
           question: currentQuestion,
           ...action,
         });
+      if (currentQuestion === question) {
+        const evaluation = await evaluateAnswer(currentQuestion, action.answer);
+        if (evaluation) {
+          return action;
+        } else {
+          badContext.push(...context);
+          context = [];
+        }
       }
     }
 
