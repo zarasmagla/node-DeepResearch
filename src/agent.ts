@@ -5,6 +5,7 @@ import {readUrl} from "./tools/read";
 import fs from 'fs/promises';
 import {SafeSearchType, search} from "duck-duck-scrape";
 import {rewriteQuery} from "./tools/query-rewriter";
+import {dedupQueries} from "./tools/dedup";
 
 // Proxy setup remains the same
 if (process.env.https_proxy) {
@@ -17,6 +18,32 @@ if (process.env.https_proxy) {
   }
 }
 dotenv.config();
+
+async function sleep(ms: number) {
+  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  const startTime = Date.now();
+  const endTime = startTime + ms;
+
+  // Clear current line and hide cursor
+  process.stdout.write('\x1B[?25l');
+
+  while (Date.now() < endTime) {
+    const remaining = Math.ceil((endTime - Date.now()) / 1000);
+    const frameIndex = Math.floor(Date.now() / 100) % frames.length;
+
+    // Clear line and write new frame
+    process.stdout.write(`\r${frames[frameIndex]} Cool down... ${remaining}s remaining`);
+
+    // Small delay for animation
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  // Clear line, show cursor and move to next line
+  process.stdout.write('\r\x1B[K\x1B[?25h\n');
+
+  // Original sleep
+  await new Promise(resolve => setTimeout(resolve, 0));
+}
 
 type ResponseSchema = {
   type: SchemaType.OBJECT;
@@ -207,10 +234,11 @@ async function getResponse(question: string) {
   let step = 0;
   let gaps: string[] = [question];  // All questions to be answered including the orginal question
   let allQuestions = [question];
+  let allKeywords = [];
 
   while (totalTokens < tokenBudget) {
     // add 1s delay to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await sleep(1000);
     step++;
     console.log('===STEPS===', step)
     console.log('Gaps:', gaps)
@@ -251,28 +279,39 @@ async function getResponse(question: string) {
     }
 
     if (action.action === 'reflect' && action.questionsToAnswer) {
-      gaps.push(...action.questionsToAnswer);
-      allQuestions.push(...action.questionsToAnswer);
+      let newGapQuestions = action.questionsToAnswer
+      if (allQuestions.length) {
+        newGapQuestions = await dedupQueries(newGapQuestions, allQuestions)
+      }
+      gaps.push(...newGapQuestions);
+      allQuestions.push(...newGapQuestions);
       gaps.push(question);  // always keep the original question in the gaps
     }
 
     // Rest of the action handling remains the same
     try {
       if (action.action === 'search' && action.searchQuery) {
-        const keywordsQueries = await rewriteQuery(action.searchQuery);
-        const searchResults = await Promise.all(
-          keywordsQueries.map(async (query) => {
-            const results = await search(query, {
-              safeSearch: SafeSearchType.STRICT
-            });
-            const minResults = results.results.map(r => ({
-              title: r.title,
-              url: r.url,
-              description: r.description,
-            }));
-            return {query, minResults};
-          })
-        );
+        // rewrite queries
+        let keywordsQueries = await rewriteQuery(action.searchQuery);
+        // avoid exisitng searched queries
+        if (allKeywords.length) {
+          keywordsQueries = await dedupQueries(keywordsQueries, allKeywords)
+        }
+        const searchResults = [];
+        for (const query of keywordsQueries) {
+          const results = await search(query, {
+            safeSearch: SafeSearchType.STRICT
+          });
+          const minResults = results.results.map(r => ({
+            title: r.title,
+            url: r.url,
+            description: r.description,
+          }));
+          searchResults.push({query, minResults});
+          allKeywords.push(query);
+          await sleep(5000);
+        }
+
         context.push({
           step,
           question: currentQuestion,
@@ -314,7 +353,7 @@ const jinaToken = process.env.JINA_API_KEY as string;
 if (!apiKey) throw new Error("GEMINI_API_KEY not found");
 if (!jinaToken) throw new Error("JINA_API_KEY not found");
 
-const modelName = 'gemini-2.0-flash-exp';
+const modelName = 'gemini-1.5-flash';
 const genAI = new GoogleGenerativeAI(apiKey);
 
 const question = process.argv[2] || "";
