@@ -9,7 +9,7 @@ interface QueryResult {
   results: SearchResult[];
 }
 
-interface StepData {
+export interface StepData {
   step: number;
   question: string;
   action: string;

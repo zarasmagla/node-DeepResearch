@@ -7,7 +7,7 @@ import {SafeSearchType, search} from "duck-duck-scrape";
 import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
-import {buildURLMap} from "./tools/getURLIndex";
+import {buildURLMap, StepData} from "./tools/getURLIndex";
 
 // Proxy setup remains the same
 if (process.env.https_proxy) {
@@ -111,7 +111,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean): ResponseSchema {
     actions.push("reflect");
   }
   if (allowRead) {
-    actions.push("read");
+    actions.push("visit");
   }
   return {
     type: SchemaType.OBJECT,
@@ -213,13 +213,13 @@ ${JSON.stringify(context, null, 2)}
 When uncertain or needing additional information, select one of these actions:
 
 ${allURLs ? `
-**read**:
-- Access any URLs from below to gather external knowledge
+**visit**:
+- Visit any URLs from below to gather external knowledge
 
 ${JSON.stringify(allURLs, null, 2)}
 
 - When you have enough search result in the context and want to deep dive into specific URLs
-- It allows you access the full content behind any URLs
+- It allows you to access the full content behind any URLs
 ` : ''}
 
 **search**:
@@ -269,9 +269,16 @@ Critical Requirements:
 - Maintain strict JSON syntax`.trim();
 }
 
-async function getResponse(question: string, tokenBudget: number = 30000000) {
+let context: StepData[] = [];  // successful steps in the current session
+let allContext: StepData[] = [];  // all steps in the current session, including those leads to wrong results
+
+function updateContext(step: any) {
+  context.push(step);
+  allContext.push(step)
+}
+
+async function getResponse(question: string, tokenBudget: number = 1000000) {
   let totalTokens = 0;
-  let context = [];
   let step = 0;
   let gaps: string[] = [question];  // All questions to be answered including the orginal question
   let allQuestions = [question];
@@ -288,7 +295,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
     const allowReflect = gaps.length <= 1;
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
     // update all urls with buildURLMap
-    allURLs = {...allURLs, ...buildURLMap(context)};
+    allURLs = buildURLMap(allContext);
     const allowRead = Object.keys(allURLs).length > 0;
     const prompt = getPrompt(
       currentQuestion,
@@ -320,15 +327,18 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
     console.log('Question-Action:', currentQuestion, action);
 
     if (action.action === 'answer') {
-      context.push({
+      updateContext({
         step,
         question: currentQuestion,
         ...action,
       });
+
       const evaluation = await evaluateAnswer(currentQuestion, action.answer);
 
       if (currentQuestion === question) {
         if (evaluation.is_valid_answer) {
+          // EXIT POINT
+          await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], step);
           return action;
         } else {
           badContext.push({
@@ -354,7 +364,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
         gaps.push(question);  // always keep the original question in the gaps
       } else {
         console.log('No new questions to ask');
-        context.push({
+        updateContext({
           step,
           ...action,
           result: 'I have tried all possible questions and found no useful information. I must think out of the box or different angle!!!'
@@ -388,7 +398,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
             await sleep(5000);
           }
 
-          context.push({
+          updateContext({
             step,
             question: currentQuestion,
             ...action,
@@ -396,20 +406,20 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
           });
         } else {
           console.log('No new queries to search');
-          context.push({
+          updateContext({
             step,
             ...action,
             result: 'I have tried all possible queries and found no new information. I must think out of the box or different angle!!!'
           });
         }
-      } else if (action.action === 'read' && action.URLTargets?.length) {
+      } else if (action.action === 'visit' && action.URLTargets?.length) {
         const urlResults = await Promise.all(
           action.URLTargets.map(async (url: string) => {
             const response = await readUrl(url, jinaToken);
             return {url, result: response};
           })
         );
-        context.push({
+        updateContext({
           step,
           question: currentQuestion,
           ...action,
@@ -420,7 +430,7 @@ async function getResponse(question: string, tokenBudget: number = 30000000) {
     } catch (error) {
       console.error('Error fetching data:', error);
     }
-    await storeContext(prompt, [context, allKeywords, allQuestions, allKnowledge], step);
+    await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], step);
   }
 }
 

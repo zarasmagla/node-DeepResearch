@@ -86,6 +86,13 @@ Evaluation: {
   "reasoning": "The answer is not definitive and fails to provide the requested information. Don't know, can't derive, lack of information is unacceptable,"
 }
 
+Question: "who owns jina ai?"
+Answer: "The ownership structure of Jina AI is not publicly disclosed."
+Evaluation: {
+  "is_valid_answer": false,
+  "reasoning": "The answer is not definitive and fails to provide the requested information. Lack of information is unacceptable, more search and deep reasoning is needed."
+}
+
 Now evaluate this pair:
 Question: ${JSON.stringify(question)}
 Answer: ${JSON.stringify(answer)}`;
