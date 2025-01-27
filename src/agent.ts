@@ -2,8 +2,9 @@ import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
 import dotenv from 'dotenv';
 import {ProxyAgent, setGlobalDispatcher} from "undici";
 import {readUrl} from "./tools/read";
-import {search} from "./tools/search";
 import fs from 'fs/promises';
+import {SafeSearchType, search} from "duck-duck-scrape";
+import {rewriteQuery} from "./tools/query-rewriter";
 
 // Proxy setup remains the same
 if (process.env.https_proxy) {
@@ -25,7 +26,7 @@ type ResponseSchema = {
       enum: string[];
       description: string;
     };
-    keywordsQuery: {
+    searchQuery: {
       type: SchemaType.STRING;
       description: string;
     };
@@ -99,7 +100,7 @@ function getSchema(allowReflect: boolean): ResponseSchema {
         description: "Only required when choosing 'reflect' action, list of most important questions to answer to fill the knowledge gaps.",
         maxItems: 2
       } : undefined,
-      keywordsQuery: {
+      searchQuery: {
         type: SchemaType.STRING,
         description: "Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand.",
       },
@@ -167,9 +168,8 @@ When uncertain or needing additional information, select one of these actions:
 - Only give keywords search query, not full sentences
 
 **readURL**:
-- Access the full content behind specific URLs
-- Requires existing URLs from previous actions
-- Use when you think URL contains needed information
+- Access the full content behind specific URLs in the search result
+- Use when you think certain URLs may contain the information you need
 
 **answer**:
 - Provide final response only when 100% certain
@@ -209,6 +209,8 @@ async function getResponse(question: string) {
   let allQuestions = [question];
 
   while (totalTokens < tokenBudget) {
+    // add 1s delay to avoid rate limiting
+    await new Promise(resolve => setTimeout(resolve, 1000));
     step++;
     console.log('===STEPS===', step)
     console.log('Gaps:', gaps)
@@ -256,15 +258,27 @@ async function getResponse(question: string) {
 
     // Rest of the action handling remains the same
     try {
-      if (action.action === 'search' && action.keywordsQuery) {
-        const results = await search(action.keywordsQuery, jinaToken);
+      if (action.action === 'search' && action.searchQuery) {
+        const keywordsQueries = await rewriteQuery(action.searchQuery);
+        const searchResults = await Promise.all(
+          keywordsQueries.map(async (query) => {
+            const results = await search(query, {
+              safeSearch: SafeSearchType.STRICT
+            });
+            const minResults = results.results.map(r => ({
+              title: r.title,
+              url: r.url,
+              description: r.description,
+            }));
+            return {query, minResults};
+          })
+        );
         context.push({
           step,
           question: currentQuestion,
           ...action,
-          result: results.data
+          result: searchResults
         });
-        totalTokens += results.data.reduce((sum, r) => sum + r.usage.tokens, 0);
       } else if (action.action === 'readURL' && action.URLTargets?.length) {
         const urlResults = await Promise.all(
           action.URLTargets.map(async (url: string) => {
