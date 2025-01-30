@@ -64,6 +64,7 @@ type ResponseSchema = {
       items: {
         type: SchemaType.STRING;
       };
+      maxItems: number;
       description: string;
     };
     answer: {
@@ -139,7 +140,8 @@ function getSchema(allowReflect: boolean, allowRead: boolean): ResponseSchema {
         items: {
           type: SchemaType.STRING
         },
-        description: "Only required when choosing 'deep dive' action, must be an array of URLs"
+        maxItems: 3,
+        description: "Only required when choosing 'deep dive' action, must be an array of URLs, choose up the most relevant 3 URLs to deep dive into"
       } : undefined,
       answer: {
         type: SchemaType.STRING,
@@ -179,9 +181,12 @@ function getPrompt(question: string, context?: any[], allQuestions?: string[], a
   const knowledgeIntro = knowledge?.length ?
     `
 ## Knowledge
-You have successfully gathered some knowledge from the following questions:
+You have successfully gathered some knowledge which might be useful for answering the original question. Here is the knowledge you have gathered so far
 
-${JSON.stringify(knowledge, null, 2)}
+${knowledge.map((k, i) => `
+### Knowledge ${i + 1}: ${k.question}
+${k.answer}
+`).join('\n')}
 
 `
     : '';
@@ -217,9 +222,10 @@ When you are uncertain about the answer and you need knowledge, choose one of th
 
 ${allURLs ? `
 **visit**:
-- Visit any URLs from below to gather external knowledge
+- Visit any URLs from below to gather external knowledge, choose to visit most relevant URLs
 
-${JSON.stringify(allURLs, null, 2)}
+${Object.keys(allURLs).map((url, i) => `
+  + "${url}": "${allURLs[url]}"`).join('')}
 
 - When you have enough search result in the context and want to deep dive into specific URLs
 - It allows you to access the full content behind any URLs
@@ -282,6 +288,10 @@ function updateContext(step: any) {
   allContext.push(step)
 }
 
+function removeAllLineBreaks(text: string) {
+    return text.replace(/(\r\n|\n|\r)/gm, " ");
+}
+
 async function getResponse(question: string, tokenBudget: number = 1000000) {
   let totalTokens = 0;
   let step = 0;
@@ -303,7 +313,6 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
     const allowReflect = gaps.length <= 1;
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
     // update all urls with buildURLMap
-    allURLs = buildURLMap(allContext);
     const allowRead = Object.keys(allURLs).length > 0;
     const prompt = getPrompt(
       currentQuestion,
@@ -345,6 +354,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
 
       if (currentQuestion === question) {
         if (evaluation.is_valid_answer) {
+          if (action.references.length > 0) {
           // EXIT POINT OF THE PROGRAM!!!!
           diaryContext.push(`
 At step ${step}, you took **answer** action and finally found the answer to the original question:
@@ -362,6 +372,20 @@ Your journey ends here. You have successfully answered the original question. Co
 `);
           await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
           return action;
+          } else {
+            diaryContext.push(`
+At step ${step}, you took **answer** action and finally found the answer to the original question:
+
+Original question: 
+${currentQuestion}
+
+Your answer: 
+${action.answer}
+
+Unfortunately, you did not provide any references to support your answer. 
+You need to find more URL references to support your answer.`);
+          }
+
         } else {
           diaryContext.push(`
 At step ${step}, you took **answer** action but evaluator thinks it is not a good answer:
@@ -449,6 +473,9 @@ But then you realized you have asked them before. You decided to to think out of
               url: r.url,
               description: r.description,
             }));
+            for (const r of minResults) {
+              allURLs[r.url] = r.title;
+            }
             searchResults.push({query, results: minResults});
             allKeywords.push(query);
             await sleep(5000);
@@ -485,7 +512,11 @@ You decided to think out of the box or cut from a completely different angle.
         const urlResults = await Promise.all(
           action.URLTargets.map(async (url: string) => {
             const response = await readUrl(url, jinaToken);
-            allKnowledge.push({question: `What is in ${response.data.url}?`, answer: response.data.content});
+            allKnowledge.push({
+              question: `What is in ${response.data.url}?`,
+              answer: removeAllLineBreaks(response.data.content)});
+            // remove that url from allURLs
+            delete allURLs[url];
             return {url, result: response};
           })
         );

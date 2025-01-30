@@ -55,13 +55,11 @@ function getPrompt(question: string, answer: string): string {
   return `You are an expert evaluator of question-answer pairs. Analyze if the given answer based on the following criteria is valid or not.
 
 Core Evaluation Criteria:
-- Definitiveness: "I don't know", "lack of information", "doesn't exist" or highly uncertain responses are **not** valid answers, return false!
+- Definitiveness: "I don't know", "lack of information", "doesn't exist" or highly uncertain ambiguous responses are **not** valid answers, must return false!
 - Informativeness: Answer must provide substantial, useful information
 - Completeness: Answer must directly address the main point of the question
-- Clarity: Answer should be clear and unambiguous
 - Specificity: Generic or vague responses are not acceptable
 - Relevance: Answer must be directly related to the question topic
-
 
 Examples:
 
