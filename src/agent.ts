@@ -401,7 +401,6 @@ ${evaluation.reasoning}
 `);
           // store the bad context and reset the diary context
           const errorAnalysis = await analyzeSteps(diaryContext);
-          console.log('Error Analysis:', errorAnalysis);
           badContext.push(errorAnalysis);
           diaryContext = [];
           step = 0;
