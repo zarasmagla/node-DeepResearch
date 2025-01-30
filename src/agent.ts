@@ -296,6 +296,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
   let totalTokens = 0;
   let step = 0;
   let totalStep = 0;
+  let badAttempts = 0;
   let gaps: string[] = [question];  // All questions to be answered including the orginal question
   let allQuestions = [question];
   let allKeywords = [];
