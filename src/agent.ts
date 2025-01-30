@@ -354,7 +354,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
 
       if (currentQuestion === question) {
         if (evaluation.is_valid_answer) {
-          if (action.references.length > 0) {
+          if (action.references.length > 0 || Object.keys(allURLs).length === 0) {
           // EXIT POINT OF THE PROGRAM!!!!
           diaryContext.push(`
 At step ${step}, you took **answer** action and finally found the answer to the original question:
