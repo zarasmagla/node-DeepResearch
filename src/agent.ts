@@ -354,6 +354,25 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
       const evaluation = await evaluateAnswer(currentQuestion, action.answer);
 
       if (currentQuestion === question) {
+        if (badAttempts >= 3) {
+          // EXIT POINT OF THE PROGRAM!!!!
+          diaryContext.push(`
+At step ${step} and ${badAttempts} attempts, you took **answer** action and found an answer, not a perfect one but good enough to answer the original question:
+
+Original question: 
+${currentQuestion}
+
+Your answer: 
+${action.answer}
+
+The evaluator thinks your answer is good because: 
+${evaluation.reasoning}
+
+Your journey ends here.
+`);
+          await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+          return action;
+        }
         if (evaluation.is_valid_answer) {
           if (action.references.length > 0 || Object.keys(allURLs).length === 0) {
           // EXIT POINT OF THE PROGRAM!!!!
