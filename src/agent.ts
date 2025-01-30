@@ -140,7 +140,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean): ResponseSchema {
         items: {
           type: SchemaType.STRING
         },
-        maxItems: 3,
+        maxItems: 2,
         description: "Only required when choosing 'deep dive' action, must be an array of URLs, choose up the most relevant 3 URLs to deep dive into"
       } : undefined,
       answer: {
@@ -222,7 +222,7 @@ When you are uncertain about the answer and you need knowledge, choose one of th
 
 ${allURLs ? `
 **visit**:
-- Visit any URLs from below to gather external knowledge, choose to visit most relevant URLs
+- Visit any URLs from below to gather external knowledge, choose the most relevant URLs that might contain the answer
 
 ${Object.keys(allURLs).map((url, i) => `
   + "${url}": "${allURLs[url]}"`).join('')}
