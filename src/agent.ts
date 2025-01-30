@@ -76,7 +76,7 @@ type ResponseSchema = {
       items: {
         type: SchemaType.OBJECT;
         properties: {
-          title: {
+          exactQuote: {
             type: SchemaType.STRING;
             description: string;
           };
@@ -152,16 +152,16 @@ function getSchema(allowReflect: boolean, allowRead: boolean): ResponseSchema {
         items: {
           type: SchemaType.OBJECT,
           properties: {
-            title: {
+            exactQuote: {
               type: SchemaType.STRING,
-              description: "Title of the document; must be directly from the context",
+              description: "Exact relevant quote from the document",
             },
             url: {
               type: SchemaType.STRING,
               description: "URL of the document; must be directly from the context"
-            }
+            },
           },
-          required: ["title", "url"]
+          required: ["exactQuote", "url"]
         },
         description: "Only required when choosing 'answer' action, must be an array of references"
       },
