@@ -29,7 +29,7 @@ const responseSchema = {
   properties: {
     is_valid_answer: {
       type: SchemaType.BOOLEAN,
-      description: "Whether the answer properly addresses the question"
+      description: "Whether the answer provides any useful information to the question"
     },
     reasoning: {
       type: SchemaType.STRING,
@@ -52,16 +52,16 @@ const model = genAI.getGenerativeModel({
 });
 
 function getPrompt(question: string, answer: string): string {
-  return `You are an expert evaluator of question-answer pairs. Analyze if the given answer properly addresses the question and provides meaningful information.
+  return `You are an expert evaluator of question-answer pairs. Analyze if the given answer based on the following criteria is valid or not.
 
 Core Evaluation Criteria:
-1. Completeness: Answer must directly address the main point of the question
-2. Clarity: Answer should be clear and unambiguous
-3. Informativeness: Answer must provide substantial, useful information
-4. Specificity: Generic or vague responses are not acceptable
-5. Definitiveness: "I don't know", "lack of information" or highly uncertain responses are not valid
-6. Relevance: Answer must be directly related to the question topic
-7. Accuracy: Information provided should be factually sound (if verifiable)
+- Definitiveness: "I don't know", "lack of information", "doesn't exist" or highly uncertain responses are **not** valid answers, return false!
+- Informativeness: Answer must provide substantial, useful information
+- Completeness: Answer must directly address the main point of the question
+- Clarity: Answer should be clear and unambiguous
+- Specificity: Generic or vague responses are not acceptable
+- Relevance: Answer must be directly related to the question topic
+
 
 Examples:
 

@@ -188,10 +188,13 @@ ${JSON.stringify(knowledge, null, 2)}
 
   const badContextIntro = badContext?.length ?
     `
-## Unsuccessful Answer Analysis
-Your last unsuccessful answer are:
+## Unsuccessful Attempts
+Your have tried the following actions but failed to find the answer to the question.
 
-${JSON.stringify(badContext, null, 2)}
+${badContext.map((c, i) => `
+### Attempt ${i + 1}
+${c.join('\n')}
+`).join('\n')}
     
 Learn to avoid these mistakes and think of a new approach, from a different angle, e.g. search for different keywords, read different URLs, or ask different questions.
     `
@@ -202,7 +205,7 @@ Learn to avoid these mistakes and think of a new approach, from a different angl
 ## Context
 You have conducted the following actions:
 
-${JSON.stringify(context, null, 2)}
+${context.join('\n')}
 
 `
     : '';
@@ -210,7 +213,7 @@ ${JSON.stringify(context, null, 2)}
   let actionsDescription = `
 ## Actions
 
-When uncertain or needing additional information, select one of these actions:
+When you are uncertain about the answer and you need knowledge, choose one of these actions to proceed:
 
 ${allURLs ? `
 **visit**:
@@ -247,6 +250,8 @@ ${allowReflect ? `- If doubts remain, use "reflect" instead` : ''}`;
   }
 
   return `
+Current date: ${new Date().toUTCString()}  
+
 You are an advanced AI research analyst specializing in multi-step reasoning. Using your training data and prior lessons learned, answer the following question with absolute certainty:
 
 ## Question
@@ -280,17 +285,20 @@ function updateContext(step: any) {
 async function getResponse(question: string, tokenBudget: number = 1000000) {
   let totalTokens = 0;
   let step = 0;
+  let totalStep = 0;
   let gaps: string[] = [question];  // All questions to be answered including the orginal question
   let allQuestions = [question];
   let allKeywords = [];
   let allKnowledge = [];  // knowledge are intermedidate questions that are answered
   let badContext = [];
+  let diaryContext = [];
   let allURLs: Record<string, string> = {};
   while (totalTokens < tokenBudget) {
     // add 1s delay to avoid rate limiting
     await sleep(1000);
     step++;
-    console.log('===STEPS===', step)
+    totalStep++;
+    console.log('===STEPS===', totalStep)
     console.log('Gaps:', gaps)
     const allowReflect = gaps.length <= 1;
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
@@ -299,7 +307,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
     const allowRead = Object.keys(allURLs).length > 0;
     const prompt = getPrompt(
       currentQuestion,
-      context,
+      diaryContext,
       allQuestions,
       allowReflect,
       badContext,
@@ -337,33 +345,83 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
 
       if (currentQuestion === question) {
         if (evaluation.is_valid_answer) {
-          // EXIT POINT
-          await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], step);
+          // EXIT POINT OF THE PROGRAM!!!!
+          diaryContext.push(`
+At step ${step}, you took **answer** action and finally found the answer to the original question:
+
+Original question: 
+${currentQuestion}
+
+Your answer: 
+${action.answer}
+
+The evaluator thinks your answer is good because: 
+${evaluation.reasoning}
+
+Your journey ends here. You have successfully answered the original question. Congratulations! 🎉
+`);
+          await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
           return action;
         } else {
-          badContext.push({
-            question: currentQuestion,
-            answer: action.answer,
-            "Why this is a bad answer?": evaluation.reasoning
-          });
-          context = [];
+          diaryContext.push(`
+At step ${step}, you took **answer** action but evaluator thinks it is not a good answer:
+
+Original question: 
+${currentQuestion}
+
+Your answer: 
+${action.answer}
+
+The evaluator thinks your answer is bad because: 
+${evaluation.reasoning}
+`);
+          // store the bad context and reset the diary context
+          badContext.push(diaryContext);
+          diaryContext = [];
+          step = 0;
         }
       } else if (evaluation.is_valid_answer) {
+        diaryContext.push(`
+At step ${step}, you took **answer** action. You found a good answer to the sub-question:
+
+Sub-question: 
+${currentQuestion}
+
+Your answer: 
+${action.answer}
+
+The evaluator thinks your answer is good because: 
+${evaluation.reasoning}
+
+Although you solved a sub-question, you still need to find the answer to the original question. You need to keep going.
+`);
         allKnowledge.push({question: currentQuestion, answer: action.answer});
       }
     }
-
-    if (action.action === 'reflect' && action.questionsToAnswer) {
+    else if (action.action === 'reflect' && action.questionsToAnswer) {
       let newGapQuestions = action.questionsToAnswer
+      const oldQuestions = newGapQuestions;
       if (allQuestions.length) {
         newGapQuestions = await dedupQueries(newGapQuestions, allQuestions)
       }
       if (newGapQuestions.length > 0) {
+        // found new gap questions
+        diaryContext.push(`
+At step ${step}, you took **reflect** and think about the knowledge gaps. You found some sub-questions are important to the question: "${currentQuestion}"
+You realize you need to know the answers to the following sub-questions:
+${newGapQuestions.map((q: string) => `- ${q}`).join('\n')}
+
+You will now figure out the answers to these sub-questions and see if they can help me find the answer to the original question.
+`);
         gaps.push(...newGapQuestions);
         allQuestions.push(...newGapQuestions);
         gaps.push(question);  // always keep the original question in the gaps
       } else {
         console.log('No new questions to ask');
+        diaryContext.push(`
+At step ${step}, you took **reflect** and think about the knowledge gaps. You tried to break down the question "${currentQuestion}" into gap-questions like this: ${oldQuestions.join(', ')} 
+But then you realized you have asked them before. You decided to to think out of the box or cut from a completely different angle. 
+`);
         updateContext({
           step,
           ...action,
@@ -371,12 +429,10 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
         });
       }
     }
-
-    // Rest of the action handling remains the same
-    try {
-      if (action.action === 'search' && action.searchQuery) {
+    else if (action.action === 'search' && action.searchQuery) {
         // rewrite queries
         let keywordsQueries = await rewriteQuery(action.searchQuery);
+        const oldKeywords = keywordsQueries;
         // avoid exisitng searched queries
         if (allKeywords.length) {
           keywordsQueries = await dedupQueries(keywordsQueries, allKeywords)
@@ -397,6 +453,11 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
             allKeywords.push(query);
             await sleep(5000);
           }
+            diaryContext.push(`
+At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
+In particular, you tried to search for the following keywords: "${keywordsQueries.join(', ')}".
+You found quite some information and add them to your URL list and **visit** them later when needed. 
+`);
 
           updateContext({
             step,
@@ -405,6 +466,13 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
             result: searchResults
           });
         } else {
+          diaryContext.push(`
+At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
+In particular, you tried to search for the following keywords: ${oldKeywords.join(', ')}. 
+But then you realized you have already searched for these keywords before.
+You decided to think out of the box or cut from a completely different angle.
+`);
+
           console.log('No new queries to search');
           updateContext({
             step,
@@ -412,25 +480,31 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
             result: 'I have tried all possible queries and found no new information. I must think out of the box or different angle!!!'
           });
         }
-      } else if (action.action === 'visit' && action.URLTargets?.length) {
+      }
+    else if (action.action === 'visit' && action.URLTargets?.length) {
         const urlResults = await Promise.all(
           action.URLTargets.map(async (url: string) => {
             const response = await readUrl(url, jinaToken);
+            allKnowledge.push({question: `What is in ${response.data.url}?`, answer: response.data.content});
             return {url, result: response};
           })
         );
+        diaryContext.push(`
+At step ${step}, you took the **visit** action and deep dive into the following URLs:
+${action.URLTargets.join('\n')}
+You found some useful information on the web and add them to your knowledge for future reference.
+`);
         updateContext({
           step,
           question: currentQuestion,
           ...action,
           result: urlResults
         });
+
         totalTokens += urlResults.reduce((sum, r) => sum + r.result.data.usage.tokens, 0);
       }
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-    await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], step);
+
+    await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
   }
 }
 
