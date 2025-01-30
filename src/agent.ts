@@ -7,7 +7,8 @@ import {SafeSearchType, search} from "duck-duck-scrape";
 import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
-import {buildURLMap, StepData} from "./tools/getURLIndex";
+import {StepData} from "./tools/getURLIndex";
+import {analyzeSteps} from "./tools/error-analyzer";
 
 // Proxy setup remains the same
 if (process.env.https_proxy) {
@@ -198,11 +199,10 @@ Your have tried the following actions but failed to find the answer to the quest
 
 ${badContext.map((c, i) => `
 ### Attempt ${i + 1}
-${c.join('\n')}
-`).join('\n')}
-    
-Learn to avoid these mistakes and think of a new approach, from a different angle, e.g. search for different keywords, read different URLs, or ask different questions.
-    `
+- Recap: ${c.recap}
+- Blame: ${c.blame}
+- Improvement: ${c.improvement}
+`).join('\n')}`
     : '';
 
   const contextIntro = context?.length ?
@@ -400,7 +400,9 @@ The evaluator thinks your answer is bad because:
 ${evaluation.reasoning}
 `);
           // store the bad context and reset the diary context
-          badContext.push(diaryContext);
+          const errorAnalysis = await analyzeSteps(diaryContext);
+          console.log('Error Analysis:', errorAnalysis);
+          badContext.push(errorAnalysis);
           diaryContext = [];
           step = 0;
         }
