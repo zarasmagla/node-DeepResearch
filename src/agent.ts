@@ -276,7 +276,8 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
     await sleep(1000);
     step++;
     totalStep++;
-    console.log(`Step ${totalStep}: Gap questions ${JSON.stringify(gaps)}`);
+    console.log(`Step ${totalStep}`);
+    console.log('Gaps:', gaps);
     const allowReflect = gaps.length <= 1;
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
     // update all urls with buildURLMap
@@ -421,7 +422,7 @@ Although you solved a sub-question, you still need to find the answer to the ori
       let newGapQuestions = action.questionsToAnswer
       const oldQuestions = newGapQuestions;
       if (allQuestions.length) {
-        newGapQuestions = await dedupQueries(newGapQuestions, allQuestions)
+        newGapQuestions = (await dedupQueries(newGapQuestions, allQuestions)).unique_queries;
       }
       if (newGapQuestions.length > 0) {
         // found new gap questions
