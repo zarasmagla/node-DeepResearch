@@ -1,26 +1,13 @@
-import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
-import dotenv from 'dotenv';
-import {ProxyAgent, setGlobalDispatcher} from "undici";
-import {readUrl} from "./tools/read";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
+import { readUrl } from "./tools/read";
 import fs from 'fs/promises';
-import {SafeSearchType, search} from "duck-duck-scrape";
-import {rewriteQuery} from "./tools/query-rewriter";
-import {dedupQueries} from "./tools/dedup";
-import {evaluateAnswer} from "./tools/evaluator";
-import {StepData} from "./tools/getURLIndex";
-import {analyzeSteps} from "./tools/error-analyzer";
-
-// Proxy setup remains the same
-if (process.env.https_proxy) {
-  try {
-    const proxyUrl = new URL(process.env.https_proxy).toString();
-    const dispatcher = new ProxyAgent({uri: proxyUrl});
-    setGlobalDispatcher(dispatcher);
-  } catch (error) {
-    console.error('Failed to set proxy:', error);
-  }
-}
-dotenv.config();
+import { SafeSearchType, search } from "duck-duck-scrape";
+import { rewriteQuery } from "./tools/query-rewriter";
+import { dedupQueries } from "./tools/dedup";
+import { evaluateAnswer } from "./tools/evaluator";
+import { StepData } from "./tools/getURLIndex";
+import { analyzeSteps } from "./tools/error-analyzer";
+import { GEMINI_API_KEY, JINA_API_KEY, MODEL_NAME } from "./config";
 
 async function sleep(ms: number) {
   const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -326,7 +313,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
     console.log('Prompt len:', prompt.length)
 
     const model = genAI.getGenerativeModel({
-      model: modelName,
+      model: MODEL_NAME,
       generationConfig: {
         temperature: 0.7,
         responseMimeType: "application/json",
@@ -351,7 +338,8 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
         ...action,
       });
 
-      const evaluation = await evaluateAnswer(currentQuestion, action.answer);
+      const { response: evaluation, tokens: evalTokens } = await evaluateAnswer(currentQuestion, action.answer);
+      totalTokens += evalTokens;
 
       if (currentQuestion === question) {
         if (badAttempts >= 3) {
@@ -420,7 +408,8 @@ The evaluator thinks your answer is bad because:
 ${evaluation.reasoning}
 `);
           // store the bad context and reset the diary context
-          const errorAnalysis = await analyzeSteps(diaryContext);
+          const { response: errorAnalysis, tokens: analyzeTokens } = await analyzeSteps(diaryContext);
+          totalTokens += analyzeTokens;
           badContext.push(errorAnalysis);
           badAttempts++;
           diaryContext = [];
@@ -477,11 +466,14 @@ But then you realized you have asked them before. You decided to to think out of
     }
     else if (action.action === 'search' && action.searchQuery) {
         // rewrite queries
-        let keywordsQueries = await rewriteQuery(action.searchQuery);
+        let { keywords: keywordsQueries, tokens: rewriteTokens } = await rewriteQuery(action.searchQuery);
+        totalTokens += rewriteTokens;
         const oldKeywords = keywordsQueries;
         // avoid exisitng searched queries
         if (allKeywords.length) {
-          keywordsQueries = await dedupQueries(keywordsQueries, allKeywords)
+          const { unique_queries: dedupedQueries, tokens: dedupTokens } = await dedupQueries(keywordsQueries, allKeywords);
+          totalTokens += dedupTokens;
+          keywordsQueries = dedupedQueries;
         }
         if (keywordsQueries.length > 0) {
           const searchResults = [];
@@ -533,7 +525,7 @@ You decided to think out of the box or cut from a completely different angle.
     else if (action.action === 'visit' && action.URLTargets?.length) {
         const urlResults = await Promise.all(
           action.URLTargets.map(async (url: string) => {
-            const response = await readUrl(url, jinaToken);
+            const response = await readUrl(url, JINA_API_KEY);
             allKnowledge.push({
               question: `What is in ${response.data.url}?`,
               answer: removeAllLineBreaks(response.data.content)});
@@ -574,13 +566,7 @@ async function storeContext(prompt: string, memory: any[][], step: number) {
   }
 }
 
-const apiKey = process.env.GEMINI_API_KEY as string;
-const jinaToken = process.env.JINA_API_KEY as string;
-if (!apiKey) throw new Error("GEMINI_API_KEY not found");
-if (!jinaToken) throw new Error("JINA_API_KEY not found");
-
-const modelName = 'gemini-1.5-flash';
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 const question = process.argv[2] || "";
 getResponse(question);

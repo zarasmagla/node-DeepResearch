@@ -136,14 +136,15 @@ ${diaryContext.join('\n')}
 `;
 }
 
-export async function analyzeSteps(diaryContext: string[]): Promise<EvaluationResponse> {
+export async function analyzeSteps(diaryContext: string[]): Promise<{ response: EvaluationResponse, tokens: number }> {
   try {
     const prompt = getPrompt(diaryContext);
     const result = await model.generateContent(prompt);
     const response = await result.response;
+    const usage = response.usageMetadata;
     const json = JSON.parse(response.text()) as EvaluationResponse;
     console.log('Rejection analysis:', json);
-    return json;
+    return { response: json, tokens: usage?.totalTokenCount || 0 };
   } catch (error) {
     console.error('Error in answer evaluation:', error);
     throw error;

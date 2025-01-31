@@ -95,14 +95,15 @@ Set A: ${JSON.stringify(newQueries)}
 Set B: ${JSON.stringify(existingQueries)}`;
 }
 
-export async function dedupQueries(newQueries: string[], existingQueries: string[]): Promise<string[]> {
+export async function dedupQueries(newQueries: string[], existingQueries: string[]): Promise<{ unique_queries: string[], tokens: number }> {
   try {
     const prompt = getPrompt(newQueries, existingQueries);
     const result = await model.generateContent(prompt);
     const response = await result.response;
+    const usage = response.usageMetadata;
     const json = JSON.parse(response.text()) as DedupResponse;
     console.log('Dedup:', json);
-    return json.unique_queries;
+    return { unique_queries: json.unique_queries, tokens: usage?.totalTokenCount || 0 };
   } catch (error) {
     console.error('Error in deduplication analysis:', error);
     throw error;
