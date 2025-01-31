@@ -1,4 +1,5 @@
 import https from 'https';
+import { tokenTracker } from "../utils/token-tracker";
 
 interface ReadResponse {
   code: number;
@@ -12,7 +13,7 @@ interface ReadResponse {
   };
 }
 
-export function readUrl(url: string, token: string): Promise<ReadResponse> {
+export function readUrl(url: string, token: string): Promise<{ response: ReadResponse, tokens: number }> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify({url});
 
@@ -33,7 +34,18 @@ export function readUrl(url: string, token: string): Promise<ReadResponse> {
     const req = https.request(options, (res) => {
       let responseData = '';
       res.on('data', (chunk) => responseData += chunk);
-      res.on('end', () => resolve(JSON.parse(responseData)));
+      res.on('end', () => {
+        const response = JSON.parse(responseData) as ReadResponse;
+        console.debug('\x1b[36m%s\x1b[0m', 'Read intermediate result:', response);
+        console.info('\x1b[32m%s\x1b[0m', 'Read final output:', {
+          title: response.data.title,
+          url: response.data.url,
+          tokens: response.data.usage.tokens
+        });
+        const tokens = response.data?.usage?.tokens || 0;
+        tokenTracker.trackUsage('read', tokens);
+        resolve({ response, tokens });
+      });
     });
 
     req.on('error', reject);
