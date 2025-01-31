@@ -1,13 +1,14 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { readUrl } from "./tools/read";
 import fs from 'fs/promises';
-import { SafeSearchType, search } from "duck-duck-scrape";
+import { SafeSearchType, search as duckSearch } from "duck-duck-scrape";
+import { braveSearch } from "./tools/brave-search";
 import { rewriteQuery } from "./tools/query-rewriter";
 import { dedupQueries } from "./tools/dedup";
 import { evaluateAnswer } from "./tools/evaluator";
 import { StepData } from "./tools/getURLIndex";
 import { analyzeSteps } from "./tools/error-analyzer";
-import { GEMINI_API_KEY, JINA_API_KEY, MODEL_NAME } from "./config";
+import { GEMINI_API_KEY, JINA_API_KEY, MODEL_NAME, BRAVE_API_KEY, SEARCH_PROVIDER } from "./config";
 import { tokenTracker } from "./utils/token-tracker";
 
 async function sleep(ms: number) {
@@ -260,7 +261,6 @@ function removeAllLineBreaks(text: string) {
 }
 
 async function getResponse(question: string, tokenBudget: number = 1000000, maxBadAttempts: number = 3) {
-  let totalTokens = 0;
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
@@ -271,7 +271,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
   const badContext = [];
   let diaryContext = [];
   const allURLs: Record<string, string> = {};
-  while (totalTokens < tokenBudget) {
+  while (tokenTracker.getTotalUsage() < tokenBudget) {
     // add 1s delay to avoid rate limiting
     await sleep(1000);
     step++;
@@ -462,9 +462,21 @@ But then you realized you have asked them before. You decided to to think out of
           const searchResults = [];
           for (const query of keywordsQueries) {
             console.log(`Search query: ${query}`);
-            const results = await search(query, {
-              safeSearch: SafeSearchType.STRICT
-            });
+            let results;
+            if (SEARCH_PROVIDER === 'duck') {
+              results = await duckSearch(query, {
+                safeSearch: SafeSearchType.STRICT
+              });
+            } else {
+              const { response } = await braveSearch(query);
+              results = {
+                results: response.web.results.map(r => ({
+                  title: r.title,
+                  url: r.url,
+                  description: r.description
+                }))
+              };
+            }
             const minResults = results.results.map(r => ({
               title: r.title,
               url: r.url,
