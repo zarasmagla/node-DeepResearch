@@ -38,6 +38,7 @@ function getPrompt(question: string, answer: string): string {
 Core Evaluation Criteria:
 - Definitiveness: "I don't know", "lack of information", "doesn't exist" or highly uncertain ambiguous responses are **not** valid answers, must return false!
 - Informativeness: Answer must provide substantial, useful information
+- Completeness: When question mentions multiple aspects or elements, the answer should cover all of them
 
 Examples:
 
