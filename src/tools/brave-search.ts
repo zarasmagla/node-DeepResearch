@@ -25,12 +25,6 @@ export async function braveSearch(query: string): Promise<{ response: BraveSearc
     timeout: 10000
   });
 
-  // Keep the same console.log as the original code
-  console.log('Brave Search:', response.data.web.results.map(item => ({
-    title: item.title,
-    url: item.url
-  })));
-
   // Maintain the same return structure as the original code
   return { response: response.data };
 }
