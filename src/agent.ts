@@ -8,7 +8,7 @@ import { dedupQueries } from "./tools/dedup";
 import { evaluateAnswer } from "./tools/evaluator";
 import { StepData } from "./tools/getURLIndex";
 import { analyzeSteps } from "./tools/error-analyzer";
-import { GEMINI_API_KEY, JINA_API_KEY, MODEL_NAME, BRAVE_API_KEY, SEARCH_PROVIDER } from "./config";
+import {GEMINI_API_KEY, JINA_API_KEY, MODEL_NAME, BRAVE_API_KEY, SEARCH_PROVIDER, STEP_SLEEP} from "./config";
 import { tokenTracker } from "./utils/token-tracker";
 
 async function sleep(ms: number) {
@@ -273,7 +273,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
   const allURLs: Record<string, string> = {};
   while (tokenTracker.getTotalUsage() < tokenBudget) {
     // add 1s delay to avoid rate limiting
-    await sleep(1000);
+    await sleep(STEP_SLEEP);
     step++;
     totalStep++;
     console.log(`Step ${totalStep}`);
@@ -487,7 +487,6 @@ But then you realized you have asked them before. You decided to to think out of
             }
             searchResults.push({query, results: minResults});
             allKeywords.push(query);
-            await sleep(5000);
           }
             diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".

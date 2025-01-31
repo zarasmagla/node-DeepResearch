@@ -20,6 +20,7 @@ export const BRAVE_API_KEY = process.env.BRAVE_API_KEY as string;
 export const SEARCH_PROVIDER = BRAVE_API_KEY ? 'brave' : 'duck';
 
 export const MODEL_NAME = 'gemini-1.5-flash';
+export const STEP_SLEEP = 1000;
 
 if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not found");
 if (!JINA_API_KEY) throw new Error("JINA_API_KEY not found");
