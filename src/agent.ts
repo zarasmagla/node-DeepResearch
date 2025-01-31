@@ -483,7 +483,7 @@ But then you realized you have asked them before. You decided to to think out of
               description: r.description,
             }));
             for (const r of minResults) {
-              allURLs[r.url] = r.title;
+              allURLs[r.url] = r.title + ' - ' + r.description;
             }
             searchResults.push({query, results: minResults});
             allKeywords.push(query);
