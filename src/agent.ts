@@ -259,7 +259,8 @@ function removeAllLineBreaks(text: string) {
     return text.replace(/(\r\n|\n|\r)/gm, " ");
 }
 
-async function getResponse(question: string) {
+async function getResponse(question: string, tokenBudget: number = 1000000, maxBadAttempts: number = 3) {
+  let totalTokens = 0;
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
@@ -270,14 +271,14 @@ async function getResponse(question: string) {
   const badContext = [];
   let diaryContext = [];
   const allURLs: Record<string, string> = {};
-  const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
-  while (gaps.length > 0 || currentQuestion === question) {
+  while (totalTokens < tokenBudget) {
     // add 1s delay to avoid rate limiting
     await sleep(1000);
     step++;
     totalStep++;
     console.log(`Step ${totalStep}: Gap questions ${JSON.stringify(gaps)}`);
     const allowReflect = gaps.length <= 1;
+    const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
     // update all urls with buildURLMap
     const allowRead = Object.keys(allURLs).length > 0;
     const prompt = getPrompt(
@@ -321,7 +322,7 @@ async function getResponse(question: string) {
 
 
       if (currentQuestion === question) {
-        if (badAttempts >= 3) {
+        if (badAttempts >= maxBadAttempts) {
           // EXIT POINT OF THE PROGRAM!!!!
           diaryContext.push(`
 At step ${step} and ${badAttempts} attempts, you took **answer** action and found an answer, not a perfect one but good enough to answer the original question:
