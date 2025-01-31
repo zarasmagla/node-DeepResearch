@@ -276,7 +276,7 @@ async function getResponse(question: string) {
     await sleep(1000);
     step++;
     totalStep++;
-    console.log(`Step ${totalStep}: Processing ${gaps.length} remaining questions`);
+    console.log(`Step ${totalStep}: Gap questions ${JSON.stringify(gaps)}`);
     const allowReflect = gaps.length <= 1;
     // update all urls with buildURLMap
     const allowRead = Object.keys(allURLs).length > 0;
@@ -307,6 +307,7 @@ async function getResponse(question: string) {
 
 
     const action = JSON.parse(response.text());
+    console.log('Action:', action);
 
 
     if (action.action === 'answer') {
