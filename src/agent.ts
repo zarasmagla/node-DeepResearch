@@ -11,29 +11,9 @@ import { GEMINI_API_KEY, JINA_API_KEY, MODEL_NAME } from "./config";
 import { tokenTracker } from "./utils/token-tracker";
 
 async function sleep(ms: number) {
-  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-  const startTime = Date.now();
-  const endTime = startTime + ms;
-
-  // Clear current line and hide cursor
-  process.stdout.write('\x1B[?25l');
-
-  while (Date.now() < endTime) {
-    const remaining = Math.ceil((endTime - Date.now()) / 1000);
-    const frameIndex = Math.floor(Date.now() / 100) % frames.length;
-
-    // Clear line and write new frame
-    process.stdout.write(`\r${frames[frameIndex]} Cool down... ${remaining}s remaining`);
-
-    // Small delay for animation
-    await new Promise(resolve => setTimeout(resolve, 50));
-  }
-
-  // Clear line, show cursor and move to next line
-  process.stdout.write('\r\x1B[K\x1B[?25h\n');
-
-  // Original sleep
-  await new Promise(resolve => setTimeout(resolve, 0));
+  const seconds = Math.ceil(ms / 1000);
+  console.log(`Waiting ${seconds}s...`);
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 type ResponseSchema = {
@@ -96,7 +76,7 @@ type ResponseSchema = {
 };
 
 function getSchema(allowReflect: boolean, allowRead: boolean): ResponseSchema {
-  let actions = ["search", "answer"];
+  const actions = ["search", "answer"];
   if (allowReflect) {
     actions.push("reflect");
   }
@@ -164,8 +144,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean): ResponseSchema {
 }
 
 function getPrompt(question: string, context?: any[], allQuestions?: string[], allowReflect: boolean = false, badContext?: any[], knowledge?: any[], allURLs?: Record<string, string>) {
-  // console.log('Context:', context);
-  // console.log('All URLs:', JSON.stringify(allURLs, null, 2));
+
 
   const knowledgeIntro = knowledge?.length ?
     `
@@ -212,7 +191,7 @@ ${allURLs ? `
 **visit**:
 - Visit any URLs from below to gather external knowledge, choose the most relevant URLs that might contain the answer
 
-${Object.keys(allURLs).map((url, i) => `
+${Object.keys(allURLs).map(url => `
   + "${url}": "${allURLs[url]}"`).join('')}
 
 - When you have enough search result in the context and want to deep dive into specific URLs
@@ -268,8 +247,8 @@ Critical Requirements:
 - Maintain strict JSON syntax`.trim();
 }
 
-let context: StepData[] = [];  // successful steps in the current session
-let allContext: StepData[] = [];  // all steps in the current session, including those leads to wrong results
+const context: StepData[] = [];  // successful steps in the current session
+const allContext: StepData[] = [];  // all steps in the current session, including those leads to wrong results
 
 function updateContext(step: any) {
   context.push(step);
@@ -280,27 +259,25 @@ function removeAllLineBreaks(text: string) {
     return text.replace(/(\r\n|\n|\r)/gm, " ");
 }
 
-async function getResponse(question: string, tokenBudget: number = 1000000) {
-  let totalTokens = 0;
+async function getResponse(question: string) {
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
-  let gaps: string[] = [question];  // All questions to be answered including the orginal question
-  let allQuestions = [question];
-  let allKeywords = [];
-  let allKnowledge = [];  // knowledge are intermedidate questions that are answered
-  let badContext = [];
+  const gaps: string[] = [question];  // All questions to be answered including the orginal question
+  const allQuestions = [question];
+  const allKeywords = [];
+  const allKnowledge = [];  // knowledge are intermedidate questions that are answered
+  const badContext = [];
   let diaryContext = [];
-  let allURLs: Record<string, string> = {};
-  while (totalTokens < tokenBudget) {
+  const allURLs: Record<string, string> = {};
+  const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
+  while (gaps.length > 0 || currentQuestion === question) {
     // add 1s delay to avoid rate limiting
     await sleep(1000);
     step++;
     totalStep++;
-    console.log('===STEPS===', totalStep)
-    console.log('Gaps:', gaps)
+    console.log(`Step ${totalStep}: Processing ${gaps.length} remaining questions`);
     const allowReflect = gaps.length <= 1;
-    const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
     // update all urls with buildURLMap
     const allowRead = Object.keys(allURLs).length > 0;
     const prompt = getPrompt(
@@ -311,7 +288,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
       badContext,
       allKnowledge,
       allURLs);
-    console.log('Prompt len:', prompt.length)
+
 
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
@@ -325,12 +302,12 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const usage = response.usageMetadata;
+    tokenTracker.trackUsage('agent', usage?.totalTokenCount || 0);
 
-    totalTokens += usage?.totalTokenCount || 0;
-    console.log(`Tokens: ${totalTokens}/${tokenBudget}`);
+
 
     const action = JSON.parse(response.text());
-    console.log('Question-Action:', currentQuestion, action);
+
 
     if (action.action === 'answer') {
       updateContext({
@@ -339,8 +316,8 @@ async function getResponse(question: string, tokenBudget: number = 1000000) {
         ...action,
       });
 
-      const { response: evaluation, tokens: evalTokens } = await evaluateAnswer(currentQuestion, action.answer);
-      totalTokens += evalTokens;
+      const { response: evaluation } = await evaluateAnswer(currentQuestion, action.answer);
+
 
       if (currentQuestion === question) {
         if (badAttempts >= 3) {
@@ -359,7 +336,7 @@ ${evaluation.reasoning}
 
 Your journey ends here.
 `);
-          console.info('\x1b[32m%s\x1b[0m', 'Final Answer:', action.answer);
+          console.log('Final Answer:', action.answer);
           tokenTracker.printSummary();
           await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
           return action;
@@ -381,7 +358,7 @@ ${evaluation.reasoning}
 
 Your journey ends here. You have successfully answered the original question. Congratulations! 🎉
 `);
-          console.info('\x1b[32m%s\x1b[0m', 'Final Answer:', action.answer);
+          console.log('Final Answer:', action.answer);
           tokenTracker.printSummary();
           await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
           return action;
@@ -413,8 +390,8 @@ The evaluator thinks your answer is bad because:
 ${evaluation.reasoning}
 `);
           // store the bad context and reset the diary context
-          const { response: errorAnalysis, tokens: analyzeTokens } = await analyzeSteps(diaryContext);
-          totalTokens += analyzeTokens;
+          const { response: errorAnalysis } = await analyzeSteps(diaryContext);
+
           badContext.push(errorAnalysis);
           badAttempts++;
           diaryContext = [];
@@ -457,7 +434,6 @@ You will now figure out the answers to these sub-questions and see if they can h
         allQuestions.push(...newGapQuestions);
         gaps.push(question);  // always keep the original question in the gaps
       } else {
-        console.log('No new questions to ask');
         diaryContext.push(`
 At step ${step}, you took **reflect** and think about the knowledge gaps. You tried to break down the question "${currentQuestion}" into gap-questions like this: ${oldQuestions.join(', ')} 
 But then you realized you have asked them before. You decided to to think out of the box or cut from a completely different angle. 
@@ -471,19 +447,18 @@ But then you realized you have asked them before. You decided to to think out of
     }
     else if (action.action === 'search' && action.searchQuery) {
         // rewrite queries
-        let { keywords: keywordsQueries, tokens: rewriteTokens } = await rewriteQuery(action.searchQuery);
-        totalTokens += rewriteTokens;
+        let { keywords: keywordsQueries } = await rewriteQuery(action.searchQuery);
+
         const oldKeywords = keywordsQueries;
         // avoid exisitng searched queries
         if (allKeywords.length) {
-          const { unique_queries: dedupedQueries, tokens: dedupTokens } = await dedupQueries(keywordsQueries, allKeywords);
-          totalTokens += dedupTokens;
+          const { unique_queries: dedupedQueries } = await dedupQueries(keywordsQueries, allKeywords);
           keywordsQueries = dedupedQueries;
         }
         if (keywordsQueries.length > 0) {
           const searchResults = [];
           for (const query of keywordsQueries) {
-            console.log('Searching:', query);
+            console.log(`Search query: ${query}`);
             const results = await search(query, {
               safeSearch: SafeSearchType.STRICT
             });
@@ -519,7 +494,7 @@ But then you realized you have already searched for these keywords before.
 You decided to think out of the box or cut from a completely different angle.
 `);
 
-          console.log('No new queries to search');
+
           updateContext({
             step,
             ...action,
@@ -551,7 +526,7 @@ You found some useful information on the web and add them to your knowledge for 
           result: urlResults
         });
 
-        totalTokens += urlResults.reduce((sum, r) => sum + r.tokens, 0);
+
       }
 
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
@@ -567,7 +542,7 @@ async function storeContext(prompt: string, memory: any[][], step: number) {
     await fs.writeFile('questions.json', JSON.stringify(questions, null, 2));
     await fs.writeFile('knowledge.json', JSON.stringify(knowledge, null, 2));
   } catch (error) {
-    console.error('Failed to store context:', error);
+    console.error('Context storage failed:', error);
   }
 }
 
