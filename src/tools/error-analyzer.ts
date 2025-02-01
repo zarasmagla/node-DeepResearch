@@ -21,7 +21,7 @@ const responseSchema = {
     },
     improvement: {
       type: SchemaType.STRING,
-      description: "Suggested improvements for the next iteration"
+      description: "Suggested improvement plan for the next iteration"
     }
   },
   required: ["recap", "blame", "improvement"]
@@ -125,7 +125,7 @@ export async function analyzeSteps(diaryContext: string[]): Promise<{ response: 
     const usage = response.usageMetadata;
     const json = JSON.parse(response.text()) as EvaluationResponse;
     console.log('Error analysis:', {
-      is_valid: json.blame ? false : true,
+      is_valid: !json.blame,
       reason: json.blame || 'No issues found'
     });
     const tokens = usage?.totalTokenCount || 0;
