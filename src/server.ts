@@ -51,6 +51,32 @@ app.get('/api/v1/stream/:requestId', ((req: Request, res: StreamResponse) => {
   });
 }) as RequestHandler);
 
+function createProgressEmitter(requestId: string, budget: number | undefined, thisStep: StepAction | undefined) {
+  return (message: string, step: number, budgetPercentage?: string) => {
+    const budgetInfo = budgetPercentage ? {
+      used: tokenTracker.getTotalUsage(),
+      total: budget || 1_000_000,
+      percentage: budgetPercentage
+    } : undefined;
+
+    if (thisStep?.action && thisStep?.thoughts) {
+      eventEmitter.emit(`progress-${requestId}`, {
+        type: 'progress',
+        data: { ...thisStep, totalStep: step },
+        step,
+        budget: budgetInfo
+      });
+    } else {
+      eventEmitter.emit(`progress-${requestId}`, {
+        type: 'progress',
+        data: message,
+        step,
+        budget: budgetInfo
+      });
+    }
+  };
+}
+
 // POST endpoint to handle questions
 app.post('/api/v1/query', (async (req: QueryRequest, res: Response) => {
   const { q, budget, maxBadAttempt } = req.body;
@@ -62,82 +88,20 @@ app.post('/api/v1/query', (async (req: QueryRequest, res: Response) => {
   res.json({ requestId });
 
   // Store original console.log
-  const originalConsoleLog: typeof console.log = console.log;
+  const originalConsoleLog = console.log;
   let thisStep: StepAction | undefined;
 
   try {
-    // Wrap getResponse to emit progress
+    const emitProgress = createProgressEmitter(requestId, budget, thisStep);
+
+    // Override console.log to track progress
     console.log = (...args: any[]) => {
       originalConsoleLog(...args);
       const message = args.join(' ');
       if (message.includes('Step') || message.includes('Budget used')) {
         const step = parseInt(message.match(/Step (\d+)/)?.[1] || '0');
         const budgetPercentage = message.match(/Budget used ([\d.]+)%/)?.[1];
-        const budgetInfo = budgetPercentage ? {
-          used: tokenTracker.getTotalUsage(),
-          total: budget || 1_000_000,
-          percentage: budgetPercentage
-        } : undefined;
-        
-        // Emit the full thisStep object if available
-        if (thisStep && thisStep.action && thisStep.thoughts) {
-          eventEmitter.emit(`progress-${requestId}`, {
-            type: 'progress',
-            data: thisStep,
-            step,
-            budget: budgetInfo
-          });
-        } else {
-          eventEmitter.emit(`progress-${requestId}`, {
-            type: 'progress',
-            data: message,
-            step,
-            budget: budgetInfo
-          });
-        }
-      }
-    };
-
-    // Track step updates during execution
-    const emitStep = (step: StepAction & { totalStep?: number }) => {
-      if (step.action && step.thoughts) {
-        eventEmitter.emit(`progress-${requestId}`, {
-          type: 'progress',
-          data: step,
-          step: step.totalStep,
-          budget: {
-            used: tokenTracker.getTotalUsage(),
-            total: budget || 1_000_000,
-            percentage: ((tokenTracker.getTotalUsage() / (budget || 1_000_000)) * 100).toFixed(2)
-          }
-        });
-      }
-    };
-
-    // Override console.log to track steps
-    const originalConsoleLog = console.log;
-    console.log = (...args: any[]) => {
-      originalConsoleLog(...args);
-      const message = args.join(' ');
-      if (message.includes('Step') || message.includes('Budget used')) {
-        const step = parseInt(message.match(/Step (\d+)/)?.[1] || '0');
-        const budgetPercentage = message.match(/Budget used ([\d.]+)%/)?.[1];
-        const budgetInfo = budgetPercentage ? {
-          used: tokenTracker.getTotalUsage(),
-          total: budget || 1_000_000,
-          percentage: budgetPercentage
-        } : undefined;
-        
-        if (thisStep && thisStep.action && thisStep.thoughts) {
-          emitStep({...thisStep, totalStep: step});
-        } else {
-          eventEmitter.emit(`progress-${requestId}`, {
-            type: 'progress',
-            data: message,
-            step,
-            budget: budgetInfo
-          });
-        }
+        emitProgress(message, step, budgetPercentage);
       }
     };
 
