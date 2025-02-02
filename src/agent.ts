@@ -131,7 +131,8 @@ function getPrompt(
   allowSearch: boolean = true,
   badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
   knowledge?: { question: string; answer: string; }[],
-  allURLs?: Record<string, string>
+  allURLs?: Record<string, string>,
+  beastMode?: boolean
 ): string {
   const sections: string[] = [];
 
@@ -214,6 +215,14 @@ ${urlList}
 - Responses must be definitive (no ambiguity, uncertainty, or disclaimers)${allowReflect ? '\n- If doubts remain, use "reflect" instead' : ''}`);
   }
 
+  if (beastMode) {
+   actions.push(`**answer**:
+- You have gathered enough information to answer the question; they may not be perfect, but this is your very last chance to answer the question.
+- Try the best of the best reasoning ability, investigate every details in the context and provide the best answer you can think of.
+- When uncertain, educated guess is allowed and encouraged, but make sure it is based on the context and knowledge you have gathered.
+- Responses must be definitive (no ambiguity, uncertainty, or disclaimers`);
+  }
+
   if (allowReflect) {
     actions.push(`**reflect**:
 - Perform critical analysis through hypothetical scenarios or systematic breakdowns
@@ -268,6 +277,8 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
   let allowRead = true;
   let allowReflect = true;
   let prompt = '';
+  let thisStep: StepAction = {action: 'answer', answer: '', references: [], thoughts: ''};
+  let isAnswered = false;
 
   const allURLs: Record<string, string> = {};
   const visitedURLs: string[] = [];
@@ -295,7 +306,9 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
       allowSearch,
       badContext,
       allKnowledge,
-      allURLs);
+      allURLs,
+      false
+      );
 
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
@@ -312,7 +325,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
     tokenTracker.trackUsage('agent', usage?.totalTokenCount || 0);
 
 
-    const thisStep = JSON.parse(response.text());
+    thisStep = JSON.parse(response.text());
     // print allowed and chose action
     const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
     console.log(`${thisStep.action} <- [${actionsStr}]`);
@@ -352,10 +365,11 @@ ${evaluation.reasoning}
 
 Your journey ends here.
 `);
-          return thisStep;
+          isAnswered = false;
+          break
         }
         if (evaluation.is_definitive) {
-          if (thisStep.references.length > 0 || Object.keys(allURLs).length === 0) {
+          if (thisStep.references?.length > 0 || Object.keys(allURLs).length === 0) {
             // EXIT POINT OF THE PROGRAM!!!!
             diaryContext.push(`
 At step ${step}, you took **answer** action and finally found the answer to the original question:
@@ -371,7 +385,8 @@ ${evaluation.reasoning}
 
 Your journey ends here. You have successfully answered the original question. Congratulations! 🎉
 `);
-            return thisStep;
+            isAnswered = true;
+            break
           } else {
             diaryContext.push(`
 At step ${step}, you took **answer** action and finally found the answer to the original question:
@@ -386,8 +401,8 @@ Unfortunately, you did not provide any references to support your answer.
 You need to find more URL references to support your answer.`);
           }
 
-          await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
-          return thisStep;
+          isAnswered = true;
+          break
 
         } else {
           diaryContext.push(`
@@ -592,6 +607,42 @@ You decided to think out of the box or cut from a completely different angle.`);
     }
 
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+  }
+
+  await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+  if (isAnswered) {
+    return thisStep;
+  } else {
+    const prompt = getPrompt(
+      question,
+      diaryContext,
+      allQuestions,
+      false,
+      false,
+      false,
+      false,
+      badContext,
+      allKnowledge,
+      allURLs,
+      true
+      );
+
+    const model = genAI.getGenerativeModel({
+      model: MODEL_NAME,
+      generationConfig: {
+        temperature: 0.7,
+        responseMimeType: "application/json",
+        responseSchema: getSchema(false, false, allowAnswer, false)
+      }
+    });
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const usage = response.usageMetadata;
+    tokenTracker.trackUsage('agent', usage?.totalTokenCount || 0);
+
+    await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+    return JSON.parse(response.text());
   }
 }
 
