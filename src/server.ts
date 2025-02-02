@@ -2,8 +2,8 @@ import express, { Request, Response, RequestHandler } from 'express';
 import cors from 'cors';
 import { EventEmitter } from 'events';
 import { getResponse } from './agent';
-import { tokenTracker } from './utils/token-tracker';
 import { StepAction } from './types';
+import { TrackerContext } from './types/tracker';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -51,29 +51,21 @@ app.get('/api/v1/stream/:requestId', ((req: Request, res: StreamResponse) => {
   });
 }) as RequestHandler);
 
-function createProgressEmitter(requestId: string, budget: number | undefined, thisStep: StepAction | undefined) {
-  return (message: string, step: number, budgetPercentage?: string) => {
-    const budgetInfo = budgetPercentage ? {
-      used: tokenTracker.getTotalUsage(),
+function createProgressEmitter(requestId: string, budget: number | undefined, context: TrackerContext) {
+  return () => {
+    const state = context.actionTracker.getState();
+    const budgetInfo = {
+      used: context.tokenTracker.getTotalUsage(),
       total: budget || 1_000_000,
-      percentage: budgetPercentage
-    } : undefined;
+      percentage: ((context.tokenTracker.getTotalUsage() / (budget || 1_000_000)) * 100).toFixed(2)
+    };
 
-    if (thisStep?.action && thisStep?.thoughts) {
-      eventEmitter.emit(`progress-${requestId}`, {
-        type: 'progress',
-        data: { ...thisStep, totalStep: step },
-        step,
-        budget: budgetInfo
-      });
-    } else {
-      eventEmitter.emit(`progress-${requestId}`, {
-        type: 'progress',
-        data: message,
-        step,
-        budget: budgetInfo
-      });
-    }
+    eventEmitter.emit(`progress-${requestId}`, {
+      type: 'progress',
+      data: { ...state.thisStep, totalStep: state.totalStep },
+      step: state.totalStep,
+      budget: budgetInfo
+    });
   };
 }
 
@@ -87,32 +79,14 @@ app.post('/api/v1/query', (async (req: QueryRequest, res: Response) => {
   const requestId = Date.now().toString();
   res.json({ requestId });
 
-  // Store original console.log
-  const originalConsoleLog = console.log;
-  let thisStep: StepAction | undefined;
-
   try {
-    const emitProgress = createProgressEmitter(requestId, budget, thisStep);
-
-    // Override console.log to track progress
-    console.log = (...args: any[]) => {
-      originalConsoleLog(...args);
-      const message = args.join(' ');
-      if (message.includes('Step') || message.includes('Budget used')) {
-        const step = parseInt(message.match(/Step (\d+)/)?.[1] || '0');
-        const budgetPercentage = message.match(/Budget used ([\d.]+)%/)?.[1];
-        emitProgress(message, step, budgetPercentage);
-      }
-    };
-
-    const result = await getResponse(q, budget, maxBadAttempt);
-    thisStep = result;
+    const { result, context } = await getResponse(q, budget, maxBadAttempt);
+    const emitProgress = createProgressEmitter(requestId, budget, context);
+    context.actionTracker.on('action', emitProgress);
     await storeTaskResult(requestId, result);
     eventEmitter.emit(`progress-${requestId}`, { type: 'answer', data: result });
   } catch (error: any) {
     eventEmitter.emit(`progress-${requestId}`, { type: 'error', data: error?.message || 'Unknown error' });
-  } finally {
-    console.log = originalConsoleLog;
   }
 }) as RequestHandler);
 
