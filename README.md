@@ -1,5 +1,6 @@
 ```bash
 export GOOGLE_API_KEY=...  # ask han
+export BRAVE_API_KEY=...  # ask han
 export JINA_API_KEY=jina_...  # get from jina.ai
 npm install
 # example: no tool calling 
