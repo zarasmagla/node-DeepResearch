@@ -266,7 +266,8 @@ async function getResponse(question: string, tokenBudget: number = 1_000_000, ma
     await sleep(STEP_SLEEP);
     step++;
     totalStep++;
-    console.log(`Step ${totalStep} / Budget used ${(tokenTracker.getTotalUsage() / tokenBudget * 100).toFixed(2)}%`);
+    const budgetPercentage = (tokenTracker.getTotalUsage() / tokenBudget * 100).toFixed(2);
+    console.log(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
     console.log('Gaps:', gaps);
     allowReflect = allowReflect && (gaps.length <= 1);
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
