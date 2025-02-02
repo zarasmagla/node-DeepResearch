@@ -156,7 +156,7 @@ function getPrompt(
   allQuestions?: string[],
   allowReflect: boolean = false,
   allowAnswer: boolean = true,
-  badContext?: { recap: string; blame: string; improvement: string; }[],
+  badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
   knowledge?: { question: string; answer: string; }[],
   allURLs?: Record<string, string>
 ): string {
@@ -194,8 +194,11 @@ ${knowledgeItems}`);
   if (badContext?.length) {
     const attempts = badContext
       .map((c, i) => `### Attempt ${i + 1}
-- Recap: ${c.recap}
-- Blame: ${c.blame}
+- Question: ${c.question}
+- Answer: ${c.answer}
+- Reject Reason: ${c.evaluation}
+- Steps Recap: ${c.recap}
+- Steps Blame: ${c.blame}
 - Improvement Plan: ${c.improvement}`)
       .join('\n\n');
 
@@ -260,11 +263,9 @@ Critical Requirements:
   return sections.join('\n\n');
 }
 
-const context: StepData[] = [];  // successful steps in the current session
 const allContext: StepData[] = [];  // all steps in the current session, including those leads to wrong results
 
 function updateContext(step: any) {
-  context.push(step);
   allContext.push(step)
 }
 
@@ -332,7 +333,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
 
     if (action.action === 'answer') {
       updateContext({
-        step,
+        totalStep,
         question: currentQuestion,
         ...action,
       });
@@ -413,7 +414,10 @@ ${evaluation.reasoning}
           // store the bad context and reset the diary context
           const {response: errorAnalysis} = await analyzeSteps(diaryContext);
 
-          badContext.push(errorAnalysis);
+          badContext.push({question: currentQuestion,
+          answer: action.answer,
+          evaluation: evaluation.reasoning,
+            ...errorAnalysis});
           badAttempts++;
           allowAnswer = false;  // disable answer action in the immediate next step
           diaryContext = [];
@@ -460,7 +464,7 @@ At step ${step}, you took **reflect** and think about the knowledge gaps. You tr
 But then you realized you have asked them before. You decided to to think out of the box or cut from a completely different angle. 
 `);
         updateContext({
-          step,
+          totalStep,
           ...action,
           result: 'I have tried all possible questions and found no useful information. I must think out of the box or different angle!!!'
         });
@@ -512,7 +516,7 @@ You found quite some information and add them to your URL list and **visit** the
 `);
 
         updateContext({
-          step,
+          totalStep,
           question: currentQuestion,
           ...action,
           result: searchResults
@@ -527,7 +531,7 @@ You decided to think out of the box or cut from a completely different angle.
 
 
         updateContext({
-          step,
+          totalStep,
           ...action,
           result: 'I have tried all possible queries and found no new information. I must think out of the box or different angle!!!'
         });
@@ -551,7 +555,7 @@ ${action.URLTargets.join('\n')}
 You found some useful information on the web and add them to your knowledge for future reference.
 `);
       updateContext({
-        step,
+        totalStep,
         question: currentQuestion,
         ...action,
         result: urlResults
