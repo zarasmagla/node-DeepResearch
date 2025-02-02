@@ -227,7 +227,7 @@ ${urlList}
 
   sections.push(`## Actions
 
-When you are uncertain about the answer and you need knowledge, choose one of these actions to proceed:
+Based on the current context, you must choose one of the following actions:
 
 ${actions.join('\n\n')}`);
 
@@ -269,6 +269,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
   let allowReflect = true;
 
   const allURLs: Record<string, string> = {};
+  const visitedURLs: string[] = [];
   while (tokenTracker.getTotalUsage() < tokenBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
     await sleep(STEP_SLEEP);
@@ -432,7 +433,10 @@ ${evaluation.reasoning}
 
 Although you solved a sub-question, you still need to find the answer to the original question. You need to keep going.
 `);
-        allKnowledge.push({question: currentQuestion, answer: thisStep.answer});
+        allKnowledge.push({
+          question: currentQuestion,
+          answer: thisStep.answer,
+          type: 'qa'});
       }
     } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
       let newGapQuestions = thisStep.questionsToAnswer
@@ -538,9 +542,9 @@ You decided to think out of the box or cut from a completely different angle.
     } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
 
       let uniqueURLs = thisStep.URLTargets;
-      if (Object.keys(allURLs).length > 0) {
+      if (visitedURLs.length > 0) {
         // check duplicate urls
-        uniqueURLs = thisStep.URLTargets.filter((url: string) => !allURLs[url]);
+        uniqueURLs = uniqueURLs.filter((url: string) => !visitedURLs.includes(url));
       }
 
       if (uniqueURLs.length > 0) {
@@ -550,8 +554,11 @@ You decided to think out of the box or cut from a completely different angle.
             const {response, tokens} = await readUrl(url, JINA_API_KEY);
             allKnowledge.push({
               question: `What is in ${response.data.url}?`,
-              answer: removeAllLineBreaks(response.data.content)
+              answer: removeAllLineBreaks(response.data.content),
+              type: 'url'
             });
+            visitedURLs.push(url);
+            delete allURLs[url];
             return {url, result: response, tokens};
           })
         );
