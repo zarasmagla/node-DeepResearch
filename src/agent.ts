@@ -656,10 +656,10 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 export async function main() {
   const question = process.argv[2] || "";
-  const { result: finalStep } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
+  const { result: finalStep, context: tracker } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
   console.log('Final Answer:', finalStep.answer);
-  const tracker = new TokenTracker();
-  tracker.printSummary();
+
+  tracker.tokenTracker.printSummary();
 }
 
 if (require.main === module) {
