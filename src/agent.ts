@@ -262,7 +262,7 @@ function removeAllLineBreaks(text: string) {
   return text.replace(/(\r\n|\n|\r)/gm, " ");
 }
 
-async function getResponse(question: string, tokenBudget: number = 1000000, maxBadAttempts: number = 3) {
+async function getResponse(question: string, tokenBudget: number = 1_000_000, maxBadAttempts: number = 3) {
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
@@ -613,6 +613,7 @@ You decided to think out of the box or cut from a completely different angle.`);
   if (isAnswered) {
     return thisStep;
   } else {
+    console.log('Enter Beast mode!!!')
     const prompt = getPrompt(
       question,
       diaryContext,
