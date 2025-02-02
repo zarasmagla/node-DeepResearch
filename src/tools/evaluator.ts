@@ -3,23 +3,23 @@ import { GEMINI_API_KEY, MODEL_NAME } from "../config";
 import { tokenTracker } from "../utils/token-tracker";
 
 type EvaluationResponse = {
-  is_valid_answer: boolean;
+  is_definitive: boolean;
   reasoning: string;
 };
 
 const responseSchema = {
   type: SchemaType.OBJECT,
   properties: {
-    is_valid_answer: {
+    is_definitive: {
       type: SchemaType.BOOLEAN,
-      description: "Whether the answer provides any useful information to the question"
+      description: "Whether the answer provides a definitive response without uncertainty or 'I don't know' type statements"
     },
     reasoning: {
       type: SchemaType.STRING,
-      description: "Detailed explanation of the evaluation"
+      description: "Explanation of why the answer is or isn't definitive"
     }
   },
-  required: ["is_valid_answer", "reasoning"]
+  required: ["is_definitive", "reasoning"]
 };
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -33,41 +33,32 @@ const model = genAI.getGenerativeModel({
 });
 
 function getPrompt(question: string, answer: string): string {
-  return `You are an expert evaluator of question-answer pairs. Analyze if the given answer based on the following criteria is valid or not.
+  return `You are an evaluator of answer definitiveness. Analyze if the given answer provides a definitive response or not.
 
-Core Evaluation Criteria:
-- Definitiveness: "I don't know", "lack of information", "doesn't exist" or highly uncertain ambiguous responses are **not** valid answers, must return false!
-- Informativeness: Answer must provide substantial, useful information
-- Completeness: When question mentions multiple aspects or elements, the answer should cover all of them
+Core Evaluation Criterion:
+- Definitiveness: "I don't know", "lack of information", "doesn't exist", "not sure" or highly uncertain/ambiguous responses are **not** definitive, must return false!
 
 Examples:
 
 Question: "What are the system requirements for running Python 3.9?"
 Answer: "I'm not entirely sure, but I think you need a computer with some RAM."
 Evaluation: {
-  "is_valid_answer": false,
-  "reasoning": "The answer is vague, uncertain, and lacks specific information about actual system requirements. It fails the specificity and informativeness criteria."
+  "is_definitive": false,
+  "reasoning": "The answer contains uncertainty markers like 'not entirely sure' and 'I think', making it non-definitive."
 }
 
 Question: "What are the system requirements for running Python 3.9?"
-Answer: "Python 3.9 requires: Windows 7 or later, macOS 10.11 or later, or Linux. Minimum 4GB RAM recommended, 2GB disk space, and x86-64 processor. For Windows, you'll need Microsoft Visual C++ 2015 or later."
+Answer: "Python 3.9 requires Windows 7 or later, macOS 10.11 or later, or Linux."
 Evaluation: {
-  "is_valid_answer": true,
-  "reasoning": "The answer is comprehensive, specific, and covers all key system requirements across different operating systems. It provides concrete numbers and necessary additional components."
+  "is_definitive": true,
+  "reasoning": "The answer makes clear, definitive statements without uncertainty markers or ambiguity."
 }
 
 Question: "what is the twitter account of jina ai's founder?"
 Answer: "The provided text does not contain the Twitter account of Jina AI's founder."
 Evaluation: {
-  "is_valid_answer": false,
-  "reasoning": "The answer is not definitive and fails to provide the requested information. Don't know, can't derive, lack of information is unacceptable,"
-}
-
-Question: "who owns jina ai?"
-Answer: "The ownership structure of Jina AI is not publicly disclosed."
-Evaluation: {
-  "is_valid_answer": false,
-  "reasoning": "The answer is not definitive and fails to provide the requested information. Lack of information is unacceptable, more search and deep reasoning is needed."
+  "is_definitive": false,
+  "reasoning": "The answer indicates a lack of information rather than providing a definitive response."
 }
 
 Now evaluate this pair:
@@ -83,7 +74,7 @@ export async function evaluateAnswer(question: string, answer: string): Promise<
     const usage = response.usageMetadata;
     const json = JSON.parse(response.text()) as EvaluationResponse;
     console.log('Evaluation:', {
-      valid: json.is_valid_answer,
+      definitive: json.is_definitive,
       reason: json.reasoning
     });
     const tokens = usage?.totalTokenCount || 0;

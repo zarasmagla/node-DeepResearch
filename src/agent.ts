@@ -351,12 +351,10 @@ ${evaluation.reasoning}
 
 Your journey ends here.
 `);
-          console.log('Final Answer:', thisStep.answer);
-          tokenTracker.printSummary();
           await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
           return thisStep;
         }
-        if (evaluation.is_valid_answer) {
+        if (evaluation.is_definitive) {
           if (thisStep.references.length > 0 || Object.keys(allURLs).length === 0) {
             // EXIT POINT OF THE PROGRAM!!!!
             diaryContext.push(`
@@ -373,8 +371,6 @@ ${evaluation.reasoning}
 
 Your journey ends here. You have successfully answered the original question. Congratulations! 🎉
 `);
-            console.log('Final Answer:', thisStep.answer);
-            tokenTracker.printSummary();
             await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
             return thisStep;
           } else {
@@ -390,6 +386,9 @@ ${thisStep.answer}
 Unfortunately, you did not provide any references to support your answer. 
 You need to find more URL references to support your answer.`);
           }
+
+          await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+          return thisStep;
 
         } else {
           diaryContext.push(`
@@ -418,7 +417,7 @@ ${evaluation.reasoning}
           diaryContext = [];
           step = 0;
         }
-      } else if (evaluation.is_valid_answer) {
+      } else if (evaluation.is_definitive) {
         diaryContext.push(`
 At step ${step}, you took **answer** action. You found a good answer to the sub-question:
 
@@ -436,7 +435,8 @@ Although you solved a sub-question, you still need to find the answer to the ori
         allKnowledge.push({
           question: currentQuestion,
           answer: thisStep.answer,
-          type: 'qa'});
+          type: 'qa'
+        });
       }
     } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
       let newGapQuestions = thisStep.questionsToAnswer
@@ -611,5 +611,14 @@ async function storeContext(prompt: string, memory: any[][], step: number) {
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-const question = process.argv[2] || "";
-getResponse(question);
+
+export async function main() {
+  const question = process.argv[2] || "";
+  const finalStep = await getResponse(question);
+  console.log('Final Answer:', finalStep.answer);
+  tokenTracker.printSummary();
+}
+
+if (require.main === module) {
+  main().catch(console.error);
+}
