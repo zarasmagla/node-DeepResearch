@@ -9,7 +9,7 @@ import {evaluateAnswer} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {GEMINI_API_KEY, JINA_API_KEY, SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
 import {tokenTracker} from "./utils/token-tracker";
-import {StepAction, SchemaProperty, ResponseSchema} from "./types";
+import {StepAction, SchemaProperty, ResponseSchema, AnswerAction} from "./types";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -241,7 +241,7 @@ function removeAllLineBreaks(text: string) {
   return text.replace(/(\r\n|\n|\r)/gm, " ");
 }
 
-export async function getResponse(question: string, tokenBudget: number = 1_000_000, maxBadAttempts: number = 3) {
+export async function getResponse(question: string, tokenBudget: number = 1_000_000, maxBadAttempts: number = 3): Promise<StepAction> {
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
@@ -624,7 +624,9 @@ You decided to think out of the box or cut from a completely different angle.`);
     tokenTracker.trackUsage('agent', usage?.totalTokenCount || 0);
 
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
-    return JSON.parse(response.text());
+    thisStep = JSON.parse(response.text());
+    console.log(thisStep)
+    return thisStep;
   }
 }
 
@@ -646,7 +648,7 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 export async function main() {
   const question = process.argv[2] || "";
-  const finalStep = await getResponse(question);
+  const finalStep = await getResponse(question) as AnswerAction;
   console.log('Final Answer:', finalStep.answer);
   tokenTracker.printSummary();
 }
