@@ -27,7 +27,8 @@ export function readUrl(url: string, token: string): Promise<{ response: ReadRes
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         'Content-Length': data.length,
-        'X-Retain-Images': 'none'
+        'X-Retain-Images': 'none',
+        'X-Return-Format': 'markdown'
       }
     };
 

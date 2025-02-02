@@ -267,6 +267,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
   let allowSearch = true;
   let allowRead = true;
   let allowReflect = true;
+  let prompt = '';
 
   const allURLs: Record<string, string> = {};
   const visitedURLs: string[] = [];
@@ -284,7 +285,7 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
     allowSearch = allowSearch && (Object.keys(allURLs).length < 20);  // disable search when too many urls already
 
     // generate prompt for this step
-    const prompt = getPrompt(
+    prompt = getPrompt(
       currentQuestion,
       diaryContext,
       allQuestions,
@@ -351,7 +352,6 @@ ${evaluation.reasoning}
 
 Your journey ends here.
 `);
-          await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
           return thisStep;
         }
         if (evaluation.is_definitive) {
@@ -371,7 +371,6 @@ ${evaluation.reasoning}
 
 Your journey ends here. You have successfully answered the original question. Congratulations! 🎉
 `);
-            await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
             return thisStep;
           } else {
             diaryContext.push(`
