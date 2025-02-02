@@ -21,7 +21,7 @@ const responseSchema = {
     },
     improvement: {
       type: SchemaType.STRING,
-      description: "Suggested improvement plan for the next iteration"
+      description: "Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe."
     }
   },
   required: ["recap", "blame", "improvement"]

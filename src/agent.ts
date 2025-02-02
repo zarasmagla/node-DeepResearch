@@ -125,8 +125,10 @@ function getPrompt(
   question: string,
   context?: string[],
   allQuestions?: string[],
-  allowReflect: boolean = false,
+  allowReflect: boolean = true,
   allowAnswer: boolean = true,
+  allowRead: boolean = true,
+  allowSearch: boolean = true,
   badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
   knowledge?: { question: string; answer: string; }[],
   allURLs?: Record<string, string>
@@ -187,10 +189,10 @@ ${learnedStrategy}
   // Build actions section
   const actions: string[] = [];
 
-  if (allURLs) {
+  if (allURLs && Object.keys(allURLs).length > 0 && allowRead) {
     const urlList = Object.entries(allURLs)
       .map(([url, desc]) => `  + "${url}": "${desc}"`)
-      .join('');
+      .join('\n');
 
     actions.push(`**visit**:
 - Visit any URLs from below to gather external knowledge, choose the most relevant URLs that might contain the answer
@@ -199,10 +201,12 @@ ${urlList}
 - It allows you to access the full content behind any URLs`);
   }
 
-  actions.push(`**search**:
+  if (allowSearch) {
+    actions.push(`**search**:
 - Query external sources using a public search engine
 - Focus on solving one specific aspect of the question
 - Only give keywords search query, not full sentences`);
+  }
 
   if (allowAnswer) {
     actions.push(`**answer**:
@@ -260,6 +264,10 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
   const badContext = [];
   let diaryContext = [];
   let allowAnswer = true;
+  let allowSearch = true;
+  let allowRead = true;
+  let allowReflect = true;
+
   const allURLs: Record<string, string> = {};
   while (tokenTracker.getTotalUsage() < tokenBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
@@ -268,11 +276,11 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
     totalStep++;
     console.log(`Step ${totalStep}`);
     console.log('Gaps:', gaps);
-    const allowReflect = gaps.length <= 1;
+    allowReflect = allowReflect && (gaps.length <= 1);
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
     // update all urls with buildURLMap
-    const allowRead = Object.keys(allURLs).length > 0;
-    const allowSearch = Object.keys(allURLs).length < 20;  // disable search when too many urls already
+    allowRead = allowRead && (Object.keys(allURLs).length > 0);
+    allowSearch = allowSearch && (Object.keys(allURLs).length < 20);  // disable search when too many urls already
 
     // generate prompt for this step
     const prompt = getPrompt(
@@ -281,6 +289,8 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
       allQuestions,
       allowReflect,
       allowAnswer,
+      allowRead,
+      allowSearch,
       badContext,
       allKnowledge,
       allURLs);
@@ -308,6 +318,9 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
 
     // reset allowAnswer to true
     allowAnswer = true;
+    allowReflect = true;
+    allowRead = true;
+    allowSearch = true;
 
     // execute the step and action
     if (thisStep.action === 'answer') {
@@ -393,10 +406,12 @@ ${evaluation.reasoning}
           // store the bad context and reset the diary context
           const {response: errorAnalysis} = await analyzeSteps(diaryContext);
 
-          badContext.push({question: currentQuestion,
-          answer: thisStep.answer,
-          evaluation: evaluation.reasoning,
-            ...errorAnalysis});
+          badContext.push({
+            question: currentQuestion,
+            answer: thisStep.answer,
+            evaluation: evaluation.reasoning,
+            ...errorAnalysis
+          });
           badAttempts++;
           allowAnswer = false;  // disable answer action in the immediate next step
           diaryContext = [];
@@ -447,6 +462,8 @@ But then you realized you have asked them before. You decided to to think out of
           ...thisStep,
           result: 'I have tried all possible questions and found no useful information. I must think out of the box or different angle!!!'
         });
+
+        allowReflect = false;
       }
     } else if (thisStep.action === 'search' && thisStep.searchQuery) {
       // rewrite queries
@@ -515,33 +532,57 @@ You decided to think out of the box or cut from a completely different angle.
           ...thisStep,
           result: 'I have tried all possible queries and found no new information. I must think out of the box or different angle!!!'
         });
+
+        allowSearch = false;
       }
     } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
-      const urlResults = await Promise.all(
-        thisStep.URLTargets.map(async (url: string) => {
-          const {response, tokens} = await readUrl(url, JINA_API_KEY);
-          allKnowledge.push({
-            question: `What is in ${response.data.url}?`,
-            answer: removeAllLineBreaks(response.data.content)
-          });
-          // remove that url from allURLs
-          delete allURLs[url];
-          return {url, result: response, tokens};
-        })
-      );
-      diaryContext.push(`
+
+      let uniqueURLs = thisStep.URLTargets;
+      if (Object.keys(allURLs).length > 0) {
+        // check duplicate urls
+        uniqueURLs = thisStep.URLTargets.filter((url: string) => !allURLs[url]);
+      }
+
+      if (uniqueURLs.length > 0) {
+
+        const urlResults = await Promise.all(
+          uniqueURLs.map(async (url: string) => {
+            const {response, tokens} = await readUrl(url, JINA_API_KEY);
+            allKnowledge.push({
+              question: `What is in ${response.data.url}?`,
+              answer: removeAllLineBreaks(response.data.content)
+            });
+            return {url, result: response, tokens};
+          })
+        );
+        diaryContext.push(`
 At step ${step}, you took the **visit** action and deep dive into the following URLs:
 ${thisStep.URLTargets.join('\n')}
 You found some useful information on the web and add them to your knowledge for future reference.
 `);
-      updateContext({
-        totalStep,
-        question: currentQuestion,
-        ...thisStep,
-        result: urlResults
-      });
+        updateContext({
+          totalStep,
+          question: currentQuestion,
+          ...thisStep,
+          result: urlResults
+        });
+      } else {
 
+        diaryContext.push(`
+At step ${step}, you took the **visit** action and try to visit the following URLs:
+${thisStep.URLTargets.join('\n')}
+But then you realized you have already visited these URLs and you already know very well about their contents.
 
+You decided to think out of the box or cut from a completely different angle.`);
+
+        updateContext({
+          totalStep,
+          ...thisStep,
+          result: 'I have visited all possible URLs and found no new information. I must think out of the box or different angle!!!'
+        });
+
+        allowRead = false;
+      }
     }
 
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
