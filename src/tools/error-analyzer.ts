@@ -17,7 +17,7 @@ const responseSchema = {
     },
     blame: {
       type: SchemaType.STRING,
-      description: "Which step or action was the root cause of the answer rejection"
+      description: "Which action or the step was the root cause of the answer rejection"
     },
     improvement: {
       type: SchemaType.STRING,

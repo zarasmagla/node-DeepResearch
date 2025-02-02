@@ -6,10 +6,10 @@ import {braveSearch} from "./tools/brave-search";
 import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
-import {StepData} from "./tools/getURLIndex";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {GEMINI_API_KEY, JINA_API_KEY, MODEL_NAME, SEARCH_PROVIDER, STEP_SLEEP} from "./config";
 import {tokenTracker} from "./utils/token-tracker";
+import {StepAction} from "./types";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -17,136 +17,107 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-type ResponseSchema = {
-  type: SchemaType.OBJECT;
-  properties: {
-    action: {
-      type: SchemaType.STRING;
-      enum: string[];
-      description: string;
-    };
-    searchQuery: {
-      type: SchemaType.STRING;
-      description: string;
-    };
-    URLTargets?: {
-      type: SchemaType.ARRAY;
-      items: {
-        type: SchemaType.STRING;
-      };
-      maxItems: number;
-      description: string;
-    };
-    answer: {
-      type: SchemaType.STRING;
-      description: string;
-    };
-    references: {
-      type: SchemaType.ARRAY;
-      items: {
-        type: SchemaType.OBJECT;
-        properties: {
-          exactQuote: {
-            type: SchemaType.STRING;
-            description: string;
-          };
-          url: {
-            type: SchemaType.STRING;
-            description: string;
-          };
-        };
-        required: string[];
-      };
-      description: string;
-    };
-    thoughts: {
-      type: SchemaType.STRING;
-      description: string;
-    };
-    questionsToAnswer?: {
-      type: SchemaType.ARRAY;
-      items: {
-        type: SchemaType.STRING;
-        description: string;
-      };
-      description: string;
-      maxItems: number;
-    };
+type SchemaProperty = {
+  type: SchemaType;
+  description: string;
+  enum?: string[];
+  items?: {
+    type: SchemaType;
+    description?: string;
+    properties?: Record<string, SchemaProperty>;
+    required?: string[];
   };
+  properties?: Record<string, SchemaProperty>;
+  required?: string[];
+  maxItems?: number;
+};
+
+type ResponseSchema = {
+  type: SchemaType;
+  properties: Record<string, SchemaProperty>;
   required: string[];
 };
 
 function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean): ResponseSchema {
-  const actions = [];
+  const actions: string[] = [];
+  const properties: Record<string, SchemaProperty> = {
+    action: {
+      type: SchemaType.STRING,
+      enum: actions,
+      description: "Must match exactly one action type"
+    },
+    thoughts: {
+      type: SchemaType.STRING,
+      description: "Explain why choose this action, what's the thought process behind choosing this action"
+    }
+  };
+
   if (allowSearch) {
     actions.push("search");
+    properties.searchQuery = {
+      type: SchemaType.STRING,
+      description: "Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand."
+    };
   }
+
   if (allowAnswer) {
     actions.push("answer");
+    properties.answer = {
+      type: SchemaType.STRING,
+      description: "Only required when choosing 'answer' action, must be the final answer in natural language"
+    };
+    properties.references = {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          exactQuote: {
+            type: SchemaType.STRING,
+            description: "Exact relevant quote from the document"
+          },
+          url: {
+            type: SchemaType.STRING,
+            description: "URL of the document; must be directly from the context"
+          }
+        },
+        required: ["exactQuote", "url"]
+      },
+      description: "Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document"
+    };
   }
+
   if (allowReflect) {
     actions.push("reflect");
+    properties.questionsToAnswer = {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.STRING,
+        description: "each question must be a single line, concise and clear. not composite or compound, less than 20 words."
+      },
+      description: "List of most important questions to fill the knowledge gaps of finding the answer to the original question",
+      maxItems: 2
+    };
   }
+
   if (allowRead) {
     actions.push("visit");
+    properties.URLTargets = {
+      type: SchemaType.ARRAY,
+      items: {
+        type: SchemaType.STRING
+      },
+      maxItems: 2,
+      description: "Must be an array of URLs, choose up the most relevant 2 URLs to visit"
+    };
   }
+
+  // Update the enum values after collecting all actions
+  properties.action.enum = actions;
+
   return {
     type: SchemaType.OBJECT,
-    properties: {
-      action: {
-        type: SchemaType.STRING,
-        enum: actions,
-        description: "Must match exactly one action type"
-      },
-      questionsToAnswer: allowReflect ? {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.STRING,
-          description: "each question must be a single line, concise and clear. not composite or compound, less than 20 words.",
-        },
-        description: "Only required when choosing 'reflect' action, list of most important questions to answer to fill the knowledge gaps.",
-        maxItems: 2
-      } : undefined,
-      searchQuery: {
-        type: SchemaType.STRING,
-        description: "Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand.",
-      },
-      URLTargets: allowRead ? {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.STRING
-        },
-        maxItems: 2,
-        description: "Only required when choosing 'deep dive' action, must be an array of URLs, choose up the most relevant 3 URLs to deep dive into"
-      } : undefined,
-      answer: {
-        type: SchemaType.STRING,
-        description: "Only required when choosing 'answer' action, must be the final answer in natural language"
-      },
-      references: {
-        type: SchemaType.ARRAY,
-        items: {
-          type: SchemaType.OBJECT,
-          properties: {
-            exactQuote: {
-              type: SchemaType.STRING,
-              description: "Exact relevant quote from the document",
-            },
-            url: {
-              type: SchemaType.STRING,
-              description: "URL of the document; must be directly from the context"
-            },
-          },
-          required: ["exactQuote", "url"]
-        },
-        description: "Only required when choosing 'answer' action, must be an array of references"
-      },
-      thoughts: {
-        type: SchemaType.STRING,
-        description: "Explain why choose this action, what's the thought process behind this action"
-      },
-    },
-    required: ["action", "thoughts"],
+    properties,
+    required: ["action", "thoughts"]
   };
 }
 
@@ -197,15 +168,20 @@ ${knowledgeItems}`);
 - Question: ${c.question}
 - Answer: ${c.answer}
 - Reject Reason: ${c.evaluation}
-- Steps Recap: ${c.recap}
-- Steps Blame: ${c.blame}
-- Improvement Plan: ${c.improvement}`)
+- Actions Recap: ${c.recap}
+- Actions Blame: ${c.blame}`)
       .join('\n\n');
+
+    const learnedStrategy = badContext.map(c => c.improvement).join('\n');
 
     sections.push(`## Unsuccessful Attempts
 Your have tried the following actions but failed to find the answer to the question.
 
-${attempts}`);
+${attempts}
+
+## Learned Strategy
+${learnedStrategy}
+`);
   }
 
   // Build actions section
@@ -263,7 +239,7 @@ Critical Requirements:
   return sections.join('\n\n');
 }
 
-const allContext: StepData[] = [];  // all steps in the current session, including those leads to wrong results
+const allContext: StepAction[] = [];  // all steps in the current session, including those leads to wrong results
 
 function updateContext(step: any) {
   allContext.push(step)
@@ -309,9 +285,6 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
       allKnowledge,
       allURLs);
 
-    // reset allowAnswer to true
-    allowAnswer = true;
-
     const model = genAI.getGenerativeModel({
       model: MODEL_NAME,
       generationConfig: {
@@ -327,18 +300,24 @@ async function getResponse(question: string, tokenBudget: number = 1000000, maxB
     tokenTracker.trackUsage('agent', usage?.totalTokenCount || 0);
 
 
-    const action = JSON.parse(response.text());
-    console.log('Action:', action);
+    const thisStep = JSON.parse(response.text());
+    // print allowed and chose action
+    const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
+    console.log(`${thisStep.action} <- [${actionsStr}]`);
+    console.log(thisStep)
 
+    // reset allowAnswer to true
+    allowAnswer = true;
 
-    if (action.action === 'answer') {
+    // execute the step and action
+    if (thisStep.action === 'answer') {
       updateContext({
         totalStep,
         question: currentQuestion,
-        ...action,
+        ...thisStep,
       });
 
-      const {response: evaluation} = await evaluateAnswer(currentQuestion, action.answer);
+      const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep.answer);
 
 
       if (currentQuestion === question) {
@@ -351,20 +330,20 @@ Original question:
 ${currentQuestion}
 
 Your answer: 
-${action.answer}
+${thisStep.answer}
 
 The evaluator thinks your answer is good because: 
 ${evaluation.reasoning}
 
 Your journey ends here.
 `);
-          console.log('Final Answer:', action.answer);
+          console.log('Final Answer:', thisStep.answer);
           tokenTracker.printSummary();
           await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
-          return action;
+          return thisStep;
         }
         if (evaluation.is_valid_answer) {
-          if (action.references.length > 0 || Object.keys(allURLs).length === 0) {
+          if (thisStep.references.length > 0 || Object.keys(allURLs).length === 0) {
             // EXIT POINT OF THE PROGRAM!!!!
             diaryContext.push(`
 At step ${step}, you took **answer** action and finally found the answer to the original question:
@@ -373,17 +352,17 @@ Original question:
 ${currentQuestion}
 
 Your answer: 
-${action.answer}
+${thisStep.answer}
 
 The evaluator thinks your answer is good because: 
 ${evaluation.reasoning}
 
 Your journey ends here. You have successfully answered the original question. Congratulations! 🎉
 `);
-            console.log('Final Answer:', action.answer);
+            console.log('Final Answer:', thisStep.answer);
             tokenTracker.printSummary();
             await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
-            return action;
+            return thisStep;
           } else {
             diaryContext.push(`
 At step ${step}, you took **answer** action and finally found the answer to the original question:
@@ -392,7 +371,7 @@ Original question:
 ${currentQuestion}
 
 Your answer: 
-${action.answer}
+${thisStep.answer}
 
 Unfortunately, you did not provide any references to support your answer. 
 You need to find more URL references to support your answer.`);
@@ -406,7 +385,7 @@ Original question:
 ${currentQuestion}
 
 Your answer: 
-${action.answer}
+${thisStep.answer}
 
 The evaluator thinks your answer is bad because: 
 ${evaluation.reasoning}
@@ -415,7 +394,7 @@ ${evaluation.reasoning}
           const {response: errorAnalysis} = await analyzeSteps(diaryContext);
 
           badContext.push({question: currentQuestion,
-          answer: action.answer,
+          answer: thisStep.answer,
           evaluation: evaluation.reasoning,
             ...errorAnalysis});
           badAttempts++;
@@ -431,17 +410,17 @@ Sub-question:
 ${currentQuestion}
 
 Your answer: 
-${action.answer}
+${thisStep.answer}
 
 The evaluator thinks your answer is good because: 
 ${evaluation.reasoning}
 
 Although you solved a sub-question, you still need to find the answer to the original question. You need to keep going.
 `);
-        allKnowledge.push({question: currentQuestion, answer: action.answer});
+        allKnowledge.push({question: currentQuestion, answer: thisStep.answer});
       }
-    } else if (action.action === 'reflect' && action.questionsToAnswer) {
-      let newGapQuestions = action.questionsToAnswer
+    } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
+      let newGapQuestions = thisStep.questionsToAnswer
       const oldQuestions = newGapQuestions;
       if (allQuestions.length) {
         newGapQuestions = (await dedupQueries(newGapQuestions, allQuestions)).unique_queries;
@@ -465,13 +444,13 @@ But then you realized you have asked them before. You decided to to think out of
 `);
         updateContext({
           totalStep,
-          ...action,
+          ...thisStep,
           result: 'I have tried all possible questions and found no useful information. I must think out of the box or different angle!!!'
         });
       }
-    } else if (action.action === 'search' && action.searchQuery) {
+    } else if (thisStep.action === 'search' && thisStep.searchQuery) {
       // rewrite queries
-      let {keywords: keywordsQueries} = await rewriteQuery(action.searchQuery);
+      let {queries: keywordsQueries} = await rewriteQuery(thisStep);
 
       const oldKeywords = keywordsQueries;
       // avoid exisitng searched queries
@@ -490,6 +469,7 @@ But then you realized you have asked them before. You decided to to think out of
             });
           } else {
             const {response} = await braveSearch(query);
+            await sleep(STEP_SLEEP);
             results = {
               results: response.web.results.map(r => ({
                 title: r.title,
@@ -518,7 +498,7 @@ You found quite some information and add them to your URL list and **visit** the
         updateContext({
           totalStep,
           question: currentQuestion,
-          ...action,
+          ...thisStep,
           result: searchResults
         });
       } else {
@@ -532,13 +512,13 @@ You decided to think out of the box or cut from a completely different angle.
 
         updateContext({
           totalStep,
-          ...action,
+          ...thisStep,
           result: 'I have tried all possible queries and found no new information. I must think out of the box or different angle!!!'
         });
       }
-    } else if (action.action === 'visit' && action.URLTargets?.length) {
+    } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
       const urlResults = await Promise.all(
-        action.URLTargets.map(async (url: string) => {
+        thisStep.URLTargets.map(async (url: string) => {
           const {response, tokens} = await readUrl(url, JINA_API_KEY);
           allKnowledge.push({
             question: `What is in ${response.data.url}?`,
@@ -551,13 +531,13 @@ You decided to think out of the box or cut from a completely different angle.
       );
       diaryContext.push(`
 At step ${step}, you took the **visit** action and deep dive into the following URLs:
-${action.URLTargets.join('\n')}
+${thisStep.URLTargets.join('\n')}
 You found some useful information on the web and add them to your knowledge for future reference.
 `);
       updateContext({
         totalStep,
         question: currentQuestion,
-        ...action,
+        ...thisStep,
         result: urlResults
       });
 

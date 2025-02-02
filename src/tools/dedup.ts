@@ -41,34 +41,71 @@ function getPrompt(newQueries: string[], existingQueries: string[]): string {
 Core Rules:
 1. Consider semantic meaning and query intent, not just lexical similarity
 2. Account for different phrasings of the same information need
-3. A query is considered duplicate if its core information need is already covered by:
-   - any query in set A
-   - OR any query in set B
-4. Be aggressive - mark as duplicate as long as they are reasonably similar
-5. Different aspects or perspectives of the same object are not duplicates
-6. Consider query specificity - a more specific query might not be a duplicate of a general one
+3. A query is considered duplicate ONLY if:
+   - It has identical base keywords AND identical operators to another query in set A
+   - OR it has identical base keywords AND identical operators to a query in set B
+4. Queries with same base keywords but different operators are NOT duplicates
+5. Different aspects or perspectives of the same topic are not duplicates
+6. Consider query specificity - a more specific query is not a duplicate of a general one
+7. Search operators that make queries behave differently:
+   - Different site: filters (e.g., site:youtube.com vs site:github.com)
+   - Different file types (e.g., filetype:pdf vs filetype:doc)
+   - Different language/location filters (e.g., lang:en vs lang:es)
+   - Different exact match phrases (e.g., "exact phrase" vs no quotes)
+   - Different inclusion/exclusion (+/- operators)
+   - Different title/body filters (intitle: vs inbody:)
 
 Examples:
 
 Set A: [
-  "how to install python on windows",
-  "what's the best pizza in brooklyn heights",
-  "windows python installation guide",
-  "recommend good pizza places brooklyn heights"
+  "python tutorial site:youtube.com",
+  "python tutorial site:udemy.com",
+  "python tutorial filetype:pdf",
+  "best restaurants brooklyn",
+  "best restaurants brooklyn site:yelp.com",
+  "python tutorial site:youtube.com -beginner"
 ]
 Set B: [
-  "macbook setup guide",
-  "restaurant recommendations manhattan"
+  "python programming guide",
+  "brooklyn dining recommendations"
 ]
-Thought: Let's analyze set A both internally and against B:
-1. The first python installation query is unique
-2. The first pizza query is unique
-3. The second python query is a duplicate of the first
-4. The second pizza query is a duplicate of the earlier one
-Neither query in set B is similar enough to affect our decisions.
+Thought: Let's analyze each query in set A considering operators:
+1. First query targets YouTube tutorials - unique
+2. Second query targets Udemy - different site operator, so unique
+3. Third query targets PDF files - different filetype operator, so unique
+4. Fourth query is basic restaurant search - unique
+5. Fifth query adds Yelp filter - different site operator, so unique
+6. Sixth query has same site as first but adds exclusion - different operator combo, so unique
+None of the queries in set B have matching operators, so they don't cause duplicates.
 Unique Queries: [
-  "how to install python on windows",
-  "what's the best pizza in brooklyn heights"
+  "python tutorial site:youtube.com",
+  "python tutorial site:udemy.com",
+  "python tutorial filetype:pdf",
+  "best restaurants brooklyn",
+  "best restaurants brooklyn site:yelp.com",
+  "python tutorial site:youtube.com -beginner"
+]
+
+Set A: [
+  "machine learning +tensorflow filetype:pdf",
+  "machine learning +pytorch filetype:pdf",
+  "machine learning tutorial lang:en",
+  "machine learning tutorial lang:es"
+]
+Set B: [
+  "machine learning guide"
+]
+Thought: Analyzing queries with attention to operators:
+1. First query specifies tensorflow PDFs - unique
+2. Second query targets pytorch PDFs - different inclusion operator, so unique
+3. Third query targets English content - unique due to language filter
+4. Fourth query targets Spanish content - different language filter, so unique
+The query in set B has no operators and different base terms, so it doesn't affect our decisions.
+Unique Queries: [
+  "machine learning +tensorflow filetype:pdf",
+  "machine learning +pytorch filetype:pdf",
+  "machine learning tutorial lang:en",
+  "machine learning tutorial lang:es"
 ]
 
 Now, analyze these sets:
@@ -93,8 +130,7 @@ export async function dedupQueries(newQueries: string[], existingQueries: string
   }
 }
 
-// Example usage
-async function main() {
+export async function main() {
   const newQueries = process.argv[2] ? JSON.parse(process.argv[2]) : [];
   const existingQueries = process.argv[3] ? JSON.parse(process.argv[3]) : [];
 

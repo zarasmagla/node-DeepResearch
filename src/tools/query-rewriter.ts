@@ -1,9 +1,11 @@
-import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { GEMINI_API_KEY, MODEL_NAME } from "../config";
 import { tokenTracker } from "../utils/token-tracker";
+import { SearchAction } from "../types";
 
 type KeywordsResponse = {
-  keywords: string[];
+  thought: string;
+  queries: string[];
 };
 
 const responseSchema = {
@@ -13,18 +15,18 @@ const responseSchema = {
       type: SchemaType.STRING,
       description: "Strategic reasoning about query complexity and search approach"
     },
-    keywords: {
+    queries: {
       type: SchemaType.ARRAY,
       items: {
         type: SchemaType.STRING,
-        description: "Space-separated keywords (2-4 words) optimized for search"
+        description: "Search query with integrated operators"
       },
-      description: "Array of keyword combinations, each targeting a specific aspect",
+      description: "Array of search queries with appropriate operators",
       minItems: 1,
       maxItems: 3
     }
   },
-  required: ["thought", "keywords"]
+  required: ["thought", "queries"]
 };
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -37,81 +39,90 @@ const model = genAI.getGenerativeModel({
   }
 });
 
-function getPrompt(query: string): string {
-  return `You are an expert Information Retrieval Assistant. Transform user queries into precise keyword combinations, with strategic reasoning.
+function getPrompt(action: SearchAction): string {
+  return `You are an expert Information Retrieval Assistant. Transform user queries into precise keyword combinations with strategic reasoning and appropriate search operators.
 
 Core Rules:
-1. Always return keywords in array format, even for single queries
-2. Keep keywords minimal: 2-4 words preferred
-3. Split only when necessary for distinctly different aspects, but a comparison query may need multiple searches for each aspect
-4. Remove fluff words (question words, modals, qualifiers)
-5. Preserve crucial qualifiers (brands, versions, dates)
-6. The generated query should not be easily "captured" by those malicious SEO articles
+1. Generate search queries that directly include appropriate operators
+2. Keep base keywords minimal: 2-4 words preferred
+3. Use exact match quotes for specific phrases that must stay together
+4. Apply + operator for critical terms that must appear
+5. Use - operator to exclude irrelevant or ambiguous terms
+6. Add appropriate filters (filetype:, site:, lang:, loc:) when context suggests
+7. Split queries only when necessary for distinctly different aspects
+8. Preserve crucial qualifiers while removing fluff words
+9. Make the query resistant to SEO manipulation
+
+Available Operators:
+- "phrase" : exact match for phrases
+- +term : must include term
+- -term : exclude term
+- filetype:pdf/doc : specific file type
+- site:example.com : limit to specific site
+- lang:xx : language filter (ISO 639-1 code)
+- loc:xx : location filter (ISO 3166-1 code)
+- intitle:term : term must be in title
+- inbody:term : term must be in body text
 
 Examples with Strategic Reasoning:
 
-Input Query: What's the best pizza place in Brooklyn Heights?
-Thought: This is a straightforward location-based query. Since it's just about finding pizza places in a specific neighborhood, a single focused search should suffice. No need to complicate it by splitting into multiple searches.
-Output Keywords: ["brooklyn heights pizza"]
-
-Input Query: Why does my MacBook M1 Pro battery drain so fast after the latest OS update?
-Thought: Hmm, this seems simple at first, but we need multiple angles to properly diagnose. First, we should look for M1 specific battery issues. Then check the OS update problems, as it might be a known issue. By combining results from both searches, we should get a comprehensive answer.
-Output Keywords: [
-  "macbook m1 battery drain",
-  "macos update battery issues"
+Input Query: What's the difference between ReactJS and Vue.js for building web applications?
+Thought: This is a comparison query. User is likely looking for technical evaluation and objective feature comparisons, possibly for framework selection decisions. We'll split this into separate queries to capture both high-level differences and specific technical aspects.
+Queries: [
+  "react vue comparison +advantages +disadvantages",
+  "react vue performance +benchmark"
 ]
 
-Input Query: How does caffeine timing affect athletic performance and post-workout recovery for morning vs evening workouts?
-Thought: This is quite complex - it involves caffeine's effects in different contexts. We need to understand: 1) caffeine's impact on performance, 2) its role in recovery, and 3) timing considerations. All three aspects are crucial for a complete answer. By searching these separately, we can piece together a comprehensive understanding.
-Output Keywords: [
-  "caffeine athletic performance timing",
-  "caffeine post workout recovery",
-  "morning evening workout caffeine"
+Input Query: How to fix a leaking kitchen faucet?
+Thought: This is a how-to query seeking practical solutions. User likely wants step-by-step guidance and visual demonstrations for DIY repair. We'll target both video tutorials and written guides.
+Queries: [
+  "kitchen faucet leak repair site:youtube.com",
+  "faucet drip fix +diy +steps -professional",
+  "faucet repair tools +parts +guide"
 ]
 
-Input Query: Need help with my sourdough starter - it's not rising and smells like acetone
-Thought: Initially seems like it needs two searches - one for not rising, one for the smell. But wait - these symptoms are likely related and commonly occur together in sourdough troubleshooting. A single focused search should capture solutions for both issues.
-Output Keywords: ["sourdough starter troubleshooting"]
+Input Query: What are healthy breakfast options for type 2 diabetes?
+Thought: This is a health-specific informational query. User needs authoritative medical advice combined with practical meal suggestions. Splitting into medical guidelines and recipes will provide comprehensive coverage.
+Queries: [
+  "type 2 diabetes breakfast guidelines site:edu",
+  "diabetic breakfast recipes -sugar +easy"
+]
 
-Input Query: Looking for a Python machine learning framework that works well with Apple Silicon and can handle large language models
-Thought: This query looks straightforward but requires careful consideration. We need information about ML frameworks' compatibility with M1/M2 chips specifically, and then about their LLM capabilities. Two separate searches will give us more precise results than trying to find everything in one search.
-Output Keywords: [
-  "python ml framework apple silicon",
-  "python framework llm support"
+Input Query: Latest AWS Lambda features for serverless applications
+Thought: This is a product research query focused on recent updates. User wants current information about specific technology features, likely for implementation purposes. We'll target official docs and community insights.
+Queries: [
+  "aws lambda features site:aws.amazon.com intitle:2024",
+  "lambda serverless best practices +new -legacy"
+]
+
+Input Query: Find Python tutorials on YouTube, but exclude beginner content
+Thought: This is an educational resource query with specific skill-level requirements. User is seeking advanced learning materials on a specific platform. We'll focus on advanced topics while explicitly filtering out basic content.
+Queries: [
+  "python advanced programming site:youtube.com -beginner -basics",
+  "python design patterns tutorial site:youtube.com"
 ]
 
 Now, process this query:
-Input Query: ${query}`;
+Input Query: ${action.searchQuery}
+Intention: ${action.thoughts}
+`;
 }
 
-export async function rewriteQuery(query: string): Promise<{ keywords: string[], tokens: number }> {
+export async function rewriteQuery(action: SearchAction): Promise<{ queries: string[], tokens: number }> {
   try {
-    const prompt = getPrompt(query);
+    const prompt = getPrompt(action);
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const usage = response.usageMetadata;
     const json = JSON.parse(response.text()) as KeywordsResponse;
-    console.log('Query rewriter:', json.keywords)
+
+    console.log('Query rewriter:', json.queries);
     const tokens = usage?.totalTokenCount || 0;
     tokenTracker.trackUsage('query-rewriter', tokens);
-    return { keywords: json.keywords, tokens };
+
+    return { queries: json.queries, tokens };
   } catch (error) {
     console.error('Error in query rewriting:', error);
     throw error;
   }
-}
-
-// Example usage
-async function main() {
-  const query = process.argv[2] || "";
-
-  try {
-    await rewriteQuery(query);
-  } catch (error) {
-    console.error('Failed to rewrite query:', error);
-  }
-}
-
-if (require.main === module) {
-  main().catch(console.error);
 }
