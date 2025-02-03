@@ -1,9 +1,18 @@
+## DeepResearch
+
+Keep searching and reading webpages until finding the answer (or exceeding the token budget).
+
 ## Install
+
+We use gemini for llm, brave for search, jina reader for reading a webpage. 
 
 ```bash
 export GOOGLE_API_KEY=...  # ask han
 export BRAVE_API_KEY=...  # brave provide free key, ask han
 export JINA_API_KEY=jina_...  # get from jina.ai
+
+git clone https://github.com/jina-ai/node-DeepResearch.git
+cd node-DeepResearch
 npm install
 ```
 
