@@ -11,7 +11,7 @@ Query: `"who is the biggest? cohere, jina ai, voyage?"` - 13 steps
 We use gemini for llm, brave for search, jina reader for reading a webpage. 
 
 ```bash
-export GOOGLE_API_KEY=...  # ask han
+export GEMINI_API_KEY=...  # ask han
 export BRAVE_API_KEY=...  # brave provide free key, ask han
 export JINA_API_KEY=jina_...  # get from jina.ai
 
