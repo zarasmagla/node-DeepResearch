@@ -645,7 +645,7 @@ async function storeContext(prompt: string, memory: any[][], step: number) {
     await fs.writeFile(`prompt-${step}.txt`, prompt);
     const [context, keywords, questions, knowledge] = memory;
     await fs.writeFile('context.json', JSON.stringify(context, null, 2));
-    await fs.writeFile('keywords.json', JSON.stringify(keywords, null, 2));
+    await fs.writeFile('queries.json', JSON.stringify(keywords, null, 2));
     await fs.writeFile('questions.json', JSON.stringify(questions, null, 2));
     await fs.writeFile('knowledge.json', JSON.stringify(knowledge, null, 2));
   } catch (error) {
