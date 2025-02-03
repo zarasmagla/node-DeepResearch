@@ -1,8 +1,8 @@
-## DeepResearch
+# DeepResearch
 
 Keep searching and reading webpages until finding the answer (or exceeding the token budget).
 
-Query: `"who is the biggest? cohere, jina ai, voyage?"`
+Query: `"who is the biggest? cohere, jina ai, voyage?"` - 13 steps
 ![example-biggest](example-biggest.gif)
 
 
