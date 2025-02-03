@@ -2,7 +2,7 @@ import express, { Request, Response, RequestHandler } from 'express';
 import cors from 'cors';
 import { EventEmitter } from 'events';
 import { getResponse } from './agent';
-import { StepAction } from './types';
+import {StepAction, StreamMessage} from './types';
 import { TrackerContext } from './types/tracker';
 import fs from 'fs/promises';
 import path from 'path';
@@ -10,15 +10,10 @@ import path from 'path';
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Enable CORS for localhost debugging
 app.use(cors());
 app.use(express.json());
 
-// Create event emitter for SSE
 const eventEmitter = new EventEmitter();
-
-// Type definitions
-import { StreamMessage } from './types';
 
 interface QueryRequest extends Request {
   body: {
@@ -32,10 +27,27 @@ interface StreamResponse extends Response {
   write: (chunk: string) => boolean;
 }
 
-// SSE endpoint for progress updates
-app.get('/api/v1/stream/:requestId', ((req: Request, res: StreamResponse) => {
+async function checkRequestExists(requestId: string): Promise<boolean> {
+  try {
+    const taskPath = path.join(process.cwd(), 'tasks', `${requestId}.json`);
+    await fs.access(taskPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// SSE endpoint with request validation
+app.get('/api/v1/stream/:requestId', (async (req: Request, res: StreamResponse) => {
   const requestId = req.params.requestId;
-  
+
+  // Check if request exists before setting up SSE
+  const exists = await checkRequestExists(requestId);
+  if (!exists) {
+    res.status(404).json({ error: 'Request ID not found' });
+    return;
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -46,9 +58,13 @@ app.get('/api/v1/stream/:requestId', ((req: Request, res: StreamResponse) => {
 
   eventEmitter.on(`progress-${requestId}`, listener);
 
+  // Handle client disconnection
   req.on('close', () => {
     eventEmitter.removeListener(`progress-${requestId}`, listener);
   });
+
+  // Send initial connection confirmation
+  res.write(`data: ${JSON.stringify({ type: 'connected', requestId })}\n\n`);
 }) as RequestHandler);
 
 function createProgressEmitter(requestId: string, budget: number | undefined, context: TrackerContext) {
@@ -69,7 +85,6 @@ function createProgressEmitter(requestId: string, budget: number | undefined, co
   };
 }
 
-// POST endpoint to handle questions
 app.post('/api/v1/query', (async (req: QueryRequest, res: Response) => {
   const { q, budget, maxBadAttempt } = req.body;
   if (!q) {
@@ -86,7 +101,11 @@ app.post('/api/v1/query', (async (req: QueryRequest, res: Response) => {
     await storeTaskResult(requestId, result);
     eventEmitter.emit(`progress-${requestId}`, { type: 'answer', data: result });
   } catch (error: any) {
-    eventEmitter.emit(`progress-${requestId}`, { type: 'error', data: error?.message || 'Unknown error' });
+    eventEmitter.emit(`progress-${requestId}`, {
+      type: 'error',
+      data: error?.message || 'Unknown error',
+      status: 500
+    });
   }
 }) as RequestHandler);
 
@@ -100,10 +119,10 @@ async function storeTaskResult(requestId: string, result: StepAction) {
     );
   } catch (error) {
     console.error('Task storage failed:', error);
+    throw new Error('Failed to store task result');
   }
 }
 
-// GET endpoint to fetch task results
 app.get('/api/v1/task/:requestId', (async (req: Request, res: Response) => {
   const requestId = req.params.requestId;
   try {

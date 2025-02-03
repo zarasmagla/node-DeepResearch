@@ -243,10 +243,12 @@ function removeAllLineBreaks(text: string) {
   return text.replace(/(\r\n|\n|\r)/gm, " ");
 }
 
-export async function getResponse(question: string, tokenBudget: number = 1_000_000, maxBadAttempts: number = 3): Promise<{ result: StepAction; context: TrackerContext }> {
+export async function getResponse(question: string, tokenBudget: number = 1_000_000,
+                                  maxBadAttempts: number = 3,
+                                  existingContext?: Partial<TrackerContext>): Promise<{ result: StepAction; context: TrackerContext }> {
   const context: TrackerContext = {
-    tokenTracker: new TokenTracker(),
-    actionTracker: new ActionTracker()
+    tokenTracker: existingContext?.tokenTracker || new TokenTracker(),
+    actionTracker: existingContext?.actionTracker || new ActionTracker()
   };
   context.actionTracker.trackAction({ gaps: [question], totalStep: 0, badAttempts: 0 });
   let step = 0;
