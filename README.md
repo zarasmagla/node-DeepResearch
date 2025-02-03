@@ -11,16 +11,16 @@ Query: `"who is the biggest? cohere, jina ai, voyage?"` - 13 steps
 We use gemini for llm, brave for search, jina reader for reading a webpage. 
 
 ```bash
-export GOOGLE_API_KEY=...  # ask han
-export BRAVE_API_KEY=...  # brave provide free key, ask han
-export JINA_API_KEY=jina_...  # get from jina.ai
+export GOOGLE_API_KEY=...  # for gemini api, ask han
+export JINA_API_KEY=jina_...  # free jina api key, get from jina.ai/reader
+export BRAVE_API_KEY=...  # brave search provide free key, ask han
 
 git clone https://github.com/jina-ai/node-DeepResearch.git
 cd node-DeepResearch
 npm install
 ```
 
-## Example
+## Examples
 ```
 # example: no tool calling 
 npm run dev "1+1="
@@ -32,10 +32,10 @@ npm run dev "what is the latest news from Jina AI?"
 # example: 3-step
 npm run dev "what is the twitter account of jina ai's founder"
 
-# example: many-step, ambiguious question
+# example: 13-step, ambiguious question (no def of "big")
 npm run dev "who is bigger? cohere, jina ai, voyage?"
 
-# example: open question, long chain of thoughts
+# example: open question, research-like, long chain of thoughts
 npm run dev "who will be president of US in 2028?"
 npm run dev "what should be jina ai strategy for 2025?"
 ```
@@ -81,9 +81,11 @@ The server will emit the following event types:
 
 Example events:
 ```
-data: {"type":"progress","data":"Step 1 / Budget used 10%"}
-data: {"type":"progress","data":"Step 2 / Budget used 25%"}
-data: {"type":"answer","data":{"action":"answer","answer":"Paris is the capital of France","references":[]}}
+data: {"type":"progress","trackers":{"tokenUsage":74950,"tokenBreakdown":{"agent":64631,"read":10319},"actionState":{"action":"search","thoughts":"The provided text mentions several investors in Jina AI but doesn't specify ownership percentages.  A direct search for ownership percentages is needed to answer the question definitively.","URLTargets":[],"answer":"","questionsToAnswer":[],"references":[],"searchQuery":"Jina AI investor ownership percentages"},"step":7,"badAttempts":0,"gaps":[]}}
+
+data: {"type":"progress","trackers":{"tokenUsage":74950,"tokenBreakdown":{"agent":64631,"read":10319},"actionState":{"action":"search","thoughts":"The provided text mentions several investors in Jina AI's funding rounds but doesn't specify ownership percentages.  A search focusing on equity stakes and ownership percentages held by each investor will provide the necessary information to answer the main question.","URLTargets":[],"answer":"","questionsToAnswer":[],"references":[],"searchQuery":"Jina AI investor equity percentage ownership stake"},"step":8,"badAttempts":0,"gaps":[]}}
+
+data: {"type":"progress","trackers":{"tokenUsage":88096,"tokenBreakdown":{"agent":77777,"read":10319},"actionState":{"action":"search","thoughts":"The provided text mentions several investors in Jina AI's funding rounds but doesn't specify ownership percentages.  A search focusing on equity stakes and ownership percentages held by each investor will provide the necessary information to answer the main question.","URLTargets":[],"answer":"","questionsToAnswer":[],"references":[],"searchQuery":"Jina AI investor equity percentage ownership stake"},"step":8,"badAttempts":0,"gaps":[]}}
 ```
 
 
