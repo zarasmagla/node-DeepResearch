@@ -72,7 +72,3 @@ data: {"type":"progress","data":"Step 1 / Budget used 10%"}
 data: {"type":"progress","data":"Step 2 / Budget used 25%"}
 data: {"type":"answer","data":{"action":"answer","answer":"Paris is the capital of France","references":[]}}
 ```
-    class GapQueue,ContextStore,BadStore,QuestionStore,KeywordStore,KnowledgeStore,URLStore state
-    class OrigQuestion,TokenBudget input
-    class FinalAnswer output
-```
