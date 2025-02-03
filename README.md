@@ -8,12 +8,12 @@ Query: `"who is the biggest? cohere, jina ai, voyage?"` - 13 steps
 
 ## Install
 
-We use gemini for llm, brave for search, jina reader for reading a webpage. 
+We use gemini for llm, brave/duckduckgo for search, jina reader for reading a webpage. 
 
 ```bash
 export GOOGLE_API_KEY=...  # for gemini api, ask han
-export JINA_API_KEY=jina_...  # free jina api key, get from jina.ai/reader
-export BRAVE_API_KEY=...  # brave search provide free key, ask han
+export JINA_API_KEY=jina_...  # free jina api key, get from https://jina.ai/reader
+export BRAVE_API_KEY=...  # (optional, when not given it uses duckduckgo) brave search provide free key, ask han
 
 git clone https://github.com/jina-ai/node-DeepResearch.git
 cd node-DeepResearch
