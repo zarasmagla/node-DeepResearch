@@ -1,17 +1,26 @@
+## Install
+
 ```bash
 export GOOGLE_API_KEY=...  # ask han
-export BRAVE_API_KEY=...  # ask han
+export BRAVE_API_KEY=...  # brave provide free key, ask han
 export JINA_API_KEY=jina_...  # get from jina.ai
 npm install
+```
+
+## Example
+```
 # example: no tool calling 
 npm run dev "1+1="
 npm run dev "what is the capital of France?"
 
-# example: simple
+# example: 2-step
 npm run dev "what is the latest news from Jina AI?"
 
-# example: wrong answer
+# example: 3-step
 npm run dev "what is the twitter account of jina ai's founder"
+
+# example: many-step, ambiguious question
+npm run dev "who is bigger? cohere, jina ai, voyage?"
 
 # example: open question, long chain of thoughts
 npm run dev "who will be president of US in 2028?"
