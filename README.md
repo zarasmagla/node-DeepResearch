@@ -2,6 +2,10 @@
 
 Keep searching and reading webpages until finding the answer (or exceeding the token budget).
 
+Query: "who is the biggest? cohere, jina ai, voyage?"
+![example-biggest](example-biggest.gif)
+
+
 ## Install
 
 We use gemini for llm, brave for search, jina reader for reading a webpage. 
