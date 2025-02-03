@@ -11,7 +11,7 @@ import {GEMINI_API_KEY, JINA_API_KEY, SEARCH_PROVIDER, STEP_SLEEP, modelConfigs}
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
 import {StepAction, SchemaProperty, ResponseSchema, AnswerAction} from "./types";
-import {TrackerContext} from "./types/tracker";
+import {TrackerContext} from "./types";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -247,7 +247,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
                                   maxBadAttempts: number = 3,
                                   existingContext?: Partial<TrackerContext>): Promise<{ result: StepAction; context: TrackerContext }> {
   const context: TrackerContext = {
-    tokenTracker: existingContext?.tokenTracker || new TokenTracker(),
+    tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker()
   };
   context.actionTracker.trackAction({ gaps: [question], totalStep: 0, badAttempts: 0 });
@@ -308,6 +308,13 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
         responseSchema: getSchema(allowReflect, allowRead, allowAnswer, allowSearch)
       }
     });
+
+    // Check if we have enough budget for this operation (estimate 50 tokens for prompt + response)
+    const estimatedTokens = 50;
+    const currentUsage = context.tokenTracker.getTotalUsage();
+    if (currentUsage + estimatedTokens > tokenBudget) {
+      throw new Error(`Token budget would be exceeded: ${currentUsage + estimatedTokens} > ${tokenBudget}`);
+    }
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -557,8 +564,8 @@ You decided to think out of the box or cut from a completely different angle.
           uniqueURLs.map(async (url: string) => {
             const {response, tokens} = await readUrl(url, JINA_API_KEY, context.tokenTracker);
             allKnowledge.push({
-              question: `What is in ${response.data.url}?`,
-              answer: removeAllLineBreaks(response.data.content),
+              question: `What is in ${response.data?.url || 'the URL'}?`,
+              answer: removeAllLineBreaks(response.data?.content || 'No content available'),
               type: 'url'
             });
             visitedURLs.push(url);
@@ -627,6 +634,13 @@ You decided to think out of the box or cut from a completely different angle.`);
         responseSchema: getSchema(false, false, allowAnswer, false)
       }
     });
+
+    // Check if we have enough budget for this operation (estimate 50 tokens for prompt + response)
+    const estimatedTokens = 50;
+    const currentUsage = context.tokenTracker.getTotalUsage();
+    if (currentUsage + estimatedTokens > tokenBudget) {
+      throw new Error(`Token budget would be exceeded: ${currentUsage + estimatedTokens} > ${tokenBudget}`);
+    }
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
