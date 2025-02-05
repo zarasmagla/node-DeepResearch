@@ -7,7 +7,7 @@ import { DedupResponse } from '../types';
 const responseSchema = {
   type: SchemaType.OBJECT,
   properties: {
-    thought: {
+    think: {
       type: SchemaType.STRING,
       description: "Strategic reasoning about the overall deduplication approach"
     },
@@ -19,7 +19,7 @@ const responseSchema = {
       description: "Array of semantically unique queries from set A"
     }
   },
-  required: ["thought", "unique_queries"]
+  required: ["think", "unique_queries"]
 };
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);

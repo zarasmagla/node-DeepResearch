@@ -36,7 +36,7 @@ const model = genAI.getGenerativeModel({
 function getPrompt(diaryContext: string[]): string {
   return `You are an expert at analyzing search and reasoning processes. Your task is to analyze the given sequence of steps and identify what went wrong in the search process.
 
-Focus on:
+<rules>
 1. The sequence of actions taken
 2. The effectiveness of each step
 3. The logic between consecutive steps
@@ -44,9 +44,17 @@ Focus on:
 5. Signs of getting stuck in repetitive patterns
 6. Whether the final answer matches the accumulated information
 
-Based on the steps provided, generate a JSON response following this schema.
+Analyze the steps and provide detailed feedback following these guidelines:
+- In the recap: Summarize key actions chronologically, highlight patterns, and identify where the process started to go wrong
+- In the blame: Point to specific steps or patterns that led to the inadequate answer
+- In the improvement: Provide actionable suggestions that could have led to a better outcome
 
-Example steps to analyze:
+Generate a JSON response following JSON schema.
+</rules>
+
+<example>
+<input>
+<steps>
 
 At step 1, you took the **search** action and look for external information for the question: "how old is jina ai ceo?".
 In particular, you tried to search for the following keywords: "jina ai ceo age".
@@ -84,6 +92,8 @@ You found some useful information on the web and add them to your knowledge for 
 
 At step 7, you took **answer** action but evaluator thinks it is not a good answer:
 
+</steps>
+
 Original question: 
 how old is jina ai ceo?
 
@@ -92,13 +102,10 @@ The age of the Jina AI CEO cannot be definitively determined from the provided i
 
 The evaluator thinks your answer is bad because: 
 The answer is not definitive and fails to provide the requested information.  Lack of information is unacceptable, more search and deep reasoning is needed.
+</input>
 
-Analyze the steps and provide detailed feedback following these guidelines:
-- In the recap: Summarize key actions chronologically, highlight patterns, and identify where the process started to go wrong
-- In the blame: Point to specific steps or patterns that led to the inadequate answer
-- In the improvement: Provide actionable suggestions that could have led to a better outcome
 
-Example analysis output:
+<output>
 {
   "recap": "The search process consisted of 7 steps with multiple search and visit actions. The initial searches focused on basic biographical information through LinkedIn and Crunchbase (steps 1-2). When this didn't yield the specific age information, additional searches were conducted for birthdate information (steps 3-5). The process showed signs of repetition in steps 4-5 with identical searches. Final visits to entertainment websites (step 6) suggested a loss of focus on reliable business sources.",
   
@@ -106,7 +113,8 @@ Example analysis output:
   
   "improvement": "1. Avoid repeating identical searches and implement a strategy to track previously searched terms. 2. When direct age/birthdate searches fail, try indirect approaches like: searching for earliest career mentions, finding university graduation years, or identifying first company founding dates. 3. Focus on high-quality business sources and avoid entertainment websites for professional information. 4. Consider using industry event appearances or conference presentations where age-related context might be mentioned. 5. If exact age cannot be determined, provide an estimated range based on career timeline and professional achievements."
 }
-
+</output>
+</example>
 Review the steps below carefully and generate your analysis following this format.
 
 ${diaryContext.join('\n')}
