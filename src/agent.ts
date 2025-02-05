@@ -674,13 +674,15 @@ You decided to think out of the box or cut from a completely different angle.`);
 
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
   }
-  step++;
-  totalStep++;
+
   await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
   if (isAnswered) {
     return {result: thisStep, context};
   } else {
     console.log('Enter Beast mode!!!')
+    // any answer is better than no answer, humanity last resort
+    step ++;
+    totalStep ++;
     const prompt = getPrompt(
       question,
       diaryContext,
