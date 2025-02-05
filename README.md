@@ -2,8 +2,14 @@
 
 Keep searching, reading webpages, reasoning until it finds the answer (or exceeding the token budget).
 
-Query: `"who is the biggest? cohere, jina ai, voyage?"` - 13 steps
-![example-biggest](example-biggest.gif)
+## Demo
+Query: `"what is the latest blog post's title from jina ai?"`
+> 3 steps; answer correct!
+![demo1](demo.gif)
+
+Query: `"list all employees from jina ai that u can find, as many as possible"` 
+> 11 steps; partial answer, but incomplete complete, im not in it!
+![demo1](demo2.gif)
 
 
 ## Install
