@@ -111,7 +111,7 @@ function getPrompt(
   allowRead: boolean = true,
   allowSearch: boolean = true,
   badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
-  knowledge?: { question: string; answer: string; }[],
+  knowledge?: { question: string; answer: string; references: any[]}[],
   allURLs?: Record<string, string>,
   beastMode?: boolean
 ): string {
@@ -122,49 +122,78 @@ function getPrompt(
 
 You are an advanced AI research analyst specializing in multi-step reasoning. Using your training data and prior lessons learned, answer the following question with absolute certainty:
 
-## Question
-${question}`);
+<question>
+${question}
+</question>
+`);
 
   // Add context section if exists
   if (context?.length) {
-    sections.push(`## Context
+    sections.push(`
+<context>
 You have conducted the following actions:
 
-${context.join('\n')}`);
+${context.join('\n')}
+
+</context>
+`);
   }
 
   // Add knowledge section if exists
   if (knowledge?.length) {
     const knowledgeItems = knowledge
-      .map((k, i) => `### Knowledge ${i + 1}: ${k.question}\n${k.answer}`)
+      .map((k, i) => `
+<knowledge-${i + 1}>
+<question>
+${k.question}
+</question>
+<answer>
+${k.answer}
+</answer>
+<references>
+${JSON.stringify(k.references)}
+</references>
+</knowledge-${i + 1}>
+`)
       .join('\n\n');
 
-    sections.push(`## Knowledge
+    sections.push(`
+<knowledge>
 You have successfully gathered some knowledge which might be useful for answering the original question. Here is the knowledge you have gathered so far
 
-${knowledgeItems}`);
+${knowledgeItems}
+
+</knowledge>
+`);
   }
 
   // Add bad context section if exists
   if (badContext?.length) {
     const attempts = badContext
-      .map((c, i) => `### Attempt ${i + 1}
+      .map((c, i) => `
+<attempt-${i + 1}>
 - Question: ${c.question}
 - Answer: ${c.answer}
 - Reject Reason: ${c.evaluation}
 - Actions Recap: ${c.recap}
-- Actions Blame: ${c.blame}`)
+- Actions Blame: ${c.blame}
+</attempt-${i + 1}>
+`)
       .join('\n\n');
 
     const learnedStrategy = badContext.map(c => c.improvement).join('\n');
 
-    sections.push(`## Unsuccessful Attempts
+    sections.push(`
+<bad-attempts>    
 Your have tried the following actions but failed to find the answer to the question.
 
 ${attempts}
 
-## Learned Strategy
+</bad-attempts>
+
+<learned-strategy>
 ${learnedStrategy}
+</learned-strategy>
 `);
   }
 
@@ -176,50 +205,69 @@ ${learnedStrategy}
       .map(([url, desc]) => `  + "${url}": "${desc}"`)
       .join('\n');
 
-    actions.push(`**visit**:
+    actions.push(`
+<action-visit>    
 - Visit any URLs from below to gather external knowledge, choose the most relevant URLs that might contain the answer
+<url-list>
 ${urlList}
+</url-list>
 - When you have enough search result in the context and want to deep dive into specific URLs
-- It allows you to access the full content behind any URLs`);
+- It allows you to access the full content behind any URLs
+
+</action-visit>
+`);
   }
 
   if (allowSearch) {
-    actions.push(`**search**:
+    actions.push(`
+<action-search>    
 - Query external sources using a public search engine
 - Focus on solving one specific aspect of the question
-- Only give keywords search query, not full sentences`);
+- Only give keywords search query, not full sentences
+</action-search>
+`);
   }
 
   if (allowAnswer) {
-    actions.push(`**answer**:
+    actions.push(`
+<action-answer>
 - Provide final response only when 100% certain
-- Responses must be definitive (no ambiguity, uncertainty, or disclaimers)${allowReflect ? '\n- If doubts remain, use "reflect" instead' : ''}`);
+- Responses must be definitive (no ambiguity, uncertainty, or disclaimers)${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
+</action-answer>
+`);
   }
 
   if (beastMode) {
-   actions.push(`**answer**:
-- You have gathered enough information to answer the question; they may not be perfect, but this is your very last chance to answer the question.
-- Try the best of the best reasoning ability, investigate every details in the context and provide the best answer you can think of.
-- When uncertain, educated guess is allowed and encouraged, but make sure it is based on the context and knowledge you have gathered.
-- Responses must be definitive (no ambiguity, uncertainty, or disclaimers`);
+    actions.push(`
+<action-answer>
+- Any answer is better than no answer
+- Partial answers are allowed, but make sure they are based on the context and knowledge you have gathered    
+- When uncertain, educated guess based on the context and knowledge is allowed and encouraged.
+- Responses must be definitive (no ambiguity, uncertainty, or disclaimers)
+</action-answer>
+`);
   }
 
   if (allowReflect) {
-    actions.push(`**reflect**:
+    actions.push(`
+<action-reflect>    
 - Perform critical analysis through hypothetical scenarios or systematic breakdowns
 - Identify knowledge gaps and formulate essential clarifying questions
 - Questions must be:
   - Original (not variations of existing questions)
   - Focused on single concepts
   - Under 20 words
-  - Non-compound/non-complex`);
+  - Non-compound/non-complex
+</action-reflect>
+`);
   }
 
-  sections.push(`## Actions
-
+  sections.push(`
+<actions>
 Based on the current context, you must choose one of the following actions:
-
-${actions.join('\n\n')}`);
+${actions.join('\n\n')}
+</actions>
+`);
 
   // Add footer
   sections.push(`Respond exclusively in valid JSON format matching exact JSON schema.
@@ -243,6 +291,10 @@ function removeAllLineBreaks(text: string) {
   return text.replace(/(\r\n|\n|\r)/gm, " ");
 }
 
+function removeHTMLtags(text: string) {
+  return text.replace(/<[^>]*>?/gm, '');
+}
+
 export async function getResponse(question: string, tokenBudget: number = 1_000_000,
                                   maxBadAttempts: number = 3,
                                   existingContext?: Partial<TrackerContext>): Promise<{ result: StepAction; context: TrackerContext }> {
@@ -250,7 +302,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker()
   };
-  context.actionTracker.trackAction({ gaps: [question], totalStep: 0, badAttempts: 0 });
+  context.actionTracker.trackAction({gaps: [question], totalStep: 0, badAttempts: 0});
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
@@ -275,7 +327,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     await sleep(STEP_SLEEP);
     step++;
     totalStep++;
-    context.actionTracker.trackAction({ totalStep, thisStep, gaps, badAttempts });
+    context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
     const budgetPercentage = (context.tokenTracker.getTotalUsage() / tokenBudget * 100).toFixed(2);
     console.log(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
     console.log('Gaps:', gaps);
@@ -298,7 +350,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       allKnowledge,
       allURLs,
       false
-      );
+    );
 
     const model = genAI.getGenerativeModel({
       model: modelConfigs.agent.model,
@@ -439,15 +491,14 @@ Although you solved a sub-question, you still need to find the answer to the ori
         allKnowledge.push({
           question: currentQuestion,
           answer: thisStep.answer,
+          references: thisStep.references,
           type: 'qa'
         });
       }
     } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
       let newGapQuestions = thisStep.questionsToAnswer
       const oldQuestions = newGapQuestions;
-      if (allQuestions.length) {
-        newGapQuestions = (await dedupQueries(newGapQuestions, allQuestions)).unique_queries;
-      }
+      newGapQuestions = (await dedupQueries(newGapQuestions, allQuestions)).unique_queries;
       if (newGapQuestions.length > 0) {
         // found new gap questions
         diaryContext.push(`
@@ -479,10 +530,9 @@ But then you realized you have asked them before. You decided to to think out of
 
       const oldKeywords = keywordsQueries;
       // avoid exisitng searched queries
-      if (allKeywords.length) {
-        const {unique_queries: dedupedQueries} = await dedupQueries(keywordsQueries, allKeywords);
-        keywordsQueries = dedupedQueries;
-      }
+      const {unique_queries: dedupedQueries} = await dedupQueries(keywordsQueries, allKeywords);
+      keywordsQueries = dedupedQueries;
+
       if (keywordsQueries.length > 0) {
         const searchResults = [];
         for (const query of keywordsQueries) {
@@ -508,6 +558,14 @@ But then you realized you have asked them before. You decided to to think out of
             url: r.url,
             description: r.description,
           }));
+
+          allKnowledge.push({
+            question: `What do Internet say about ${query}?`,
+            answer: removeHTMLtags(minResults.map(r => `${r.description}`).join('; ')),
+            references: minResults.map(r => r.url),
+            type: 'side-info'
+          });
+
           for (const r of minResults) {
             allURLs[r.url] = r.title;
           }
@@ -559,6 +617,7 @@ You decided to think out of the box or cut from a completely different angle.
             allKnowledge.push({
               question: `What is in ${response.data?.url || 'the URL'}?`,
               answer: removeAllLineBreaks(response.data?.content || 'No content available'),
+              references: [response.data?.url],
               type: 'url'
             });
             visitedURLs.push(url);
@@ -602,7 +661,7 @@ You decided to think out of the box or cut from a completely different angle.`);
   totalStep++;
   await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
   if (isAnswered) {
-    return { result: thisStep, context };
+    return {result: thisStep, context};
   } else {
     console.log('Enter Beast mode!!!')
     const prompt = getPrompt(
@@ -617,7 +676,7 @@ You decided to think out of the box or cut from a completely different angle.`);
       allKnowledge,
       allURLs,
       true
-      );
+    );
 
     const model = genAI.getGenerativeModel({
       model: modelConfigs.agentBeastMode.model,
@@ -636,7 +695,7 @@ You decided to think out of the box or cut from a completely different angle.`);
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
     thisStep = JSON.parse(response.text());
     console.log(thisStep)
-    return { result: thisStep, context };
+    return {result: thisStep, context};
   }
 }
 
@@ -658,7 +717,10 @@ const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 export async function main() {
   const question = process.argv[2] || "";
-  const { result: finalStep, context: tracker } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
+  const {
+    result: finalStep,
+    context: tracker
+  } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
   console.log('Final Answer:', finalStep.answer);
 
   tracker.tokenTracker.printSummary();
