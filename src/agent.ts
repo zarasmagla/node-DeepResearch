@@ -339,7 +339,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
     // update all urls with buildURLMap
     allowRead = allowRead && (Object.keys(allURLs).length > 0);
-    allowSearch = allowSearch && (Object.keys(allURLs).length < 20);  // disable search when too many urls already
+    allowSearch = allowSearch && (Object.keys(allURLs).length < 50);  // disable search when too many urls already
 
     // generate prompt for this step
     prompt = getPrompt(
