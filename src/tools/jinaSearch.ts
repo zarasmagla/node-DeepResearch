@@ -28,8 +28,7 @@ export function jinaSearch(query: string, tracker?: TokenTracker): Promise<{ res
       res.on('data', (chunk) => responseData += chunk);
       res.on('end', () => {
         const response = JSON.parse(responseData) as SearchResponse;
-        console.log('Raw response:', response);
-        
+
         if (!query.trim()) {
           reject(new Error('Query cannot be empty'));
           return;
@@ -46,11 +45,7 @@ export function jinaSearch(query: string, tracker?: TokenTracker): Promise<{ res
         }
 
         const totalTokens = response.data.reduce((sum, item) => sum + (item.usage?.tokens || 0), 0);
-        console.log('Search:', response.data.map(item => ({
-          title: item.title,
-          url: item.url,
-          tokens: item.usage?.tokens || 0
-        })));
+        console.log('Total URLs:', response.data.length);
         (tracker || new TokenTracker()).trackUsage('search', totalTokens);
         resolve({ response, tokens: totalTokens });
       });
