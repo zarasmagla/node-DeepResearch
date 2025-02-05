@@ -8,7 +8,7 @@ import { KeywordsResponse } from '../types';
 const responseSchema = {
   type: SchemaType.OBJECT,
   properties: {
-    thought: {
+    think: {
       type: SchemaType.STRING,
       description: "Strategic reasoning about query complexity and search approach"
     },
@@ -23,7 +23,7 @@ const responseSchema = {
       maxItems: 3
     }
   },
-  required: ["thought", "queries"]
+  required: ["think", "queries"]
 };
 
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
@@ -67,7 +67,9 @@ A query can't only have operators; and operators can't be at the start a query;
 
 <examples>
 Input Query: What's the difference between ReactJS and Vue.js for building web applications?
-Thought: This is a comparison query. User is likely looking for technical evaluation and objective feature comparisons, possibly for framework selection decisions. We'll split this into separate queries to capture both high-level differences and specific technical aspects.
+<think>
+This is a comparison query. User is likely looking for technical evaluation and objective feature comparisons, possibly for framework selection decisions. We'll split this into separate queries to capture both high-level differences and specific technical aspects.
+</think>
 Queries: [
   "react performance",
   "vue performance",
@@ -75,7 +77,9 @@ Queries: [
 ]
 
 Input Query: How to fix a leaking kitchen faucet?
-Thought: This is a how-to query seeking practical solutions. User likely wants step-by-step guidance and visual demonstrations for DIY repair. We'll target both video tutorials and written guides.
+<think>
+This is a how-to query seeking practical solutions. User likely wants step-by-step guidance and visual demonstrations for DIY repair. We'll target both video tutorials and written guides.
+</think>
 Queries: [
   "kitchen faucet leak repair",
   "faucet drip fix site:youtube.com",
@@ -83,7 +87,9 @@ Queries: [
 ]
 
 Input Query: What are healthy breakfast options for type 2 diabetes?
-Thought: This is a health-specific informational query. User needs authoritative medical advice combined with practical meal suggestions. Splitting into medical guidelines and recipes will provide comprehensive coverage.
+<think>
+This is a health-specific informational query. User needs authoritative medical advice combined with practical meal suggestions. Splitting into medical guidelines and recipes will provide comprehensive coverage.
+</think>
 Queries: [
   "what to eat for type 2 diabetes",
   "type 2 diabetes breakfast guidelines",
@@ -91,7 +97,9 @@ Queries: [
 ]
 
 Input Query: Latest AWS Lambda features for serverless applications
-Thought: This is a product research query focused on recent updates. User wants current information about specific technology features, likely for implementation purposes. We'll target official docs and community insights.
+<think>
+This is a product research query focused on recent updates. User wants current information about specific technology features, likely for implementation purposes. We'll target official docs and community insights.
+</think>
 Queries: [
   "aws lambda features site:aws.amazon.com intitle:2025",
   "new features lambda serverless"
@@ -100,7 +108,7 @@ Queries: [
 
 Now, process this query:
 Input Query: ${action.searchQuery}
-Intention: ${action.thoughts}
+Intention: ${action.think}
 `;
 }
 

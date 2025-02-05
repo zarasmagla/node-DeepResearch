@@ -5,7 +5,7 @@ describe('rewriteQuery', () => {
     const { queries } = await rewriteQuery({
       action: 'search',
       searchQuery: 'how does typescript work',
-      thoughts: 'Understanding TypeScript basics'
+      think: 'Understanding TypeScript basics'
     });
     expect(Array.isArray(queries)).toBe(true);
     expect(queries.length).toBeGreaterThan(0);

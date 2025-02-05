@@ -27,7 +27,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
       enum: actions,
       description: "Must match exactly one action type"
     },
-    thoughts: {
+    think: {
       type: SchemaType.STRING,
       description: "Explain why choose this action, what's the thought process behind choosing this action"
     }
@@ -98,7 +98,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   return {
     type: SchemaType.OBJECT,
     properties,
-    required: ["action", "thoughts"]
+    required: ["action", "think"]
   };
 }
 
@@ -130,9 +130,8 @@ ${question}
   // Add context section if exists
   if (context?.length) {
     sections.push(`
-<context>
 You have conducted the following actions:
-
+<context>
 ${context.join('\n')}
 
 </context>
@@ -158,8 +157,8 @@ ${JSON.stringify(k.references)}
       .join('\n\n');
 
     sections.push(`
+You have successfully gathered some knowledge which might be useful for answering the original question. Here is the knowledge you have gathered so far:
 <knowledge>
-You have successfully gathered some knowledge which might be useful for answering the original question. Here is the knowledge you have gathered so far
 
 ${knowledgeItems}
 
@@ -184,13 +183,14 @@ ${knowledgeItems}
     const learnedStrategy = badContext.map(c => c.improvement).join('\n');
 
     sections.push(`
+Your have tried the following actions but failed to find the answer to the question:
 <bad-attempts>    
-Your have tried the following actions but failed to find the answer to the question.
 
 ${attempts}
 
 </bad-attempts>
 
+Based on the failed attempts, you have learned the following strategy:
 <learned-strategy>
 ${learnedStrategy}
 </learned-strategy>
@@ -263,8 +263,8 @@ ${urlList}
   }
 
   sections.push(`
-<actions>
 Based on the current context, you must choose one of the following actions:
+<actions>
 ${actions.join('\n\n')}
 </actions>
 `);
@@ -317,7 +317,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
   let allowRead = true;
   let allowReflect = true;
   let prompt = '';
-  let thisStep: StepAction = {action: 'answer', answer: '', references: [], thoughts: ''};
+  let thisStep: StepAction = {action: 'answer', answer: '', references: [], think: ''};
   let isAnswered = false;
 
   const allURLs: Record<string, string> = {};
@@ -559,19 +559,21 @@ But then you realized you have asked them before. You decided to to think out of
             description: r.description,
           }));
 
-          allKnowledge.push({
-            question: `What do Internet say about ${query}?`,
-            answer: removeHTMLtags(minResults.map(r => `${r.description}`).join('; ')),
-            references: minResults.map(r => r.url),
-            type: 'side-info'
-          });
-
           for (const r of minResults) {
             allURLs[r.url] = r.title;
           }
           searchResults.push({query, results: minResults});
           allKeywords.push(query);
         }
+
+        allKnowledge.push({
+            question: `What do Internet say about ${thisStep.searchQuery}?`,
+            answer: removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
+            // flatten into one url list, and take unique urls
+            references: searchResults.map(r => r.results.map(r => r.url)).flat().filter((v, i, a) => a.indexOf(v) === i),
+            type: 'side-info'
+          });
+
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords: "${keywordsQueries.join(', ')}".

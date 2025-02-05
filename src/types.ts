@@ -3,7 +3,7 @@ import { SchemaType } from "@google/generative-ai";
 // Action Types
 type BaseAction = {
   action: "search" | "answer" | "reflect" | "visit";
-  thoughts: string;
+  think: string;
 };
 
 export type SearchAction = BaseAction & {
@@ -64,7 +64,7 @@ export interface BraveSearchResponse {
 }
 
 export type DedupResponse = {
-  thought: string;
+  think: string;
   unique_queries: string[];
 };
 
@@ -115,7 +115,7 @@ export interface StepData {
 }
 
 export type KeywordsResponse = {
-  thought: string;
+  think: string;
   queries: string[];
 };
 
