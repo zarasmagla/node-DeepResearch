@@ -7,11 +7,12 @@ import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
-import {GEMINI_API_KEY, JINA_API_KEY, SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
+import {GEMINI_API_KEY, SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
 import {StepAction, SchemaProperty, ResponseSchema, AnswerAction} from "./types";
 import {TrackerContext} from "./types";
+import {jinaSearch} from "./tools/jinaSearch";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -541,6 +542,10 @@ But then you realized you have asked them before. You decided to to think out of
 
           let results;
           switch (SEARCH_PROVIDER) {
+            case 'jina':
+              // use jinaSearch
+              results = {results: (await jinaSearch(query, context.tokenTracker)).response?.data || []};
+              break;
             case 'duck':
               results = await duckSearch(query, {safeSearch: SafeSearchType.STRICT});
               break;
@@ -625,7 +630,7 @@ You decided to think out of the box or cut from a completely different angle.
 
         const urlResults = await Promise.all(
           uniqueURLs.map(async (url: string) => {
-            const {response, tokens} = await readUrl(url, JINA_API_KEY, context.tokenTracker);
+            const {response, tokens} = await readUrl(url, context.tokenTracker);
             allKnowledge.push({
               question: `What is in ${response.data?.url || 'the URL'}?`,
               answer: removeAllLineBreaks(response.data?.content || 'No content available'),

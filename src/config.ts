@@ -32,7 +32,7 @@ if (process.env.https_proxy) {
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
 export const JINA_API_KEY = process.env.JINA_API_KEY as string;
 export const BRAVE_API_KEY = process.env.BRAVE_API_KEY as string;
-export const SEARCH_PROVIDER = BRAVE_API_KEY ? 'brave' : 'duck';
+export const SEARCH_PROVIDER: 'brave' | 'jina' | 'duck' = 'jina'
 
 const DEFAULT_MODEL = 'gemini-1.5-flash';
 

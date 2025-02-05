@@ -25,12 +25,11 @@ flowchart LR
 
 ## Install
 
-We use gemini for llm, brave/duckduckgo for search, [jina reader](https://jina.ai/reader) for reading a webpage. 
+We use gemini for llm, [jina reader](https://jina.ai/reader) for searching and reading webpages. 
 
 ```bash
 export GEMINI_API_KEY=...  # for gemini api, ask han
 export JINA_API_KEY=jina_...  # free jina api key, get from https://jina.ai/reader
-export BRAVE_API_KEY=...  # (optional, when not given it uses duckduckgo) brave search provide free key, ask han
 
 git clone https://github.com/jina-ai/node-DeepResearch.git
 cd node-DeepResearch

@@ -1,10 +1,10 @@
-import { search } from '../search';
+import { jinaSearch } from '../jinaSearch';
 import { TokenTracker } from '../../utils/token-tracker';
 
 describe('search', () => {
   it.skip('should perform search with Jina API (skipped due to insufficient balance)', async () => {
     const tokenTracker = new TokenTracker();
-    const { response } = await search('TypeScript programming', process.env.JINA_API_KEY!, tokenTracker);
+    const { response } = await jinaSearch('TypeScript programming', process.env.JINA_API_KEY!, tokenTracker);
     expect(response).toBeDefined();
     expect(response.data).toBeDefined();
     if (response.data === null) {
@@ -15,7 +15,7 @@ describe('search', () => {
   }, 15000);
 
   it('should handle empty query', async () => {
-    await expect(search('', process.env.JINA_API_KEY!)).rejects.toThrow();
+    await expect(jinaSearch('', process.env.JINA_API_KEY!)).rejects.toThrow();
   }, 15000);
 
   beforeEach(() => {

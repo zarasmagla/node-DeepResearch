@@ -2,8 +2,9 @@ import https from 'https';
 import { TokenTracker } from "../utils/token-tracker";
 
 import { ReadResponse } from '../types';
+import {JINA_API_KEY} from "../config";
 
-export function readUrl(url: string, token: string, tracker?: TokenTracker): Promise<{ response: ReadResponse, tokens: number }> {
+export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response: ReadResponse, tokens: number }> {
   return new Promise((resolve, reject) => {
     const data = JSON.stringify({url});
 
@@ -14,7 +15,7 @@ export function readUrl(url: string, token: string, tracker?: TokenTracker): Pro
       method: 'POST',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${JINA_API_KEY}`,
         'Content-Type': 'application/json',
         'Content-Length': data.length,
         'X-Retain-Images': 'none',

@@ -2,8 +2,9 @@ import https from 'https';
 import { TokenTracker } from "../utils/token-tracker";
 
 import { SearchResponse } from '../types';
+import {JINA_API_KEY} from "../config";
 
-export function search(query: string, token: string, tracker?: TokenTracker): Promise<{ response: SearchResponse, tokens: number }> {
+export function jinaSearch(query: string, tracker?: TokenTracker): Promise<{ response: SearchResponse, tokens: number }> {
   return new Promise((resolve, reject) => {
     if (!query.trim()) {
       reject(new Error('Query cannot be empty'));
@@ -13,11 +14,11 @@ export function search(query: string, token: string, tracker?: TokenTracker): Pr
     const options = {
       hostname: 's.jina.ai',
       port: 443,
-      path: `/${encodeURIComponent(query)}`,
+      path: `/${encodeURIComponent(query)}?count=0`,
       method: 'GET',
       headers: {
         'Accept': 'application/json',
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${JINA_API_KEY}`,
         'X-Retain-Images': 'none'
       }
     };
