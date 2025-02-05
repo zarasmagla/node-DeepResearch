@@ -2,6 +2,26 @@
 
 Keep searching, reading webpages, reasoning until it finds the answer (or exceeding the token budget).
 
+```mermaid
+---
+config:
+  theme: mc
+  look: handDrawn
+---
+flowchart LR
+ subgraph Loop["until budget exceed"]
+    direction LR
+        Search["Search"]
+        Read["Read"]
+        Reason["Reason"]
+  end
+    Query(["Query"]) --> Loop
+    Search --> Read
+    Read --> Reason
+    Reason --> Search
+    Loop --> Answer(["Answer"])
+
+```
 
 ## Install
 
