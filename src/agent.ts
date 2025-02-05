@@ -150,9 +150,11 @@ ${k.question}
 <answer>
 ${k.answer}
 </answer>
+${k.references.length > 0 ? `
 <references>
 ${JSON.stringify(k.references)}
 </references>
+` : ''}
 </knowledge-${i + 1}>
 `)
       .join('\n\n');
@@ -508,7 +510,7 @@ At step ${step}, you took **reflect** and think about the knowledge gaps. You fo
 You realize you need to know the answers to the following sub-questions:
 ${newGapQuestions.map((q: string) => `- ${q}`).join('\n')}
 
-You will now figure out the answers to these sub-questions and see if they can help me find the answer to the original question.
+You will now figure out the answers to these sub-questions and see if they can help you find the answer to the original question.
 `);
         gaps.push(...newGapQuestions);
         allQuestions.push(...newGapQuestions);
@@ -521,7 +523,7 @@ But then you realized you have asked them before. You decided to to think out of
         updateContext({
           totalStep,
           ...thisStep,
-          result: 'I have tried all possible questions and found no useful information. I must think out of the box or different angle!!!'
+          result: 'You have tried all possible questions and found no useful information. You must think out of the box or different angle!!!'
         });
 
         allowReflect = false;
@@ -613,7 +615,7 @@ You decided to think out of the box or cut from a completely different angle.
         updateContext({
           totalStep,
           ...thisStep,
-          result: 'I have tried all possible queries and found no new information. I must think out of the box or different angle!!!'
+          result: 'You have tried all possible queries and found no new information. You must think out of the box or different angle!!!'
         });
 
         allowSearch = false;
@@ -665,7 +667,7 @@ You decided to think out of the box or cut from a completely different angle.`);
         updateContext({
           totalStep,
           ...thisStep,
-          result: 'I have visited all possible URLs and found no new information. I must think out of the box or different angle!!!'
+          result: 'You have visited all possible URLs and found no new information. You must think out of the box or different angle!!!'
         });
 
         allowRead = false;

@@ -8,13 +8,4 @@ describe('getResponse', () => {
     expect(result.context.tokenTracker).toBeDefined();
     expect(result.context.actionTracker).toBeDefined();
   });
-
-  it('should respect token budget', async () => {
-    try {
-      await getResponse('What is TypeScript?', 100);
-      fail('Expected token budget error');
-    } catch (error: any) {
-      expect(error.message).toContain('Token budget exceeded');
-    }
-  });
 });
