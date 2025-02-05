@@ -111,7 +111,7 @@ function getPrompt(
   allowRead: boolean = true,
   allowSearch: boolean = true,
   badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
-  knowledge?: { question: string; answer: string; references: any[]}[],
+  knowledge?: { question: string; answer: string; references: any[] }[],
   allURLs?: Record<string, string>,
   beastMode?: boolean
 ): string {
@@ -294,6 +294,7 @@ function removeAllLineBreaks(text: string) {
 function removeHTMLtags(text: string) {
   return text.replace(/<[^>]*>?/gm, '');
 }
+
 
 export async function getResponse(question: string, tokenBudget: number = 1_000_000,
                                   maxBadAttempts: number = 3,
@@ -537,42 +538,51 @@ But then you realized you have asked them before. You decided to to think out of
         const searchResults = [];
         for (const query of keywordsQueries) {
           console.log(`Search query: ${query}`);
+
           let results;
-          if (SEARCH_PROVIDER === 'duck') {
-            results = await duckSearch(query, {
-              safeSearch: SafeSearchType.STRICT
-            });
-          } else {
-            const {response} = await braveSearch(query);
-            await sleep(STEP_SLEEP);
-            results = {
-              results: response.web.results.map(r => ({
-                title: r.title,
-                url: r.url,
-                description: r.description
-              }))
-            };
+          switch (SEARCH_PROVIDER) {
+            case 'duck':
+              results = await duckSearch(query, {safeSearch: SafeSearchType.STRICT});
+              break;
+            case 'brave':
+              try {
+                const {response} = await braveSearch(query);
+                results = {
+                  results: response.web?.results?.map(r => ({
+                    title: r.title,
+                    url: r.url,
+                    description: r.description
+                  })) || []
+                };
+              } catch (error) {
+                console.error('Brave search failed:', error);
+                results = {results: []};
+              }
+              await sleep(STEP_SLEEP)
+              break;
+            default:
+              results = {results: []};
           }
           const minResults = results.results.map(r => ({
             title: r.title,
             url: r.url,
-            description: r.description,
+            description: r.description
           }));
 
-          for (const r of minResults) {
-            allURLs[r.url] = r.title;
-          }
+          Object.assign(allURLs, Object.fromEntries(
+            minResults.map(r => [r.url, r.title])
+          ));
           searchResults.push({query, results: minResults});
           allKeywords.push(query);
         }
 
         allKnowledge.push({
-            question: `What do Internet say about ${thisStep.searchQuery}?`,
-            answer: removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
-            // flatten into one url list, and take unique urls
-            references: searchResults.map(r => r.results.map(r => r.url)).flat().filter((v, i, a) => a.indexOf(v) === i),
-            type: 'side-info'
-          });
+          question: `What do Internet say about ${thisStep.searchQuery}?`,
+          answer: removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
+          // flatten into one url list, and take unique urls
+          references: searchResults.map(r => r.results.map(r => r.url)).flat().filter((v, i, a) => a.indexOf(v) === i),
+          type: 'side-info'
+        });
 
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".

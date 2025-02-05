@@ -79,7 +79,7 @@ Function FilterSetA(setA, setB, threshold):
    - Different title/body filters (intitle: vs inbody:)
 </similarity-definition>
 
-Now, run FilterSetA on the following:
+Now with threshold set to 0.2; run FilterSetA on the following:
 SetA: ${JSON.stringify(newQueries)}
 SetB: ${JSON.stringify(existingQueries)}`;
 }
