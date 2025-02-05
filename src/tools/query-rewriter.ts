@@ -46,12 +46,11 @@ function getPrompt(action: SearchAction): string {
 4. Split queries only when necessary for distinctly different aspects
 5. Preserve crucial qualifiers while removing fluff words
 6. Make the query resistant to SEO manipulation
-7. When necessary, append <query-operators> to the query when context suggests
+7. When necessary, append <query-operators> at the end only when must needed
 
 
 <query-operators>
-A query can't only have operators;
-Operators can't be at the start a query;
+A query can't only have operators; and operators can't be at the start a query;
 
 - "phrase" : exact match for phrases
 - +term : must include term; for critical terms that must appear
