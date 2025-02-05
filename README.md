@@ -2,19 +2,10 @@
 
 Keep searching, reading webpages, reasoning until it finds the answer (or exceeding the token budget).
 
-## Demo
-Query: `"what is the latest blog post's title from jina ai?"`
-> 3 steps; answer correct!
-![demo1](demo.gif)
-
-Query: `"list all employees from jina ai that u can find, as many as possible"` 
-> 11 steps; partial answer, but incomplete complete, im not in it!
-![demo1](demo2.gif)
-
 
 ## Install
 
-We use gemini for llm, brave/duckduckgo for search, jina reader for reading a webpage. 
+We use gemini for llm, brave/duckduckgo for search, [jina reader](https://jina.ai/reader) for reading a webpage. 
 
 ```bash
 export GEMINI_API_KEY=...  # for gemini api, ask han
@@ -26,7 +17,30 @@ cd node-DeepResearch
 npm install
 ```
 
-## Examples
+## Demo
+Query: `"what is the latest blog post's title from jina ai?"`
+> 3 steps; answer is correct!
+![demo1](demo.gif)
+
+Query: `"what is the context length of readerlm-v2?"`
+> 2 steps; answer is correct!
+![demo1](demo3.gif)
+
+Query: `"list all employees from jina ai that u can find, as many as possible"` 
+> 11 steps; partially correct, but im not in the list :(
+![demo1](demo2.gif)
+
+Query: `"who will be the biggest competitor of Jina AI"` 
+> 42 steps; future prediction kind, so it's arguably correct.
+![demo1](demo4.gif)
+
+
+## Usage
+
+```bash
+npm run dev $QUERY
+```
+
 ```
 # example: no tool calling 
 npm run dev "1+1="

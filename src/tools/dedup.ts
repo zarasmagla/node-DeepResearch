@@ -14,9 +14,10 @@ const responseSchema = {
     unique_queries: {
       type: SchemaType.ARRAY,
       items: {
-        type: SchemaType.STRING
+        type: SchemaType.STRING,
+        description: "Unique query that passed the deduplication process, must be less than 30 characters"
       },
-      description: "Array of semantically unique queries from set A"
+      description: "Array of semantically unique queries"
     }
   },
   required: ["think", "unique_queries"]

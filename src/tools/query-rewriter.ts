@@ -16,9 +16,9 @@ const responseSchema = {
       type: SchemaType.ARRAY,
       items: {
         type: SchemaType.STRING,
-        description: "Search query with integrated operators"
+        description: "Search query, must be less than 30 characters"
       },
-      description: "Array of search queries with appropriate operators",
+      description: "Array of search queries, orthogonal to each other",
       minItems: 1,
       maxItems: 3
     }
