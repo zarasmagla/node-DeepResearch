@@ -34,11 +34,11 @@ Query: `"what is the context length of readerlm-v2?"`
 ![demo1](demo3.gif)
 
 Query: `"list all employees from jina ai that u can find, as many as possible"` 
-11 steps; partially correct, but im not in the list :(
+11 steps; partially correct! but im not in the list :(
 ![demo1](demo2.gif)
 
 Query: `"who will be the biggest competitor of Jina AI"` 
-42 steps; future prediction kind, so it's arguably correct.
+42 steps; future prediction kind, so it's arguably correct! atm Im not seeing `weaviate` as a competitor, but im open for the future "i told you so" moment.
 ![demo1](demo4.gif)
 
 More examples:
