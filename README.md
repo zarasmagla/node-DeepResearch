@@ -31,10 +31,11 @@ cd node-DeepResearch
 npm install
 ```
 
+[安装部署视频教程 on Youtube](https://youtu.be/vrpraFiPUyA)
 
 ## Usage
 
-We use Gemini (`gemini-2.0-flash`)/OpenAI/[LocalLLM](#use-local-llm) for reasoning, [Jina Reader](https://jina.ai/reader) for searching and reading webpages, you can get a free API key with 1M tokens from jina.ai. 
+We use Gemini (latest `gemini-2.0-flash`) / OpenAI / [LocalLLM](#use-local-llm) for reasoning, [Jina Reader](https://jina.ai/reader) for searching and reading webpages, you can get a free API key with 1M tokens from jina.ai. 
 
 ```bash
 export GEMINI_API_KEY=...  # for gemini
@@ -156,7 +157,7 @@ docker build -t deepresearch:latest .
 ### Run Docker Container
 To run the Docker container, use the following command:
 ```bash
-docker run -p 3000:3000 --env GEMINI_API_KEY=your_gemini_api_key --env JINA_API_KEY=your_jina_api_key --env BRAVE_API_KEY=your_brave_api_key deepresearch:latest
+docker run -p 3000:3000 --env GEMINI_API_KEY=your_gemini_api_key --env JINA_API_KEY=your_jina_api_key deepresearch:latest
 ```
 
 ### Docker Compose
