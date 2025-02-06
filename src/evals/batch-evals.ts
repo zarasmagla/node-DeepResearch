@@ -1,10 +1,10 @@
 import fs from 'fs/promises';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { getResponse } from '../agent';
-import { generateObject } from 'ai';
-import { getModel, getMaxTokens } from '../config';
-import { z } from 'zod';
+import {exec} from 'child_process';
+import {promisify} from 'util';
+import {getResponse} from '../agent';
+import {generateObject} from 'ai';
+import {getModel, getMaxTokens} from '../config';
+import {z} from 'zod';
 import {AnswerAction, TrackerContext} from "../types";
 
 const execAsync = promisify(exec);
@@ -26,7 +26,7 @@ interface EvaluationResult {
 
 async function getCurrentGitCommit(): Promise<string> {
   try {
-    const { stdout } = await execAsync('git rev-parse --short HEAD');
+    const {stdout} = await execAsync('git rev-parse --short HEAD');
     return stdout.trim();
   } catch (error) {
     console.error('Error getting git commit:', error);
@@ -70,15 +70,19 @@ async function batchEvaluate(inputFile: string): Promise<void> {
   // Read and parse input file
   const questions: Question[] = JSON.parse(await fs.readFile(inputFile, 'utf-8'));
   const results: EvaluationResult[] = [];
-
+  const gitCommit = await getCurrentGitCommit();
+  const outputFile = `eval-${gitCommit}.json`;
   // Process each question
   for (let i = 0; i < questions.length; i++) {
-    const { question, answer: expectedAnswer } = questions[i];
+    const {question, answer: expectedAnswer} = questions[i];
     console.log(`\nProcessing question ${i + 1}/${questions.length}: ${question}`);
 
     try {
       // Get response using the agent
-      const { result: response, context } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
+      const {
+        result: response,
+        context
+      } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
       const actualAnswer = response.answer;
 
       // Evaluate the response
@@ -109,13 +113,12 @@ async function batchEvaluate(inputFile: string): Promise<void> {
         actual_answer: 'Error occurred'
       });
     }
+    // Save results
+    await fs.writeFile(outputFile, JSON.stringify(results, null, 2));
+    console.log(`\nEvaluation results saved to ${outputFile}`);
   }
 
-  // Save results
-  const gitCommit = await getCurrentGitCommit();
-  const outputFile = `eval-${gitCommit}.json`;
-  await fs.writeFile(outputFile, JSON.stringify(results, null, 2));
-  console.log(`\nEvaluation results saved to ${outputFile}`);
+
 }
 
 // Run batch evaluation if this is the main module
@@ -129,4 +132,4 @@ if (require.main === module) {
   batchEvaluate(inputFile).catch(console.error);
 }
 
-export { batchEvaluate };
+export {batchEvaluate};
