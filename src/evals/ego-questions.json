@@ -4,6 +4,10 @@
     "answer": "hxiao"
   },
   {
+    "question": "when was jina ai founded?",
+    "answer": "feb 2020"
+  },
+  {
     "question": "what is the latest model published by jina ai?",
     "answer": "ReaderLM-2.0"
   },
@@ -18,5 +22,21 @@
   {
     "question": "how many employees does jina ai have right now?",
     "answer": "30"
+  },
+  {
+    "question": "how much rate limit for r.jina.ai api without an api key?",
+    "answer": "20 RPM (requests per minute)"
+  },
+  {
+    "question": "How many offices do Jina AI have and where are they?",
+    "answer": "four: sunnyvale, berlin, beijing, shenzhen"
+  },
+  {
+    "question": "Does jina reranker v2 support multilingual?",
+    "answer": "Yes"
+  },
+  {
+    "question": "who are the authors of jina-clip-v2 paper?",
+    "answer": "Andreas Koukounas, Georgios Mastrapas, Bo Wang, Mohammad Kalim Akram, Sedigheh Eslami, Michael Günther, Isabelle Mohr, Saba Sturua, Scott Martens, Nan Wang, Han Xiao"
   }
 ]
