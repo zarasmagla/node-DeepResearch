@@ -31,7 +31,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
 
   if (allowSearch) {
     actions.push("search");
-    properties.searchQuery = z.string()
+    properties.searchQuery = z.string().max(30)
       .describe("Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand.").optional();
   }
 
@@ -356,39 +356,24 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
 
     // execute the step and action
     if (thisStep.action === 'answer') {
+      if (step === 1) {
+        // LLM is so confident and answer immediately, skip all evaluations
+        isAnswered = true;
+        break
+      }
+
       updateContext({
         totalStep,
         question: currentQuestion,
         ...thisStep,
       });
 
-      const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep.answer, context.tokenTracker);
-
+      const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep.answer,
+        ['definitive', 'freshness', 'plurality'], context.tokenTracker);
 
       if (currentQuestion === question) {
-        if (badAttempts >= maxBadAttempts) {
-          // EXIT POINT OF THE PROGRAM!!!!
+        if (evaluation.pass) {
           diaryContext.push(`
-At step ${step} and ${badAttempts} attempts, you took **answer** action and found an answer, not a perfect one but good enough to answer the original question:
-
-Original question: 
-${currentQuestion}
-
-Your answer: 
-${thisStep.answer}
-
-The evaluator thinks your answer is good because: 
-${evaluation.reasoning}
-
-Your journey ends here.
-`);
-          isAnswered = false;
-          break
-        }
-        if (evaluation.is_definitive) {
-          if (thisStep.references?.length > 0 || Object.keys(allURLs).length === 0) {
-            // EXIT POINT OF THE PROGRAM!!!!
-            diaryContext.push(`
 At step ${step}, you took **answer** action and finally found the answer to the original question:
 
 Original question: 
@@ -398,31 +383,18 @@ Your answer:
 ${thisStep.answer}
 
 The evaluator thinks your answer is good because: 
-${evaluation.reasoning}
+${evaluation.think}
 
 Your journey ends here. You have successfully answered the original question. Congratulations! 🎉
 `);
-            isAnswered = true;
+          isAnswered = true;
+          break
+        } else {
+          if (badAttempts >= maxBadAttempts) {
+            isAnswered = false;
             break
           } else {
             diaryContext.push(`
-At step ${step}, you took **answer** action and finally found the answer to the original question:
-
-Original question: 
-${currentQuestion}
-
-Your answer: 
-${thisStep.answer}
-
-Unfortunately, you did not provide any references to support your answer. 
-You need to find more URL references to support your answer.`);
-          }
-
-          isAnswered = true;
-          break
-
-        } else {
-          diaryContext.push(`
 At step ${step}, you took **answer** action but evaluator thinks it is not a good answer:
 
 Original question: 
@@ -432,23 +404,31 @@ Your answer:
 ${thisStep.answer}
 
 The evaluator thinks your answer is bad because: 
-${evaluation.reasoning}
+${evaluation.think}
 `);
-          // store the bad context and reset the diary context
-          const {response: errorAnalysis} = await analyzeSteps(diaryContext);
+            // store the bad context and reset the diary context
+            const {response: errorAnalysis} = await analyzeSteps(diaryContext);
 
-          badContext.push({
-            question: currentQuestion,
-            answer: thisStep.answer,
-            evaluation: evaluation.reasoning,
-            ...errorAnalysis
-          });
-          badAttempts++;
-          allowAnswer = false;  // disable answer action in the immediate next step
-          diaryContext = [];
-          step = 0;
+            allKnowledge.push({
+              question: currentQuestion,
+              answer: thisStep.answer,
+              references: thisStep.references,
+              type: 'qa'
+            });
+
+            badContext.push({
+              question: currentQuestion,
+              answer: thisStep.answer,
+              evaluation: evaluation.think,
+              ...errorAnalysis
+            });
+            badAttempts++;
+            allowAnswer = false;  // disable answer action in the immediate next step
+            diaryContext = [];
+            step = 0;
+          }
         }
-      } else if (evaluation.is_definitive) {
+      } else if (evaluation.pass) {
         diaryContext.push(`
 At step ${step}, you took **answer** action. You found a good answer to the sub-question:
 
@@ -459,7 +439,7 @@ Your answer:
 ${thisStep.answer}
 
 The evaluator thinks your answer is good because: 
-${evaluation.reasoning}
+${evaluation.think}
 
 Although you solved a sub-question, you still need to find the answer to the original question. You need to keep going.
 `);

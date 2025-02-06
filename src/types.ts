@@ -1,18 +1,3 @@
-import { z } from 'zod';
-
-export const ThinkSchema = z.string().describe('Strategic reasoning about the process');
-
-export const QuerySchema = z.string()
-  .max(30)
-  .describe('Search query, must be less than 30 characters');
-
-export const URLSchema = z.string().url();
-
-export const ReferenceSchema = z.object({
-  exactQuote: z.string().describe('Exact relevant quote from the document'),
-  url: URLSchema.describe('URL of the document')
-});
-
 // Action Types
 type BaseAction = {
   action: "search" | "answer" | "reflect" | "visit";
@@ -96,9 +81,12 @@ export interface ReadResponse {
   readableMessage?: string;
 }
 
+
+
+
 export type EvaluationResponse = {
-  is_definitive: boolean;
-  reasoning: string;
+  pass: boolean;
+  think: string;
 };
 
 export type ErrorAnalysisResponse = {
