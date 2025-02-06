@@ -66,8 +66,8 @@ export const LLM_PROVIDER: LLMProvider = (() => {
   return provider;
 })();
 
-const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
-const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini';
+const DEFAULT_GEMINI_MODEL = process.env.DEFAULT_MODEL_NAME || 'gemini-1.5-flash';
+const DEFAULT_OPENAI_MODEL = process.env.DEFAULT_MODEL_NAME || 'gpt-4o-mini';
 
 const defaultGeminiConfig: ModelConfig = {
   model: DEFAULT_GEMINI_MODEL,
@@ -145,7 +145,7 @@ if (!JINA_API_KEY) throw new Error("JINA_API_KEY not found");
 console.log('LLM Provider:', LLM_PROVIDER)
 if (LLM_PROVIDER === 'openai') {
   console.log('OPENAI_BASE_URL', OPENAI_BASE_URL)
-  console.log('Model Name', DEFAULT_OPENAI_MODEL)
+  console.log('Default Model', DEFAULT_OPENAI_MODEL)
 } else {
-  console.log('Model Name', DEFAULT_GEMINI_MODEL)
+  console.log('Default Model', DEFAULT_GEMINI_MODEL)
 }
