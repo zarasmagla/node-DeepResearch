@@ -72,13 +72,13 @@ const DEFAULT_OPENAI_MODEL = process.env.DEFAULT_MODEL_NAME || 'gpt-4o-mini';
 const defaultGeminiConfig: ModelConfig = {
   model: DEFAULT_GEMINI_MODEL,
   temperature: 0,
-  maxTokens: 1000
+  maxTokens: 8000
 };
 
 const defaultOpenAIConfig: ModelConfig = {
   model: DEFAULT_OPENAI_MODEL,
   temperature: 0,
-  maxTokens: 1000
+  maxTokens: 8000
 };
 
 export const modelConfigs: Record<LLMProvider, ToolConfigs> = {
