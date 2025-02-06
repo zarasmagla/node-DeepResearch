@@ -66,7 +66,7 @@ export const LLM_PROVIDER: LLMProvider = (() => {
   return provider;
 })();
 
-const DEFAULT_GEMINI_MODEL = process.env.DEFAULT_MODEL_NAME || 'gemini-1.5-flash';
+const DEFAULT_GEMINI_MODEL = process.env.DEFAULT_MODEL_NAME || 'gemini-2.0-flash';
 const DEFAULT_OPENAI_MODEL = process.env.DEFAULT_MODEL_NAME || 'gpt-4o-mini';
 
 const defaultGeminiConfig: ModelConfig = {
