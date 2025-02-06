@@ -1,17 +1,18 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
 import { generateObject } from 'ai';
-import { modelConfigs } from "../config";
+import { getModel, getMaxTokens } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
 import { EvaluationResponse } from '../types';
 import { handleGenerateObjectError } from '../utils/error-handling';
+
+const model = getModel('evaluator');
 
 const responseSchema = z.object({
   is_definitive: z.boolean().describe('Whether the answer provides a definitive response without uncertainty or \'I don\'t know\' type statements'),
   reasoning: z.string().describe('Explanation of why the answer is or isn\'t definitive')
 });
 
-const model = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY })(modelConfigs.evaluator.model);
+
 
 function getPrompt(question: string, answer: string): string {
   return `You are an evaluator of answer definitiveness. Analyze if the given answer provides a definitive response or not.
@@ -57,7 +58,7 @@ export async function evaluateAnswer(question: string, answer: string, tracker?:
         model,
         schema: responseSchema,
         prompt,
-        maxTokens: modelConfigs.evaluator.maxTokens
+        maxTokens: getMaxTokens('evaluator')
       });
       object = result.object;
       totalTokens = result.usage?.totalTokens || 0;

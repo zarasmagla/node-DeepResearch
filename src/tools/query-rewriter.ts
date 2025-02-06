@@ -1,10 +1,11 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
-import { modelConfigs } from "../config";
+import { generateObject } from 'ai';
+import { getModel, getMaxTokens } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
 import { SearchAction, KeywordsResponse } from '../types';
-import { generateObject } from 'ai';
 import { handleGenerateObjectError } from '../utils/error-handling';
+
+const model = getModel('queryRewriter');
 
 const responseSchema = z.object({
   think: z.string().describe('Strategic reasoning about query complexity and search approach'),
@@ -14,7 +15,7 @@ const responseSchema = z.object({
     .describe('Array of search queries, orthogonal to each other')
 });
 
-const model = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY })(modelConfigs.queryRewriter.model);
+
 
 function getPrompt(action: SearchAction): string {
   return `You are an expert Information Retrieval Assistant. Transform user queries into precise keyword combinations with strategic reasoning and appropriate search operators.
@@ -102,7 +103,7 @@ export async function rewriteQuery(action: SearchAction, tracker?: TokenTracker)
         model,
         schema: responseSchema,
         prompt,
-        maxTokens: modelConfigs.queryRewriter.maxTokens
+        maxTokens: getMaxTokens('queryRewriter')
       });
       object = result.object;
       tokens = result.usage?.totalTokens || 0;

@@ -1,6 +1,6 @@
-import {createGoogleGenerativeAI} from '@ai-sdk/google';
 import {z} from 'zod';
 import {generateObject} from 'ai';
+import {getModel, getMaxTokens, SEARCH_PROVIDER, STEP_SLEEP} from "./config";
 import {readUrl} from "./tools/read";
 import {handleGenerateObjectError} from './utils/error-handling';
 import fs from 'fs/promises';
@@ -10,7 +10,6 @@ import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
-import {SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
 import {StepAction, AnswerAction} from "./types";
@@ -325,7 +324,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       false
     );
 
-    const model = createGoogleGenerativeAI({apiKey: process.env.GEMINI_API_KEY})(modelConfigs.agent.model);
+    const model = getModel('agent');
     let object;
     let totalTokens = 0;
     try {
@@ -333,7 +332,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
         model,
         schema: getSchema(allowReflect, allowRead, allowAnswer, allowSearch),
         prompt,
-        maxTokens: modelConfigs.agent.maxTokens
+        maxTokens: getMaxTokens('agent')
       });
       object = result.object;
       totalTokens = result.usage?.totalTokens || 0;
@@ -671,7 +670,7 @@ You decided to think out of the box or cut from a completely different angle.`);
       true
     );
 
-    const model = createGoogleGenerativeAI({apiKey: process.env.GEMINI_API_KEY})(modelConfigs.agentBeastMode.model);
+    const model = getModel('agentBeastMode');
     let object;
     let totalTokens = 0;
     try {
@@ -679,7 +678,7 @@ You decided to think out of the box or cut from a completely different angle.`);
         model,
         schema: getSchema(false, false, allowAnswer, false),
         prompt,
-        maxTokens: modelConfigs.agentBeastMode.maxTokens
+        maxTokens: getMaxTokens('agentBeastMode')
       });
       object = result.object;
       totalTokens = result.usage?.totalTokens || 0;

@@ -1,19 +1,17 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { z } from 'zod';
 import { generateObject } from 'ai';
-import { modelConfigs } from "../config";
+import { getModel, getMaxTokens } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
 import { handleGenerateObjectError } from '../utils/error-handling';
 import type { DedupResponse } from '../types';
 
+const model = getModel('dedup');
 
 const responseSchema = z.object({
   think: z.string().describe('Strategic reasoning about the overall deduplication approach'),
   unique_queries: z.array(z.string().describe('Unique query that passed the deduplication process, must be less than 30 characters'))
     .describe('Array of semantically unique queries').max(3)
 });
-
-const model = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY })(modelConfigs.dedup.model);
 
 function getPrompt(newQueries: string[], existingQueries: string[]): string {
   return `You are an expert in semantic similarity analysis. Given a set of queries (setA) and a set of queries (setB)
@@ -77,7 +75,7 @@ export async function dedupQueries(newQueries: string[], existingQueries: string
         model,
         schema: responseSchema,
         prompt,
-        maxTokens: modelConfigs.dedup.maxTokens
+        maxTokens: getMaxTokens('dedup')
       });
       object = result.object;
       tokens = result.usage?.totalTokens || 0;
