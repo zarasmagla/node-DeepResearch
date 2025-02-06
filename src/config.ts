@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
+import {createOpenAI, OpenAIProviderSettings} from '@ai-sdk/openai';
 
 export type LLMProvider = 'openai' | 'gemini';
 export type ToolName = keyof ToolConfigs;
@@ -52,6 +52,7 @@ if (process.env.https_proxy) {
   }
 }
 
+export const OPENAI_BASE_URL = process.env.OPENAI_BASE_URL;
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY as string;
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY as string;
 export const JINA_API_KEY = process.env.JINA_API_KEY as string;
@@ -118,10 +119,15 @@ export function getModel(toolName: ToolName) {
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY not found');
     }
-    return createOpenAI({
+    const opt: OpenAIProviderSettings = {
       apiKey: OPENAI_API_KEY,
       compatibility: 'strict'
-    })(config.model);
+    }
+    if (OPENAI_BASE_URL) {
+      opt.baseURL = OPENAI_BASE_URL
+    }
+
+    return createOpenAI(opt)(config.model);
   }
 
   if (!GEMINI_API_KEY) {
@@ -137,3 +143,9 @@ if (LLM_PROVIDER === 'openai' && !OPENAI_API_KEY) throw new Error("OPENAI_API_KE
 if (!JINA_API_KEY) throw new Error("JINA_API_KEY not found");
 
 console.log('LLM Provider:', LLM_PROVIDER)
+if (LLM_PROVIDER === 'openai') {
+  console.log('OPENAI_BASE_URL', OPENAI_BASE_URL)
+  console.log('Model Name', DEFAULT_OPENAI_MODEL)
+} else {
+  console.log('Model Name', DEFAULT_GEMINI_MODEL)
+}
