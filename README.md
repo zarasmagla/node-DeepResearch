@@ -34,7 +34,7 @@ npm install
 
 ## Usage
 
-We use Gemini/OpenAI/[LocalLLM] for reasoning, [Jina Reader](https://jina.ai/reader) for searching and reading webpages, you can get a free API key with 1M tokens from jina.ai. 
+We use Gemini/OpenAI/[LocalLLM](#use-local-llm) for reasoning, [Jina Reader](https://jina.ai/reader) for searching and reading webpages, you can get a free API key with 1M tokens from jina.ai. 
 
 ```bash
 export GEMINI_API_KEY=...  # for gemini
@@ -88,9 +88,9 @@ npm run dev "what should be jina ai strategy for 2025?"
 If you use Ollama or LMStudio, you can redirect the reasoning request to your local LLM by setting the following environment variables:
 
 ```bash
-export LLM_PROVIDER=openai
-export OPENAI_BASE_URL=http://127.0.0.1:1234/v1
-export DEFAULT_MODEL_NAME=qwen2.5-7b
+export LLM_PROVIDER=openai  # yes, that's right - for local llm we still use openai client
+export OPENAI_BASE_URL=http://127.0.0.1:1234/v1  # your local llm endpoint
+export DEFAULT_MODEL_NAME=qwen2.5-7b  # your local llm model name
 ```
 
 Not every LLM works with our reasoning flow, but you can test it out.
