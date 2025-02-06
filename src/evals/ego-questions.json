@@ -1,0 +1,22 @@
+[
+  {
+    "question": "what is jina ai ceo's twitter account",
+    "answer": "hxiao"
+  },
+  {
+    "question": "what is the latest model published by jina ai?",
+    "answer": "ReaderLM-2.0"
+  },
+  {
+    "question": "what is the lastest blog post that jina ai published?",
+    "answer": "A Practical Guide to Deploying Search Foundation Models in Production"
+  },
+  {
+    "question": "what is the context length of readerlm-v2?",
+    "answer": "512K"
+  },
+  {
+    "question": "how many employees does jina ai have right now?",
+    "answer": "30"
+  }
+]
