@@ -217,3 +217,13 @@ flowchart TD
 
     BeastMode --> FinalAnswer[Generate final answer] --> End
 ```
+
+## Evaluation
+
+I kept the evaluation simple, LLM-as-a-judge and collect some ego questions (i.e. questions about Jina AI that I know 100% the answer) for evaluation.
+
+I mainly look at 3 things: total steps, total tokens, and the correctness of the final answer.
+
+```bash
+npm run eval ./src/evals/ego-questions.json
+```

@@ -84,16 +84,16 @@ const defaultOpenAIConfig: ModelConfig = {
 export const modelConfigs: Record<LLMProvider, ToolConfigs> = {
   gemini: {
     dedup: validateModelConfig({ ...defaultGeminiConfig, temperature: 0.1 }, 'dedup'),
-    evaluator: validateModelConfig({ ...defaultGeminiConfig }, 'evaluator'),
-    errorAnalyzer: validateModelConfig({ ...defaultGeminiConfig }, 'errorAnalyzer'),
+    evaluator: validateModelConfig({ ...defaultGeminiConfig, temperature: 0 }, 'evaluator'),
+    errorAnalyzer: validateModelConfig({ ...defaultGeminiConfig, temperature: 0 }, 'errorAnalyzer'),
     queryRewriter: validateModelConfig({ ...defaultGeminiConfig, temperature: 0.1 }, 'queryRewriter'),
     agent: validateModelConfig({ ...defaultGeminiConfig, temperature: 0.7 }, 'agent'),
     agentBeastMode: validateModelConfig({ ...defaultGeminiConfig, temperature: 0.7 }, 'agentBeastMode')
   },
   openai: {
     dedup: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0.1 }, 'dedup'),
-    evaluator: validateModelConfig({ ...defaultOpenAIConfig }, 'evaluator'),
-    errorAnalyzer: validateModelConfig({ ...defaultOpenAIConfig }, 'errorAnalyzer'),
+    evaluator: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0 }, 'evaluator'),
+    errorAnalyzer: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0 }, 'errorAnalyzer'),
     queryRewriter: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0.1 }, 'queryRewriter'),
     agent: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0.7 }, 'agent'),
     agentBeastMode: validateModelConfig({ ...defaultOpenAIConfig, temperature: 0.7 }, 'agentBeastMode')

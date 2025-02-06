@@ -17,6 +17,7 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "serve": "ts-node src/server.ts",
+    "eval": "ts-node src/evals/batch-evals.ts",
     "test": "jest",
     "test:watch": "jest --watch"
   },
