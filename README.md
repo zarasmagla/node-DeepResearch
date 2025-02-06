@@ -88,6 +88,8 @@ npm run dev "what should be jina ai strategy for 2025?"
 
 ## Use Local LLM
 
+> Note, not every LLM works with our reasoning flow, we need those who support structured output (sometimes called JSON Schema output, object output) well. Feel free to purpose a PR to add more open-source LLMs to the working list.
+
 If you use Ollama or LMStudio, you can redirect the reasoning request to your local LLM by setting the following environment variables:
 
 ```bash
@@ -96,7 +98,6 @@ export OPENAI_BASE_URL=http://127.0.0.1:1234/v1  # your local llm endpoint
 export DEFAULT_MODEL_NAME=qwen2.5-7b  # your local llm model name
 ```
 
-Not every LLM works with our reasoning flow, but you can test it out.
 
 ## Web Server API
 
