@@ -1,5 +1,8 @@
-import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
+import {createGoogleGenerativeAI} from '@ai-sdk/google';
+import {z} from 'zod';
+import {generateObject} from 'ai';
 import {readUrl} from "./tools/read";
+import {handleGenerateObjectError} from './utils/error-handling';
 import fs from 'fs/promises';
 import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
 import {braveSearch} from "./tools/brave-search";
@@ -7,10 +10,10 @@ import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/dedup";
 import {evaluateAnswer} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
-import {GEMINI_API_KEY, SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
+import {SEARCH_PROVIDER, STEP_SLEEP, modelConfigs} from "./config";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
-import {StepAction, SchemaProperty, ResponseSchema, AnswerAction} from "./types";
+import {StepAction, AnswerAction} from "./types";
 import {TrackerContext} from "./types";
 import {jinaSearch} from "./tools/jinaSearch";
 
@@ -20,88 +23,54 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean): ResponseSchema {
+function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean) {
   const actions: string[] = [];
-  const properties: Record<string, SchemaProperty> = {
-    action: {
-      type: SchemaType.STRING,
-      enum: actions,
-      description: "Must match exactly one action type"
-    },
-    think: {
-      type: SchemaType.STRING,
-      description: "Explain why choose this action, what's the thought process behind choosing this action"
-    }
+  const properties: Record<string, z.ZodTypeAny> = {
+    action: z.enum(['placeholder']), // Will update later with actual actions
+    think: z.string().describe("Explain why choose this action, what's the thought process behind choosing this action")
   };
 
   if (allowSearch) {
     actions.push("search");
-    properties.searchQuery = {
-      type: SchemaType.STRING,
-      description: "Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand."
-    };
+    properties.searchQuery = z.string()
+      .describe("Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand.").optional();
   }
 
   if (allowAnswer) {
     actions.push("answer");
-    properties.answer = {
-      type: SchemaType.STRING,
-      description: "Only required when choosing 'answer' action, must be the final answer in natural language"
-    };
-    properties.references = {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.OBJECT,
-        properties: {
-          exactQuote: {
-            type: SchemaType.STRING,
-            description: "Exact relevant quote from the document"
-          },
-          url: {
-            type: SchemaType.STRING,
-            description: "URL of the document; must be directly from the context"
-          }
-        },
-        required: ["exactQuote", "url"]
-      },
-      description: "Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document"
-    };
+    properties.answer = z.string()
+      .describe("Only required when choosing 'answer' action, must be the final answer in natural language").optional();
+    properties.references = z.array(
+      z.object({
+        exactQuote: z.string().describe("Exact relevant quote from the document"),
+        url: z.string().describe("URL of the document; must be directly from the context")
+      }).required()
+    ).describe("Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document").optional();
   }
 
   if (allowReflect) {
     actions.push("reflect");
-    properties.questionsToAnswer = {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.STRING,
-        description: "each question must be a single line, concise and clear. not composite or compound, less than 20 words."
-      },
-      description: "List of most important questions to fill the knowledge gaps of finding the answer to the original question",
-      maxItems: 2
-    };
+    properties.questionsToAnswer = z.array(
+      z.string().describe("each question must be a single line, concise and clear. not composite or compound, less than 20 words.")
+    ).max(2)
+      .describe("List of most important questions to fill the knowledge gaps of finding the answer to the original question").optional();
   }
 
   if (allowRead) {
     actions.push("visit");
-    properties.URLTargets = {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.STRING
-      },
-      maxItems: 2,
-      description: "Must be an array of URLs, choose up the most relevant 2 URLs to visit"
-    };
+    properties.URLTargets = z.array(z.string())
+      .max(2)
+      .describe("Must be an array of URLs, choose up the most relevant 2 URLs to visit").optional();
   }
 
   // Update the enum values after collecting all actions
-  properties.action.enum = actions;
+  properties.action = z.enum(actions as [string, ...string[]])
+    .describe("Must match exactly one action type");
 
-  return {
-    type: SchemaType.OBJECT,
-    properties,
-    required: ["action", "think"]
-  };
+  return z.object(properties);
+
 }
+
 
 function getPrompt(
   question: string,
@@ -117,6 +86,7 @@ function getPrompt(
   beastMode?: boolean
 ): string {
   const sections: string[] = [];
+  const actionSections: string[] = [];
 
   // Add header section
   sections.push(`Current date: ${new Date().toUTCString()}
@@ -150,7 +120,7 @@ ${k.question}
 <answer>
 ${k.answer}
 </answer>
-${k.references.length > 0 ? `
+${k.references?.length > 0 ? `
 <references>
 ${JSON.stringify(k.references)}
 </references>
@@ -201,14 +171,13 @@ ${learnedStrategy}
   }
 
   // Build actions section
-  const actions: string[] = [];
 
   if (allURLs && Object.keys(allURLs).length > 0 && allowRead) {
     const urlList = Object.entries(allURLs)
       .map(([url, desc]) => `  + "${url}": "${desc}"`)
       .join('\n');
 
-    actions.push(`
+    actionSections.push(`
 <action-visit>    
 - Visit any URLs from below to gather external knowledge, choose the most relevant URLs that might contain the answer
 <url-list>
@@ -222,7 +191,7 @@ ${urlList}
   }
 
   if (allowSearch) {
-    actions.push(`
+    actionSections.push(`
 <action-search>    
 - Query external sources using a public search engine
 - Focus on solving one specific aspect of the question
@@ -232,7 +201,7 @@ ${urlList}
   }
 
   if (allowAnswer) {
-    actions.push(`
+    actionSections.push(`
 <action-answer>
 - Provide final response only when 100% certain
 - Responses must be definitive (no ambiguity, uncertainty, or disclaimers)${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
@@ -241,7 +210,7 @@ ${urlList}
   }
 
   if (beastMode) {
-    actions.push(`
+    actionSections.push(`
 <action-answer>
 - Any answer is better than no answer
 - Partial answers are allowed, but make sure they are based on the context and knowledge you have gathered    
@@ -252,7 +221,7 @@ ${urlList}
   }
 
   if (allowReflect) {
-    actions.push(`
+    actionSections.push(`
 <action-reflect>    
 - Perform critical analysis through hypothetical scenarios or systematic breakdowns
 - Identify knowledge gaps and formulate essential clarifying questions
@@ -268,7 +237,7 @@ ${urlList}
   sections.push(`
 Based on the current context, you must choose one of the following actions:
 <actions>
-${actions.join('\n\n')}
+${actionSections.join('\n\n')}
 </actions>
 `);
 
@@ -356,22 +325,25 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       false
     );
 
-    const model = genAI.getGenerativeModel({
-      model: modelConfigs.agent.model,
-      generationConfig: {
-        temperature: modelConfigs.agent.temperature,
-        responseMimeType: "application/json",
-        responseSchema: getSchema(allowReflect, allowRead, allowAnswer, allowSearch)
-      }
-    });
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const usage = response.usageMetadata;
-    context.tokenTracker.trackUsage('agent', usage?.totalTokenCount || 0);
-
-
-    thisStep = JSON.parse(response.text());
+    const model = createGoogleGenerativeAI({apiKey: process.env.GEMINI_API_KEY})(modelConfigs.agent.model);
+    let object;
+    let totalTokens = 0;
+    try {
+      const result = await generateObject({
+        model,
+        schema: getSchema(allowReflect, allowRead, allowAnswer, allowSearch),
+        prompt,
+        maxTokens: modelConfigs.agent.maxTokens
+      });
+      object = result.object;
+      totalTokens = result.usage?.totalTokens || 0;
+    } catch (error) {
+      const result = await handleGenerateObjectError<StepAction>(error);
+      object = result.object;
+      totalTokens = result.totalTokens;
+    }
+    context.tokenTracker.trackUsage('agent', totalTokens);
+    thisStep = object as StepAction;
     // print allowed and chose action
     const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
     console.log(`${thisStep.action} <- [${actionsStr}]`);
@@ -683,8 +655,8 @@ You decided to think out of the box or cut from a completely different angle.`);
   } else {
     console.log('Enter Beast mode!!!')
     // any answer is better than no answer, humanity last resort
-    step ++;
-    totalStep ++;
+    step++;
+    totalStep++;
     const prompt = getPrompt(
       question,
       diaryContext,
@@ -699,22 +671,27 @@ You decided to think out of the box or cut from a completely different angle.`);
       true
     );
 
-    const model = genAI.getGenerativeModel({
-      model: modelConfigs.agentBeastMode.model,
-      generationConfig: {
-        temperature: modelConfigs.agentBeastMode.temperature,
-        responseMimeType: "application/json",
-        responseSchema: getSchema(false, false, allowAnswer, false)
-      }
-    });
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const usage = response.usageMetadata;
-    context.tokenTracker.trackUsage('agent', usage?.totalTokenCount || 0);
+    const model = createGoogleGenerativeAI({apiKey: process.env.GEMINI_API_KEY})(modelConfigs.agentBeastMode.model);
+    let object;
+    let totalTokens = 0;
+    try {
+      const result = await generateObject({
+        model,
+        schema: getSchema(false, false, allowAnswer, false),
+        prompt,
+        maxTokens: modelConfigs.agentBeastMode.maxTokens
+      });
+      object = result.object;
+      totalTokens = result.usage?.totalTokens || 0;
+    } catch (error) {
+      const result = await handleGenerateObjectError<StepAction>(error);
+      object = result.object;
+      totalTokens = result.totalTokens;
+    }
+    context.tokenTracker.trackUsage('agent', totalTokens);
 
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
-    thisStep = JSON.parse(response.text());
+    thisStep = object as StepAction;
     console.log(thisStep)
     return {result: thisStep, context};
   }
@@ -732,8 +709,6 @@ async function storeContext(prompt: string, memory: any[][], step: number) {
     console.error('Context storage failed:', error);
   }
 }
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 
 export async function main() {

@@ -1,37 +1,19 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { z } from 'zod';
+import { generateObject } from 'ai';
+import { modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
+import { handleGenerateObjectError } from '../utils/error-handling';
+import type { DedupResponse } from '../types';
 
-import { DedupResponse } from '../types';
 
-const responseSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    think: {
-      type: SchemaType.STRING,
-      description: "Strategic reasoning about the overall deduplication approach"
-    },
-    unique_queries: {
-      type: SchemaType.ARRAY,
-      items: {
-        type: SchemaType.STRING,
-        description: "Unique query that passed the deduplication process, must be less than 30 characters"
-      },
-      description: "Array of semantically unique queries"
-    }
-  },
-  required: ["think", "unique_queries"]
-};
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.dedup.model,
-  generationConfig: {
-    temperature: modelConfigs.dedup.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
+const responseSchema = z.object({
+  think: z.string().describe('Strategic reasoning about the overall deduplication approach'),
+  unique_queries: z.array(z.string().describe('Unique query that passed the deduplication process, must be less than 30 characters'))
+    .describe('Array of semantically unique queries').max(3)
 });
+
+const model = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY })(modelConfigs.dedup.model);
 
 function getPrompt(newQueries: string[], existingQueries: string[]): string {
   return `You are an expert in semantic similarity analysis. Given a set of queries (setA) and a set of queries (setB)
@@ -88,14 +70,25 @@ SetB: ${JSON.stringify(existingQueries)}`;
 export async function dedupQueries(newQueries: string[], existingQueries: string[], tracker?: TokenTracker): Promise<{ unique_queries: string[], tokens: number }> {
   try {
     const prompt = getPrompt(newQueries, existingQueries);
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as DedupResponse;
-    console.log('Dedup:', json.unique_queries);
-    const tokens = usage?.totalTokenCount || 0;
+    let object;
+    let tokens = 0;
+    try {
+      const result = await generateObject({
+        model,
+        schema: responseSchema,
+        prompt,
+        maxTokens: modelConfigs.dedup.maxTokens
+      });
+      object = result.object;
+      tokens = result.usage?.totalTokens || 0;
+    } catch (error) {
+      const result = await handleGenerateObjectError<DedupResponse>(error);
+      object = result.object;
+      tokens = result.totalTokens;
+    }
+    console.log('Dedup:', object.unique_queries);
     (tracker || new TokenTracker()).trackUsage('dedup', tokens);
-    return { unique_queries: json.unique_queries, tokens };
+    return { unique_queries: object.unique_queries, tokens };
   } catch (error) {
     console.error('Error in deduplication analysis:', error);
     throw error;

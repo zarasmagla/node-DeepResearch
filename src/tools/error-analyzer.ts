@@ -1,37 +1,18 @@
-import {GoogleGenerativeAI, SchemaType} from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { z } from 'zod';
+import { generateObject } from 'ai';
+import { modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-
 import { ErrorAnalysisResponse } from '../types';
+import { handleGenerateObjectError } from '../utils/error-handling';
 
-const responseSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    recap: {
-      type: SchemaType.STRING,
-      description: "Recap of the actions taken and the steps conducted"
-    },
-    blame: {
-      type: SchemaType.STRING,
-      description: "Which action or the step was the root cause of the answer rejection"
-    },
-    improvement: {
-      type: SchemaType.STRING,
-      description: "Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe."
-    }
-  },
-  required: ["recap", "blame", "improvement"]
-};
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.errorAnalyzer.model,
-  generationConfig: {
-    temperature: modelConfigs.errorAnalyzer.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
+const responseSchema = z.object({
+  recap: z.string().describe('Recap of the actions taken and the steps conducted'),
+  blame: z.string().describe('Which action or the step was the root cause of the answer rejection'),
+  improvement: z.string().describe('Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe.')
 });
+
+const model = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY })(modelConfigs.errorAnalyzer.model);
 
 function getPrompt(diaryContext: string[]): string {
   return `You are an expert at analyzing search and reasoning processes. Your task is to analyze the given sequence of steps and identify what went wrong in the search process.
@@ -124,17 +105,28 @@ ${diaryContext.join('\n')}
 export async function analyzeSteps(diaryContext: string[], tracker?: TokenTracker): Promise<{ response: ErrorAnalysisResponse, tokens: number }> {
   try {
     const prompt = getPrompt(diaryContext);
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as ErrorAnalysisResponse;
+    let object;
+    let tokens = 0;
+    try {
+      const result = await generateObject({
+        model,
+        schema: responseSchema,
+        prompt,
+        maxTokens: modelConfigs.errorAnalyzer.maxTokens
+      });
+      object = result.object;
+      tokens = result.usage?.totalTokens || 0;
+    } catch (error) {
+      const result = await handleGenerateObjectError<ErrorAnalysisResponse>(error);
+      object = result.object;
+      tokens = result.totalTokens;
+    }
     console.log('Error analysis:', {
-      is_valid: !json.blame,
-      reason: json.blame || 'No issues found'
+      is_valid: !object.blame,
+      reason: object.blame || 'No issues found'
     });
-    const tokens = usage?.totalTokenCount || 0;
     (tracker || new TokenTracker()).trackUsage('error-analyzer', tokens);
-    return { response: json, tokens };
+    return { response: object, tokens };
   } catch (error) {
     console.error('Error in answer evaluation:', error);
     throw error;

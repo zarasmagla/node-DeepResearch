@@ -1,33 +1,17 @@
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { GEMINI_API_KEY, modelConfigs } from "../config";
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { z } from 'zod';
+import { generateObject } from 'ai';
+import { modelConfigs } from "../config";
 import { TokenTracker } from "../utils/token-tracker";
-
 import { EvaluationResponse } from '../types';
+import { handleGenerateObjectError } from '../utils/error-handling';
 
-const responseSchema = {
-  type: SchemaType.OBJECT,
-  properties: {
-    is_definitive: {
-      type: SchemaType.BOOLEAN,
-      description: "Whether the answer provides a definitive response without uncertainty or 'I don't know' type statements"
-    },
-    reasoning: {
-      type: SchemaType.STRING,
-      description: "Explanation of why the answer is or isn't definitive"
-    }
-  },
-  required: ["is_definitive", "reasoning"]
-};
-
-const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({
-  model: modelConfigs.evaluator.model,
-  generationConfig: {
-    temperature: modelConfigs.evaluator.temperature,
-    responseMimeType: "application/json",
-    responseSchema: responseSchema
-  }
+const responseSchema = z.object({
+  is_definitive: z.boolean().describe('Whether the answer provides a definitive response without uncertainty or \'I don\'t know\' type statements'),
+  reasoning: z.string().describe('Explanation of why the answer is or isn\'t definitive')
 });
+
+const model = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY })(modelConfigs.evaluator.model);
 
 function getPrompt(question: string, answer: string): string {
   return `You are an evaluator of answer definitiveness. Analyze if the given answer provides a definitive response or not.
@@ -66,17 +50,28 @@ Answer: ${JSON.stringify(answer)}`;
 export async function evaluateAnswer(question: string, answer: string, tracker?: TokenTracker): Promise<{ response: EvaluationResponse, tokens: number }> {
   try {
     const prompt = getPrompt(question, answer);
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const usage = response.usageMetadata;
-    const json = JSON.parse(response.text()) as EvaluationResponse;
+    let object;
+    let totalTokens = 0;
+    try {
+      const result = await generateObject({
+        model,
+        schema: responseSchema,
+        prompt,
+        maxTokens: modelConfigs.evaluator.maxTokens
+      });
+      object = result.object;
+      totalTokens = result.usage?.totalTokens || 0;
+    } catch (error) {
+      const result = await handleGenerateObjectError<EvaluationResponse>(error);
+      object = result.object;
+      totalTokens = result.totalTokens;
+    }
     console.log('Evaluation:', {
-      definitive: json.is_definitive,
-      reason: json.reasoning
+      definitive: object.is_definitive,
+      reason: object.reasoning
     });
-    const tokens = usage?.totalTokenCount || 0;
-    (tracker || new TokenTracker()).trackUsage('evaluator', tokens);
-    return { response: json, tokens };
+    (tracker || new TokenTracker()).trackUsage('evaluator', totalTokens);
+    return { response: object, tokens: totalTokens };
   } catch (error) {
     console.error('Error in answer evaluation:', error);
     throw error;
