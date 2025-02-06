@@ -34,7 +34,7 @@ npm install
 
 ## Usage
 
-We use Gemini/OpenAI/[LocalLLM](#use-local-llm) for reasoning, [Jina Reader](https://jina.ai/reader) for searching and reading webpages, you can get a free API key with 1M tokens from jina.ai. 
+We use Gemini (`gemini-2.0-flash`)/OpenAI/[LocalLLM](#use-local-llm) for reasoning, [Jina Reader](https://jina.ai/reader) for searching and reading webpages, you can get a free API key with 1M tokens from jina.ai. 
 
 ```bash
 export GEMINI_API_KEY=...  # for gemini
@@ -46,6 +46,8 @@ npm run dev $QUERY
 ```
 
 ## Demo
+> using `gemini-1.5-flash` as llm, `gemini-2.0-flash` leads to much better!
+
 Query: `"what is the latest blog post's title from jina ai?"`
 3 steps; answer is correct!
 ![demo1](demo.gif)
