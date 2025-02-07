@@ -14,7 +14,7 @@ import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
 import {StepAction, AnswerAction} from "./types";
 import {TrackerContext} from "./types";
-import {jinaSearch} from "./tools/jinaSearch";
+import {search} from "./tools/jina-search";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -510,7 +510,7 @@ But then you realized you have asked them before. You decided to to think out of
           switch (SEARCH_PROVIDER) {
             case 'jina':
               // use jinaSearch
-              results = {results: (await jinaSearch(query, context.tokenTracker)).response?.data || []};
+              results = {results: (await search(query, context.tokenTracker)).response?.data || []};
               break;
             case 'duck':
               results = await duckSearch(query, {safeSearch: SafeSearchType.STRICT});
