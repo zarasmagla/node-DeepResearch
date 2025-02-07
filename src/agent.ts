@@ -652,7 +652,7 @@ You decided to think out of the box or cut from a completely different angle.`);
 
     const model = getModel('agentBeastMode');
     let object;
-    let totalTokens = 0;
+    let totalTokens;
     try {
       const result = await generateObject({
         model,

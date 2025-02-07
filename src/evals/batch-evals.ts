@@ -3,9 +3,10 @@ import {exec} from 'child_process';
 import {promisify} from 'util';
 import {getResponse} from '../agent';
 import {generateObject} from 'ai';
-import {getModel, getMaxTokens} from '../config';
+import {GEMINI_API_KEY} from '../config';
 import {z} from 'zod';
 import {AnswerAction, TrackerContext} from "../types";
+import {createGoogleGenerativeAI} from "@ai-sdk/google";
 
 const execAsync = promisify(exec);
 
@@ -49,10 +50,10 @@ Minor wording differences are acceptable as long as the core information of the 
 
   try {
     const result = await generateObject({
-      model: getModel('evaluator'),
+      model: createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })('gemini-2.0-flash'),  // fix to gemini-2.0-flash for evaluation
       schema,
       prompt,
-      maxTokens: getMaxTokens('evaluator'),
+      maxTokens: 1000,
       temperature: 0  // Setting temperature to 0 for deterministic output
     });
 

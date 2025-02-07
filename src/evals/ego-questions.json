@@ -1,7 +1,7 @@
 [
   {
     "question": "what is jina ai ceo's twitter account",
-    "answer": "hxiao"
+    "answer": "@hxiao"
   },
   {
     "question": "when was jina ai founded?",
@@ -12,7 +12,7 @@
     "answer": "ReaderLM-2.0"
   },
   {
-    "question": "what is the lastest blog post that jina ai published?",
+    "question": "what is the latest blog post that jina ai published?",
     "answer": "A Practical Guide to Deploying Search Foundation Models in Production"
   },
   {
@@ -38,5 +38,49 @@
   {
     "question": "who are the authors of jina-clip-v2 paper?",
     "answer": "Andreas Koukounas, Georgios Mastrapas, Bo Wang, Mohammad Kalim Akram, Sedigheh Eslami, Michael Günther, Isabelle Mohr, Saba Sturua, Scott Martens, Nan Wang, Han Xiao"
+  },
+  {
+    "question": "what can you find in common between fashion-mnist and bert-as-service?",
+    "answer": "Both are made by Han Xiao"
+  },
+  {
+    "question": "Which countries are the investors of Jina AI from?",
+    "answer": "USA and China, but no German investors"
+  },
+  {
+    "question": "what is the grounding api endpoint of jina ai?",
+    "answer": "g.jina.ai"
+  },
+  {
+    "question": "which of the following models do not support Matryoshka representation? jina-embeddings-v3, jina-embeddings-v2-base-en, jina-clip-v2, jina-clip-v1",
+    "answer": "jina-embeddings-v2-base-en and jina-clip-v1"
+  },
+  {
+    "question": "How much is the 2024 yearbook that jina ai published?",
+    "answer": "$35 USD"
+  },
+  {
+    "question": "Any meme or crypto coin that announced by jina ai?",
+    "answer": "No."
+  },
+  {
+    "question": "Who is the legal signatory of Jina AI gmbh?",
+    "answer": "Jiao Liu"
+  },
+  {
+    "question": "does node-deepresearch project support local LLMs?",
+    "answer": "Yes."
+  },
+  {
+    "question": "what is the name of the jina ai's mascot?",
+    "answer": "Jina"
+  },
+  {
+    "question": "what is the name of the jina ai's mascot?",
+    "answer": "No, Jina AI does not have a mascot."
+  },
+  {
+    "question": "Does late chunking work with cls pooling?",
+    "answer": "No. late chunking only works with mean pooling."
   }
 ]
