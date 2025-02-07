@@ -75,6 +75,7 @@ function getPrompt(
   question: string,
   context?: string[],
   allQuestions?: string[],
+  allKeywords?: string[],
   allowReflect: boolean = true,
   allowAnswer: boolean = true,
   allowRead: boolean = true,
@@ -190,11 +191,18 @@ ${urlList}
   }
 
   if (allowSearch) {
+
     actionSections.push(`
 <action-search>    
-- Query external sources using a public search engine
+- Search external, realtime world-knoweledge using a search engine
 - Focus on solving one specific aspect of the question
-- Only give keywords search query, not full sentences
+- Only use keywords in th search query, not full sentences
+${allKeywords?.length ? `
+- The following searched queries do not give useful information, you need to think out of the box or cut from a completely different angle:
+<bad-queries>
+${allKeywords.join('\n')}
+</bad-queries>
+` : ''}
 </action-search>
 `);
   }
@@ -314,6 +322,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       currentQuestion,
       diaryContext,
       allQuestions,
+      allKeywords,
       allowReflect,
       allowAnswer,
       allowRead,
@@ -640,6 +649,7 @@ You decided to think out of the box or cut from a completely different angle.`);
       question,
       diaryContext,
       allQuestions,
+      allKeywords,
       false,
       false,
       false,
