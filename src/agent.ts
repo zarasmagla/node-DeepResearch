@@ -7,7 +7,7 @@ import fs from 'fs/promises';
 import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
 import {braveSearch} from "./tools/brave-search";
 import {rewriteQuery} from "./tools/query-rewriter";
-import {dedupQueries} from "./tools/dedup";
+import {dedupQueries} from "./tools/jina-dedup";
 import {evaluateAnswer} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {TokenTracker} from "./utils/token-tracker";
@@ -198,11 +198,11 @@ ${urlList}
 - Focus on solving one specific aspect of the question
 - Only use keywords in th search query, not full sentences
 ${allKeywords?.length ? `
-- The following searched queries do not give useful information, you need to think out of the box or cut from a completely different angle:
+- Avoid the following searched queries as they do not give any useful information, you need to think out of the box and propose queries from a completely different angle:
 <bad-queries>
 ${allKeywords.join('\n')}
 </bad-queries>
-` : ''}
+`.trim() : ''}
 </action-search>
 `);
   }
@@ -257,7 +257,11 @@ Critical Requirements:
 - Exclude all non-JSON text, markdown, or explanations
 - Maintain strict JSON syntax`);
 
-  return sections.join('\n\n');
+  return removeExtraLineBreaks(sections.join('\n\n'));
+}
+
+const removeExtraLineBreaks = (text: string) => {
+  return text.replace(/\n{2,}/gm, '\n\n');
 }
 
 const allContext: StepAction[] = [];  // all steps in the current session, including those leads to wrong results
