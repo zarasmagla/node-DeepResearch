@@ -33,6 +33,9 @@ npm install
 
 [安装部署视频教程 on Youtube](https://youtu.be/vrpraFiPUyA)
 
+It is also available on npm but not recommended for now, as the code is still under active development.
+
+
 ## Usage
 
 We use Gemini (latest `gemini-2.0-flash`) / OpenAI / [LocalLLM](#use-local-llm) for reasoning, [Jina Reader](https://jina.ai/reader) for searching and reading webpages, you can get a free API key with 1M tokens from jina.ai. 
