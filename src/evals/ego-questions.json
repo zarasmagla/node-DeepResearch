@@ -1,7 +1,7 @@
 [
   {
-    "question": "what is jina ai ceo's twitter account",
-    "answer": "@hxiao"
+    "question": "what did jina ai ceo say about deepseek that went viral and become a meme?",
+    "answer": "a side project"
   },
   {
     "question": "when was jina ai founded?",
@@ -24,28 +24,28 @@
     "answer": "30"
   },
   {
-    "question": "how much rate limit for r.jina.ai api without an api key?",
-    "answer": "20 RPM (requests per minute)"
+    "question": "when was jina reader released?",
+    "answer": "April 2024"
   },
   {
     "question": "How many offices do Jina AI have and where are they?",
     "answer": "four: sunnyvale, berlin, beijing, shenzhen"
   },
   {
-    "question": "Does jina reranker v2 support multilingual?",
-    "answer": "Yes"
+    "question": "what jina-colbert-v2 improves over jina-colbert-v1?",
+    "answer": "v2 add multilingual support"
   },
   {
     "question": "who are the authors of jina-clip-v2 paper?",
     "answer": "Andreas Koukounas, Georgios Mastrapas, Bo Wang, Mohammad Kalim Akram, Sedigheh Eslami, Michael Günther, Isabelle Mohr, Saba Sturua, Scott Martens, Nan Wang, Han Xiao"
   },
   {
-    "question": "what can you find in common between fashion-mnist and bert-as-service?",
-    "answer": "Both are made by Han Xiao"
+    "question": "who is the common author of fashion-mnist and node-deepresearch?",
+    "answer": "Han Xiao"
   },
   {
     "question": "Which countries are the investors of Jina AI from?",
-    "answer": "USA and China, but no German investors"
+    "answer": "USA and China only, no German investors"
   },
   {
     "question": "what is the grounding api endpoint of jina ai?",
@@ -56,24 +56,20 @@
     "answer": "jina-embeddings-v2-base-en and jina-clip-v1"
   },
   {
-    "question": "How much is the 2024 yearbook that jina ai published?",
-    "answer": "$35 USD"
+    "question": "Can I purchase the 2024 yearbook that jina ai published today?",
+    "answer": "No it is sold out."
   },
   {
-    "question": "Any meme or crypto coin that announced by jina ai?",
-    "answer": "No."
+    "question": "How many free tokens do you get from a new jina api key?",
+    "answer": "1 million."
   },
   {
     "question": "Who is the legal signatory of Jina AI gmbh?",
     "answer": "Jiao Liu"
   },
   {
-    "question": "does node-deepresearch project support local LLMs?",
-    "answer": "Yes."
-  },
-  {
-    "question": "what is the name of the jina ai's mascot?",
-    "answer": "Jina"
+    "question": "which llm provider does node-deepresearch project support?",
+    "answer": "Gemini, Openai and some local LLMs"
   },
   {
     "question": "what is the name of the jina ai's mascot?",

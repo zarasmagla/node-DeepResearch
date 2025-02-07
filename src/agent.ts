@@ -667,10 +667,10 @@ You decided to think out of the box or cut from a completely different angle.`);
       object = result.object;
       totalTokens = result.totalTokens;
     }
-    context.tokenTracker.trackUsage('agent', totalTokens);
-
     await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
     thisStep = object as StepAction;
+    context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
+    context.tokenTracker.trackUsage('agent', totalTokens);
     console.log(thisStep)
     return {result: thisStep, context};
   }

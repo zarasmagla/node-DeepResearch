@@ -224,7 +224,7 @@ flowchart TD
 
 ## Evaluation
 
-I kept the evaluation simple, LLM-as-a-judge and collect some ego questions (i.e. questions about Jina AI that I know 100% the answer) for evaluation.
+I kept the evaluation simple, LLM-as-a-judge and collect some [ego questions](./src/evals/ego-questions.json) for evaluation. These are the questions about Jina AI that I know 100% the answer but LLMs do not.
 
 I mainly look at 3 things: total steps, total tokens, and the correctness of the final answer.
 
