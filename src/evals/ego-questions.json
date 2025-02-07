@@ -32,7 +32,7 @@
     "answer": "four: sunnyvale, berlin, beijing, shenzhen"
   },
   {
-    "question": "what jina-colbert-v2 improves over jina-colbert-v1?",
+    "question": "what exactly jina-colbert-v2 improves over jina-colbert-v1?",
     "answer": "v2 add multilingual support"
   },
   {
@@ -40,8 +40,8 @@
     "answer": "Andreas Koukounas, Georgios Mastrapas, Bo Wang, Mohammad Kalim Akram, Sedigheh Eslami, Michael Günther, Isabelle Mohr, Saba Sturua, Scott Martens, Nan Wang, Han Xiao"
   },
   {
-    "question": "who is the common author of fashion-mnist and node-deepresearch?",
-    "answer": "Han Xiao"
+    "question": "who created the node-deepresearch project?",
+    "answer": "Han Xiao / jina ai"
   },
   {
     "question": "Which countries are the investors of Jina AI from?",
@@ -68,8 +68,8 @@
     "answer": "Jiao Liu"
   },
   {
-    "question": "which llm provider does node-deepresearch project support?",
-    "answer": "Gemini, Openai and some local LLMs"
+    "question": "what is the key idea behind node-deepresearch project?",
+    "answer": "It keeps searching, reading webpages, reasoning until an answer is found."
   },
   {
     "question": "what is the name of the jina ai's mascot?",

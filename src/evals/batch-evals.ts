@@ -142,7 +142,7 @@ async function batchEvaluate(inputFile: string): Promise<void> {
       const {
         result: response,
         context
-      } = await getResponse(question, 0) as { result: AnswerAction; context: TrackerContext };
+      } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
       const actualAnswer = response.answer;
 
       // Evaluate the response
