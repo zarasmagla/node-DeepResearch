@@ -32,7 +32,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowSearch) {
     actions.push("search");
     properties.searchQuery = z.string().max(30)
-      .describe("Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand.").optional();
+      .describe("Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Existing queries must be avoided").optional();
   }
 
   if (allowAnswer) {
@@ -194,15 +194,15 @@ ${urlList}
 
     actionSections.push(`
 <action-search>    
-- Search external, realtime world-knoweledge using a search engine
-- Focus on solving one specific aspect of the question
-- Only use keywords in th search query, not full sentences
 ${allKeywords?.length ? `
-- Avoid the following searched queries as they do not give any useful information, you need to think out of the box and propose queries from a completely different angle:
+- Avoid the searched queries below as they do not give any useful information, you need to think out of the box and propose queries from a completely different angle:
 <bad-queries>
 ${allKeywords.join('\n')}
 </bad-queries>
 `.trim() : ''}
+- Propose some unique new queries that might help you find the answer to the question
+- Focus on solving one specific aspect of the original question
+- Only use keywords, not full sentences
 </action-search>
 `);
   }
