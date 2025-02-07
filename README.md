@@ -231,3 +231,21 @@ I mainly look at 3 things: total steps, total tokens, and the correctness of the
 ```bash
 npm run eval ./src/evals/ego-questions.json
 ```
+
+Here's the table comparing plain `gemini-2.0-flash` and `gemini-2.0-flash + node-deepresearch` on the ego set.
+
+Plain `gemini-2.0-flash` can be run by setting `tokenBudget` to zero, skipping the while-loop and directly answering the question. 
+
+It should not be surprised that plain `gemini-2.0-flash` has a 0% pass rate, as I intentionally filtered out the questions that LLMs can answer.
+
+| Metric | gemini-2.0-flash | gemini-2.0-flash + node-deepresearch |
+|--------|------------------|--------------------------------------|
+| Pass Rate | 0% | 60% |
+| Average Steps | 1 | 6 |
+| Maximum Steps | 1 | 21 |
+| Minimum Steps | 1 | 2 |
+| Median Steps | 1 | 3 |
+| Average Tokens | 428 | 67,650 |
+| Median Tokens | 434 | 19,800 |
+| Maximum Tokens | 463 | 374,903 |
+| Minimum Tokens | 374 | 7,347 |
