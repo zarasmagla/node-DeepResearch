@@ -31,9 +31,24 @@ export type VisitAction = BaseAction & {
 export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitAction;
 
 // Response Types
+export const TOKEN_CATEGORIES = {
+  PROMPT: 'prompt',
+  REASONING: 'reasoning',
+  ACCEPTED: 'accepted',
+  REJECTED: 'rejected'
+} as const;
+
+export type TokenCategory = typeof TOKEN_CATEGORIES[keyof typeof TOKEN_CATEGORIES];
+
+// Following Vercel AI SDK's token counting interface
 export interface TokenUsage {
   tool: string;
   tokens: number;
+  category?: TokenCategory;
+  // Following Vercel AI SDK's token counting interface
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
 }
 
 export interface SearchResponse {
@@ -142,6 +157,60 @@ export interface StreamMessage {
     total: number;
     percentage: string;
   };
+}
+
+// OpenAI API Types
+export interface ChatCompletionRequest {
+  model: string;
+  messages: Array<{
+    role: string;
+    content: string;
+  }>;
+  stream?: boolean;
+}
+
+export interface ChatCompletionResponse {
+  id: string;
+  object: 'chat.completion';
+  created: number;
+  model: string;
+  system_fingerprint: string;
+  choices: Array<{
+    index: number;
+    message: {
+      role: 'assistant';
+      content: string;
+    };
+    logprobs: null;
+    finish_reason: 'stop';
+  }>;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+    completion_tokens_details?: {
+      reasoning_tokens: number;
+      accepted_prediction_tokens: number;
+      rejected_prediction_tokens: number;
+    };
+  };
+}
+
+export interface ChatCompletionChunk {
+  id: string;
+  object: 'chat.completion.chunk';
+  created: number;
+  model: string;
+  system_fingerprint: string;
+  choices: Array<{
+    index: number;
+    delta: {
+      role?: 'assistant';
+      content?: string;
+    };
+    logprobs: null;
+    finish_reason: null | 'stop';
+  }>;
 }
 
 // Tracker Types

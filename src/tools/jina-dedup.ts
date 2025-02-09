@@ -1,13 +1,25 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { TokenTracker } from "../utils/token-tracker";
 import {JINA_API_KEY} from "../config";
 
 const JINA_API_URL = 'https://api.jina.ai/v1/embeddings';
 const SIMILARITY_THRESHOLD = 0.93; // Adjustable threshold for cosine similarity
 
+const JINA_API_CONFIG = {
+  MODEL: 'jina-embeddings-v3',
+  TASK: 'text-matching',
+  DIMENSIONS: 1024,
+  EMBEDDING_TYPE: 'float',
+  LATE_CHUNKING: false
+} as const;
+
 // Types for Jina API
 interface JinaEmbeddingRequest {
   model: string;
+  task: string;
+  late_chunking: boolean;
+  dimensions: number;
+  embedding_type: string;
   input: string[];
 }
 
@@ -41,7 +53,11 @@ async function getEmbeddings(queries: string[]): Promise<{ embeddings: number[][
   }
 
   const request: JinaEmbeddingRequest = {
-    model: 'jina-embeddings-v3',
+    model: JINA_API_CONFIG.MODEL,
+    task: JINA_API_CONFIG.TASK,
+    late_chunking: JINA_API_CONFIG.LATE_CHUNKING,
+    dimensions: JINA_API_CONFIG.DIMENSIONS,
+    embedding_type: JINA_API_CONFIG.EMBEDDING_TYPE,
     input: queries
   };
 
@@ -57,6 +73,15 @@ async function getEmbeddings(queries: string[]): Promise<{ embeddings: number[][
       }
     );
 
+    // Validate response format
+    if (!response.data.data || response.data.data.length !== queries.length) {
+      console.error('Invalid response from Jina API:', response.data);
+      return {
+        embeddings: [],
+        tokens: 0
+      };
+    }
+
     // Sort embeddings by index to maintain original order
     const embeddings = response.data.data
       .sort((a, b) => a.index - b.index)
@@ -68,6 +93,12 @@ async function getEmbeddings(queries: string[]): Promise<{ embeddings: number[][
     };
   } catch (error) {
     console.error('Error getting embeddings from Jina:', error);
+    if (error instanceof AxiosError && error.response?.status === 402) {
+      return {
+        embeddings: [],
+        tokens: 0
+      };
+    }
     throw error;
   }
 }
@@ -90,6 +121,15 @@ export async function dedupQueries(
     // Get embeddings for all queries in one batch
     const allQueries = [...newQueries, ...existingQueries];
     const { embeddings: allEmbeddings, tokens } = await getEmbeddings(allQueries);
+
+    // If embeddings is empty (due to 402 error), return all new queries
+    if (!allEmbeddings.length) {
+      console.log('Dedup (no embeddings):', newQueries);
+      return {
+        unique_queries: newQueries,
+        tokens: 0
+      };
+    }
 
     // Split embeddings back into new and existing
     const newEmbeddings = allEmbeddings.slice(0, newQueries.length);
