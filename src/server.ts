@@ -105,7 +105,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       context.tokenTracker.trackUsage('evaluator', chunkTokens, TOKEN_CATEGORIES.REASONING);
       
       // Only send chunk if there's content to send
-      if (action.think) {
+      if (action.thisStep.think) {
         const chunk: ChatCompletionChunk = {
           id: requestId,
           object: 'chat.completion.chunk',
@@ -114,7 +114,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           system_fingerprint: 'fp_' + requestId,
           choices: [{
             index: 0,
-            delta: { content: `<think>${action.think}</think>` },
+            delta: { content: `${action.thisStep.think}` },
             logprobs: null,
             finish_reason: null
           }]
@@ -175,7 +175,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: { content: '</think>' },
+          delta: { content: '</think>\n\n' },
           logprobs: null,
           finish_reason: null
         }]

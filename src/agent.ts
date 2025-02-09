@@ -210,6 +210,7 @@ ${allKeywords.join('\n')}
   if (allowAnswer) {
     actionSections.push(`
 <action-answer>
+- If <question> is a simple greeting, chit-chat, or general knowledge, provide the answer directly.
 - Provide final response only when 100% certain
 - Responses must be definitive (no ambiguity, uncertainty, or disclaimers)${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
 </action-answer>
