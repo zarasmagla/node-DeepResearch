@@ -1,6 +1,6 @@
 # DeepResearch
 
-Keep searching, reading webpages, reasoning until an answer is found (or the token budget is exceeded).
+Keep searching, reading webpages, reasoning until an answer is found (or the token budget is exceeded). Useful for deeply investigating a query.
 
 ```mermaid
 ---
@@ -22,6 +22,8 @@ flowchart LR
     Loop --> Answer(["Answer"])
 
 ```
+
+Note that this project doesn't try to mimic what OpenAI or Gemini do with their deep research product. The idea in this project is about using this loop cycle to repeat the search until finding the answer. This project doesn't implement the structural article generation part. So if you want a service that can do deep searches and give you an answer, this is it. If you want a service that mimics long article writing like OpenAI/Gemini, **this isn't it.**
 
 ## Install
 
