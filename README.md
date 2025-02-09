@@ -294,7 +294,7 @@ Plain `gemini-2.0-flash` can be run by setting `tokenBudget` to zero, skipping t
 
 It should not be surprised that plain `gemini-2.0-flash` has a 0% pass rate, as I intentionally filtered out the questions that LLMs can answer.
 
-| Metric | gemini-2.0-flash | #5e80ed4 | #3deee87 |
+| Metric | gemini-2.0-flash | #5e80ed4 | #3deee87 (latest) |
 |--------|------------------|-------------------------------------------------|--------|
 | Pass Rate | 0% | 60%                                             |  75% |
 | Average Steps | 1 | 5                                               |5 |
