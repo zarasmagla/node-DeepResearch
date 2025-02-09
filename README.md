@@ -105,9 +105,7 @@ export DEFAULT_MODEL_NAME=qwen2.5-7b  # your local llm model name
 ```
 
 
-## Server API
-
-### OpenAI-Compatible Chat Completions
+## OpenAI-Compatible Server API
 
 Start the server:
 ```bash
@@ -120,7 +118,7 @@ npm run serve --secret=your_secret_token
 
 The server will start on http://localhost:3000 with the following endpoint:
 
-#### POST /v1/chat/completions
+### POST /v1/chat/completions
 ```bash
 # Without authentication
 curl http://localhost:3000/v1/chat/completions \
@@ -208,33 +206,22 @@ Note: The think content in streaming responses is wrapped in XML tags:
 [final answer]
 ```
 
-## Server Setup
 
-### Local Setup
-Start the server:
-```bash
-# Without authentication
-npm run serve
+## Docker Setup
 
-# With authentication (clients must provide this secret as Bearer token)
-npm run serve --secret=your_secret_token
-```
-
-### Docker Setup
-
-#### Build Docker Image
+### Build Docker Image
 To build the Docker image for the application, run the following command:
 ```bash
 docker build -t deepresearch:latest .
 ```
 
-#### Run Docker Container
+### Run Docker Container
 To run the Docker container, use the following command:
 ```bash
 docker run -p 3000:3000 --env GEMINI_API_KEY=your_gemini_api_key --env JINA_API_KEY=your_jina_api_key deepresearch:latest
 ```
 
-#### Docker Compose
+### Docker Compose
 You can also use Docker Compose to manage multi-container applications. To start the application with Docker Compose, run:
 ```bash
 docker-compose up
