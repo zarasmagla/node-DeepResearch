@@ -126,6 +126,9 @@ export function getModel(toolName: ToolName) {
     throw new Error('GEMINI_API_KEY not found');
   }
 
+  if (toolName === 'search-grounding') {
+    return createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })(config.model, { useSearchGrounding: true });
+  }
   return createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })(config.model);
 }
 

@@ -32,6 +32,7 @@
         "maxTokens": 8000
       },
       "tools": {
+        "search-grounding": { "temperature": 0 },
         "dedup": { "temperature": 0.1 },
         "evaluator": {},
         "errorAnalyzer": {},
@@ -47,6 +48,7 @@
         "maxTokens": 8000
       },
       "tools": {
+        "search-grounding": { "temperature": 0 },
         "dedup": { "temperature": 0.1 },
         "evaluator": {},
         "errorAnalyzer": {},

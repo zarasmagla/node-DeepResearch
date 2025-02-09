@@ -1,6 +1,6 @@
 import {z} from 'zod';
 import {generateObject} from 'ai';
-import {getModel, getMaxTokens, SEARCH_PROVIDER, STEP_SLEEP} from "./config";
+import {getModel, getMaxTokens, SEARCH_PROVIDER, STEP_SLEEP, LLM_PROVIDER} from "./config";
 import {readUrl} from "./tools/read";
 import {handleGenerateObjectError} from './utils/error-handling';
 import fs from 'fs/promises';
@@ -15,6 +15,7 @@ import {ActionTracker} from "./utils/action-tracker";
 import {StepAction, AnswerAction} from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
+import {grounding} from "./tools/grounding";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -504,15 +505,20 @@ But then you realized you have asked them before. You decided to to think out of
       keywordsQueries = dedupedQueries;
 
       if (keywordsQueries.length > 0) {
+        let googleGrounded = '';
         const searchResults = [];
         for (const query of keywordsQueries) {
           console.log(`Search query: ${query}`);
 
           let results;
+
           switch (SEARCH_PROVIDER) {
             case 'jina':
               // use jinaSearch
               results = {results: (await search(query, context.tokenTracker)).response?.data || []};
+              if (LLM_PROVIDER === 'gemini') {
+                googleGrounded = await grounding(query, context.tokenTracker);
+              }
               break;
             case 'duck':
               results = await duckSearch(query, {safeSearch: SafeSearchType.STRICT});
@@ -551,7 +557,7 @@ But then you realized you have asked them before. You decided to to think out of
 
         allKnowledge.push({
           question: `What do Internet say about ${thisStep.searchQuery}?`,
-          answer: removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
+          answer: googleGrounded + removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
           // flatten into one url list, and take unique urls
           references: searchResults.map(r => r.results.map(r => r.url)).flat().filter((v, i, a) => a.indexOf(v) === i),
           type: 'side-info'
