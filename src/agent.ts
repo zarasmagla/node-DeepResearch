@@ -288,7 +288,6 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker()
   };
-  context.actionTracker.trackAction({gaps: [question], totalStep: 0, badAttempts: 0});
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
