@@ -114,7 +114,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           system_fingerprint: 'fp_' + requestId,
           choices: [{
             index: 0,
-            delta: { content: `${action.thisStep.think}` },
+            delta: { content: `${action.thisStep.think}\n` },
             logprobs: null,
             finish_reason: null
           }]

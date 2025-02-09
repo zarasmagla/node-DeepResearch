@@ -312,7 +312,6 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     await sleep(STEP_SLEEP);
     step++;
     totalStep++;
-    context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
     const budgetPercentage = (context.tokenTracker.getTotalUsage() / tokenBudget * 100).toFixed(2);
     console.log(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
     console.log('Gaps:', gaps);
@@ -355,12 +354,14 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       object = result.object;
       totalTokens = result.totalTokens;
     }
-    context.tokenTracker.trackUsage('agent', totalTokens);
     thisStep = object as StepAction;
     // print allowed and chose action
     const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
     console.log(`${thisStep.action} <- [${actionsStr}]`);
     console.log(thisStep)
+
+    context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
+    context.tokenTracker.trackUsage('agent', totalTokens);
 
     // reset allowAnswer to true
     allowAnswer = true;
