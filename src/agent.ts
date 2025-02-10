@@ -1,6 +1,6 @@
-import {z} from 'zod';
+import {z, ZodObject} from 'zod';
 import {generateObject} from 'ai';
-import {getModel, getMaxTokens, SEARCH_PROVIDER, STEP_SLEEP, LLM_PROVIDER} from "./config";
+import {getModel, getMaxTokens, SEARCH_PROVIDER, STEP_SLEEP} from "./config";
 import {readUrl} from "./tools/read";
 import {handleGenerateObjectError} from './utils/error-handling';
 import fs from 'fs/promises';
@@ -8,14 +8,15 @@ import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
 import {braveSearch} from "./tools/brave-search";
 import {rewriteQuery} from "./tools/query-rewriter";
 import {dedupQueries} from "./tools/jina-dedup";
-import {evaluateAnswer} from "./tools/evaluator";
+import {evaluateAnswer, evaluateQuestion} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
 import {StepAction, AnswerAction} from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
-import {grounding} from "./tools/grounding";
+// import {grounding} from "./tools/grounding";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -43,7 +44,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
     properties.references = z.array(
       z.object({
         exactQuote: z.string().describe("Exact relevant quote from the document"),
-        url: z.string().describe("URL of the document; must be directly from the context")
+        url: z.string().describe("source URL; must be directly from the context")
       }).required()
     ).describe("Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document").optional();
   }
@@ -291,6 +292,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
+  let schema: ZodObject<any> = getSchema(true, true, true, true)
   const gaps: string[] = [question];  // All questions to be answered including the orginal question
   const allQuestions = [question];
   const allKeywords = [];
@@ -307,6 +309,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
 
   const allURLs: Record<string, string> = {};
   const visitedURLs: string[] = [];
+  const evaluationMetrics: Record<string, any[]> = {};
   while (context.tokenTracker.getTotalUsage() < tokenBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
     await sleep(STEP_SLEEP);
@@ -317,6 +320,10 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     console.log('Gaps:', gaps);
     allowReflect = allowReflect && (gaps.length <= 1);
     const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
+    if (!evaluationMetrics[currentQuestion]) {
+      evaluationMetrics[currentQuestion] = await evaluateQuestion(currentQuestion, context.tokenTracker)
+    }
+
     // update all urls with buildURLMap
     allowRead = allowRead && (Object.keys(allURLs).length > 0);
     allowSearch = allowSearch && (Object.keys(allURLs).length < 50);  // disable search when too many urls already
@@ -336,14 +343,14 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       allURLs,
       false
     );
-
+    schema = getSchema(allowReflect, allowRead, allowAnswer, allowSearch)
     const model = getModel('agent');
     let object;
     let totalTokens = 0;
     try {
       const result = await generateObject({
         model,
-        schema: getSchema(allowReflect, allowRead, allowAnswer, allowSearch),
+        schema,
         prompt,
         maxTokens: getMaxTokens('agent')
       });
@@ -384,7 +391,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
       });
 
       const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep.answer,
-        ['definitive', 'freshness', 'plurality'], context.tokenTracker);
+        evaluationMetrics[currentQuestion], context.tokenTracker);
 
       if (currentQuestion === question) {
         if (evaluation.pass) {
@@ -437,6 +444,13 @@ ${evaluation.think}
               evaluation: evaluation.think,
               ...errorAnalysis
             });
+
+            if (errorAnalysis.questionsToAnswer) {
+                gaps.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
+                allQuestions.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
+                gaps.push(question);  // always keep the original question in the gaps
+            }
+
             badAttempts++;
             allowAnswer = false;  // disable answer action in the immediate next step
             diaryContext = [];
@@ -504,7 +518,7 @@ But then you realized you have asked them before. You decided to to think out of
       keywordsQueries = dedupedQueries;
 
       if (keywordsQueries.length > 0) {
-        let googleGrounded = '';
+        // let googleGrounded = '';
         const searchResults = [];
         for (const query of keywordsQueries) {
           console.log(`Search query: ${query}`);
@@ -515,9 +529,9 @@ But then you realized you have asked them before. You decided to to think out of
             case 'jina':
               // use jinaSearch
               results = {results: (await search(query, context.tokenTracker)).response?.data || []};
-              if (LLM_PROVIDER === 'gemini') {
-                googleGrounded = await grounding(query, context.tokenTracker);
-              }
+              // if (LLM_PROVIDER === 'gemini') {
+              //   googleGrounded = await grounding(query, context.tokenTracker);
+              // }
               break;
             case 'duck':
               results = await duckSearch(query, {safeSearch: SafeSearchType.STRICT});
@@ -556,7 +570,8 @@ But then you realized you have asked them before. You decided to to think out of
 
         allKnowledge.push({
           question: `What do Internet say about ${thisStep.searchQuery}?`,
-          answer: googleGrounded + removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
+          answer: removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
+          // answer: googleGrounded + removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
           // flatten into one url list, and take unique urls
           references: searchResults.map(r => r.results.map(r => r.url)).flat().filter((v, i, a) => a.indexOf(v) === i),
           type: 'side-info'
@@ -645,10 +660,10 @@ You decided to think out of the box or cut from a completely different angle.`);
       }
     }
 
-    await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+    await storeContext(prompt, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
   }
 
-  await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+  await storeContext(prompt, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
   if (isAnswered) {
     return {result: thisStep, context};
   } else {
@@ -671,13 +686,14 @@ You decided to think out of the box or cut from a completely different angle.`);
       true
     );
 
+    schema = getSchema(false, false, true, false);
     const model = getModel('agentBeastMode');
     let object;
     let totalTokens;
     try {
       const result = await generateObject({
         model,
-        schema: getSchema(false, false, allowAnswer, false),
+        schema: schema,
         prompt,
         maxTokens: getMaxTokens('agentBeastMode')
       });
@@ -688,7 +704,7 @@ You decided to think out of the box or cut from a completely different angle.`);
       object = result.object;
       totalTokens = result.totalTokens;
     }
-    await storeContext(prompt, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+    await storeContext(prompt, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
     thisStep = object as StepAction;
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
     context.tokenTracker.trackUsage('agent', totalTokens);
@@ -697,9 +713,15 @@ You decided to think out of the box or cut from a completely different angle.`);
   }
 }
 
-async function storeContext(prompt: string, memory: any[][], step: number) {
+async function storeContext(prompt: string, schema: any, memory: any[][], step: number) {
   try {
-    await fs.writeFile(`prompt-${step}.txt`, prompt);
+    await fs.writeFile(`prompt-${step}.txt`, `
+Prompt:
+${prompt}
+
+JSONSchema:
+${JSON.stringify(zodToJsonSchema(schema), null, 2)}
+`);
     const [context, keywords, questions, knowledge] = memory;
     await fs.writeFile('context.json', JSON.stringify(context, null, 2));
     await fs.writeFile('queries.json', JSON.stringify(keywords, null, 2));

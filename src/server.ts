@@ -36,6 +36,19 @@ interface QueryRequest extends Request {
   };
 }
 
+function buildMdFromAnswer(answer: AnswerAction) {
+  let refStr = '';
+  if (answer.references?.length > 0) {
+    refStr = `
+
+## References
+${answer.references.map((ref, i) => `
+${i + 1}. [${ref.exactQuote}](${ref.url})`).join('')}`;
+  }
+  return `${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}${refStr}`;
+}
+
+
 // OpenAI-compatible chat completions endpoint
 app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   // Check authentication only if secret is set
@@ -175,7 +188,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: { content: '</think>\n\n' },
+          delta: { content: `</think>\n\n` },
           logprobs: null,
           finish_reason: null
         }]
@@ -191,7 +204,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: { content: result.action === 'answer' ? (result as AnswerAction).answer : result.think },
+          delta: { content: result.action === 'answer' ? buildMdFromAnswer(result) : result.think },
           logprobs: null,
           finish_reason: 'stop'
         }]
@@ -210,7 +223,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           index: 0,
           message: {
             role: 'assistant',
-            content: result.action === 'answer' ? (result as AnswerAction).answer : result.think
+            content: result.action === 'answer' ?  buildMdFromAnswer(result): result.think
           },
           logprobs: null,
           finish_reason: 'stop'

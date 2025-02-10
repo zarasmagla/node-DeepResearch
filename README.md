@@ -289,7 +289,7 @@ I kept the evaluation simple, LLM-as-a-judge and collect some [ego questions](./
 I mainly look at 3 things: total steps, total tokens, and the correctness of the final answer.
 
 ```bash
-npm run eval ./src/evals/ego-questions
+npm run eval ./src/evals/questions.json
 ```
 
 Here's the table comparing plain `gemini-2.0-flash` and `gemini-2.0-flash + node-deepresearch` on the ego set.

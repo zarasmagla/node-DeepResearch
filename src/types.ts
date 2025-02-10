@@ -97,8 +97,6 @@ export interface ReadResponse {
 }
 
 
-
-
 export type EvaluationResponse = {
   pass: boolean;
   think: string;
@@ -121,6 +119,7 @@ export type ErrorAnalysisResponse = {
   recap: string;
   blame: string;
   improvement: string;
+  questionsToAnswer: string[];
 };
 
 export interface SearchResult {
@@ -214,8 +213,8 @@ export interface ChatCompletionChunk {
 }
 
 // Tracker Types
-import { TokenTracker } from './utils/token-tracker';
-import { ActionTracker } from './utils/action-tracker';
+import {TokenTracker} from './utils/token-tracker';
+import {ActionTracker} from './utils/action-tracker';
 
 export interface TrackerContext {
   tokenTracker: TokenTracker;
