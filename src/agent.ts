@@ -83,7 +83,7 @@ function getPrompt(
   allowRead: boolean = true,
   allowSearch: boolean = true,
   badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
-  knowledge?: { question: string; answer: string; references: any[] }[],
+  knowledge?: { question: string; answer: string; references?: any[] }[],
   allURLs?: Record<string, string>,
   beastMode?: boolean
 ): string {
@@ -122,7 +122,7 @@ ${k.question}
 <answer>
 ${k.answer}
 </answer>
-${k.references?.length > 0 ? `
+${k.references ? `
 <references>
 ${JSON.stringify(k.references)}
 </references>
@@ -572,8 +572,6 @@ But then you realized you have asked them before. You decided to to think out of
           question: `What do Internet say about ${thisStep.searchQuery}?`,
           answer: removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
           // answer: googleGrounded + removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
-          // flatten into one url list, and take unique urls
-          references: searchResults.map(r => r.results.map(r => r.url)).flat().filter((v, i, a) => a.indexOf(v) === i),
           type: 'side-info'
         });
 
@@ -618,21 +616,25 @@ You decided to think out of the box or cut from a completely different angle.
 
         const urlResults = await Promise.all(
           uniqueURLs.map(async (url: string) => {
-            const {response, tokens} = await readUrl(url, context.tokenTracker);
-            allKnowledge.push({
-              question: `What is in ${response.data?.url || 'the URL'}?`,
-              answer: removeAllLineBreaks(response.data?.content || 'No content available'),
-              references: [response.data?.url],
-              type: 'url'
-            });
-            visitedURLs.push(url);
-            delete allURLs[url];
-            return {url, result: response, tokens};
+            try {
+              const {response, tokens} = await readUrl(url, context.tokenTracker);
+              allKnowledge.push({
+                question: `What is in ${response.data?.url || 'the URL'}?`,
+                answer: removeAllLineBreaks(response.data?.content || 'No content available'),
+                references: [response.data?.url],
+                type: 'url'
+              });
+              visitedURLs.push(url);
+              delete allURLs[url];
+              return {url, result: response, tokens};
+            } catch (error) {
+              console.error('Error reading URL:', error);
+            }
           })
         );
         diaryContext.push(`
 At step ${step}, you took the **visit** action and deep dive into the following URLs:
-${thisStep.URLTargets.join('\n')}
+${urlResults.map(r => r?.url).join('\n')}
 You found some useful information on the web and add them to your knowledge for future reference.
 `);
         updateContext({
