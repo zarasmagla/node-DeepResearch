@@ -107,9 +107,9 @@ export DEFAULT_MODEL_NAME=qwen2.5-7b  # your local llm model name
 
 ## OpenAI-Compatible Server API
 
-If you have a GUI client that supports OpenAI API (e.g. [Chatbox](https://github.com/Bin-Huang/chatbox)) , you can simply config it to use this server.
+If you have a GUI client that supports OpenAI API (e.g. [CherryStudio](https://docs.cherry-ai.com/), [Chatbox](https://github.com/Bin-Huang/chatbox)) , you can simply config it to use this server.
 
-![demo1](.github/visuals/chatbox.gif)
+![demo1](.github/visuals/demo6.gif)
 
 Start the server:
 ```bash
