@@ -9,6 +9,16 @@ export class TokenTracker extends EventEmitter {
   constructor(budget?: number) {
     super();
     this.budget = budget;
+
+    if ('asyncLocalContext' in process) {
+      const asyncLocalContext = process.asyncLocalContext as any;
+      this.on('usage', () => {
+        if (asyncLocalContext.available()) {
+          asyncLocalContext.ctx.chargeAmount = this.getTotalUsage();
+        }
+      });
+      
+    }
   }
 
   trackUsage(tool: string, tokens: number, category?: TokenCategory) {
@@ -53,9 +63,9 @@ export class TokenTracker extends EventEmitter {
     }, {} as Record<string, number>);
 
     const prompt_tokens = categoryBreakdown.prompt || 0;
-    const completion_tokens = 
-      (categoryBreakdown.reasoning || 0) + 
-      (categoryBreakdown.accepted || 0) + 
+    const completion_tokens =
+      (categoryBreakdown.reasoning || 0) +
+      (categoryBreakdown.accepted || 0) +
       (categoryBreakdown.rejected || 0);
 
     return {
