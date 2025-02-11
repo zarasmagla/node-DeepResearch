@@ -174,20 +174,24 @@ ${learnedStrategy}
 
   // Build actions section
 
-  if (allURLs && Object.keys(allURLs).length > 0 && allowRead) {
-    const urlList = Object.entries(allURLs)
-      .map(([url, desc]) => `  + "${url}": "${desc}"`)
-      .join('\n');
+  if (allowRead) {
+    let urlList = '';
+    if (allURLs && Object.keys(allURLs).length > 0) {
+      urlList = Object.entries(allURLs)
+        .map(([url, desc]) => `  + "${url}": "${desc}"`)
+        .join('\n');
+    }
 
     actionSections.push(`
-<action-visit>    
+<action-visit>
+- This allows you to access the full content behind any URLs.
+- If the <question> contains a URL, you must visit the URL to gather more information.
+${urlList ? `    
 - Visit any URLs from below to gather external knowledge, choose the most relevant URLs that might contain the answer
 <url-list>
 ${urlList}
 </url-list>
-- When you have enough search result in the context and want to deep dive into specific URLs
-- It allows you to access the full content behind any URLs
-
+`.trim() : ''}
 </action-visit>
 `);
   }
@@ -213,8 +217,10 @@ ${allKeywords.join('\n')}
     actionSections.push(`
 <action-answer>
 - If <question> is a simple greeting, chit-chat, or general knowledge, provide the answer directly.
-- Provide final response only when 100% certain
-- Responses must be definitive (no ambiguity, uncertainty, or disclaimers)${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
+- Must provide "references" and each must specify "exactQuote" and "url" 
+- In the answer, use markdown footnote syntax like [^1], [^2] to refer to the references
+- Responses must be definitive (no ambiguity, uncertainty, or disclaimers)
+- Provide final response only when 100% certain${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
 </action-answer>
 `);
   }
@@ -323,7 +329,7 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     }
 
     // update all urls with buildURLMap
-    allowRead = allowRead && (Object.keys(allURLs).length > 0);
+    // allowRead = allowRead && (Object.keys(allURLs).length > 0);
     allowSearch = allowSearch && (Object.keys(allURLs).length < 50);  // disable search when too many urls already
 
     // generate prompt for this step

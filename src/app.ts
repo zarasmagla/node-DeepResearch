@@ -45,12 +45,13 @@ function buildMdFromAnswer(answer: AnswerAction) {
   let refStr = '';
   if (answer.references?.length > 0) {
     refStr = `
-
-## References
+<references>
 ${answer.references.map((ref, i) => `
-${i + 1}. [${ref.exactQuote}](${ref.url})`).join('')}`;
+${i + 1}. [${ref.exactQuote}](${ref.url})`).join('')}
+</references>
+`.trim();
   }
-  return `${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}${refStr}`;
+  return `${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}\n${refStr}`;
 }
 
 
