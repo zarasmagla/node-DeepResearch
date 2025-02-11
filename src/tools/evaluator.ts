@@ -310,12 +310,13 @@ function getQuestionEvaluationPrompt(question: string): string {
   return `You are an evaluator that determines if a question requires freshness and/or plurality checks in addition to the required definitiveness check.
 
 <evaluation_types>
-1. freshness - Checks if the answer needs to be current and up-to-date
-2. plurality - Checks if the answer needs to provide multiple items or a specific count
-Note: Definitiveness check is always applied regardless of the question type
+1. freshness - Checks if the question is time-sensitive or requires very recent information
+2. plurality - Checks if the question asks for multiple items or a specific count or enumeration
 </evaluation_types>
 
 <rules>
+If question is a simple greeting, chit-chat, or general knowledge, provide the answer directly.
+
 1. Freshness Evaluation:
    - Required for questions about current state, recent events, or time-sensitive information
    - Required for: prices, versions, leadership positions, status updates
@@ -327,15 +328,16 @@ Note: Definitiveness check is always applied regardless of the question type
    - Check for: numbers ("5 examples"), plural nouns, list requests
    - Look for: "all", "list", "enumerate", "examples", plural forms
    - Required when question implies completeness ("all the reasons", "every factor")
-
-3. Ordering Rules:
-   - Always include definitive check in the order
-   - Prioritize freshness for "current/latest" queries as outdated info invalidates other aspects
-   - Prioritize plurality for explicit numbered requests when freshness isn't critical
-   - Default order is: definitive -> freshness -> plurality
 </rules>
 
 <examples>
+Question: "Hello, how are you?"
+Evaluation: {
+  "needsFreshness": false,
+  "needsPlurality": false,
+  "reasoning": "Simple greeting, no additional checks needed."
+}
+
 Question: "What is the current CEO of OpenAI?"
 Evaluation: {
   "needsFreshness": true,
@@ -394,8 +396,8 @@ export async function evaluateQuestion(
     // Always evaluate definitive first, then freshness (if needed), then plurality (if needed)
     return types;
   } catch (error) {
-    // Default to all evaluations in standard order if evaluation fails
-    console.error('Question evaluation failed:', error);
+    const errorResult = await handleGenerateObjectError<EvaluationResponse>(error);
+    (tracker || new TokenTracker()).trackUsage('evaluator', errorResult.totalTokens || 0);
     return ['definitive', 'freshness', 'plurality'];
   }
 }
