@@ -524,8 +524,8 @@ But then you realized you have asked them before. You decided to to think out of
       if (keywordsQueries.length > 0) {
         // let googleGrounded = '';
         const searchResults = [];
+        context.actionTracker.trackThink(`Let me search for "${keywordsQueries.join(', ')}" to gather more information.`)
         for (const query of keywordsQueries) {
-          context.actionTracker.trackThink(`Let me search for "${query}" to gather more information.`)
           console.log(`Search query: ${query}`);
 
           let results;
@@ -618,11 +618,10 @@ You decided to think out of the box or cut from a completely different angle.
       }
 
       if (uniqueURLs.length > 0) {
-
+        context.actionTracker.trackThink(`Let me read ${uniqueURLs.join(', ')} to gather more information.`);
         const urlResults = await Promise.all(
           uniqueURLs.map(async (url: string) => {
             try {
-              context.actionTracker.trackThink(`Let me visit ${url} to gather more information.`)
               const {response, tokens} = await readUrl(url, context.tokenTracker);
               allKnowledge.push({
                 question: `What is in ${response.data?.url || 'the URL'}?`,
