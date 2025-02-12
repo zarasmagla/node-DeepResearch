@@ -15,7 +15,7 @@ export class TokenTracker extends EventEmitter {
       const asyncLocalContext = process.asyncLocalContext as any;
       this.on('usage', () => {
         if (asyncLocalContext.available()) {
-          asyncLocalContext.ctx.chargeAmount = this.getTotalUsage();
+          asyncLocalContext.ctx.chargeAmount = this.getTotalUsage().totalTokens;
         }
       });
 
