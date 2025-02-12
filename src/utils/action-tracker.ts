@@ -21,6 +21,12 @@ export class ActionTracker extends EventEmitter {
     this.emit('action', this.state);
   }
 
+  trackThink(think: string) {
+    // update the think field of the current step
+    this.trackAction({thisStep: {...this.state.thisStep, think}});
+    this.emit('action', this.state);
+  }
+
   getState(): ActionState {
     return { ...this.state };
   }

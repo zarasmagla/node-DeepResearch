@@ -34,19 +34,19 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowSearch) {
     actions.push("search");
     properties.searchQuery = z.string().max(30)
-      .describe("Only required when choosing 'search' action, must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Existing queries must be avoided").optional();
+      .describe("Required when action='search'. Must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Existing queries must be avoided").optional();
   }
 
   if (allowAnswer) {
     actions.push("answer");
     properties.answer = z.string()
-      .describe("Only required when choosing 'answer' action, must be the final answer in natural language").optional();
+      .describe("Required when action='answer'. Must be the final answer in natural language").optional();
     properties.references = z.array(
       z.object({
         exactQuote: z.string().describe("Exact relevant quote from the document"),
         url: z.string().describe("source URL; must be directly from the context")
       }).required()
-    ).describe("Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document").optional();
+    ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document").optional();
   }
 
   if (allowReflect) {
@@ -54,14 +54,14 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
     properties.questionsToAnswer = z.array(
       z.string().describe("each question must be a single line, concise and clear. not composite or compound, less than 20 words.")
     ).max(2)
-      .describe("List of most important questions to fill the knowledge gaps of finding the answer to the original question").optional();
+      .describe("Required when action='reflect'. List of most important questions to fill the knowledge gaps of finding the answer to the original question").optional();
   }
 
   if (allowRead) {
     actions.push("visit");
     properties.URLTargets = z.array(z.string())
       .max(2)
-      .describe("Must be an array of URLs, choose up the most relevant 2 URLs to visit").optional();
+      .describe("Required when action='visit'. Must be an array of URLs, choose up the most relevant 2 URLs to visit").optional();
   }
 
   // Update the enum values after collecting all actions
@@ -433,7 +433,7 @@ The evaluator thinks your answer is bad because:
 ${evaluation.think}
 `);
             // store the bad context and reset the diary context
-            const {response: errorAnalysis} = await analyzeSteps(diaryContext);
+            const {response: errorAnalysis} = await analyzeSteps(diaryContext, context.tokenTracker);
 
             allKnowledge.push({
               question: currentQuestion,
@@ -486,7 +486,7 @@ Although you solved a sub-question, you still need to find the answer to the ori
     } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
       let newGapQuestions = thisStep.questionsToAnswer
       const oldQuestions = newGapQuestions;
-      newGapQuestions = (await dedupQueries(newGapQuestions, allQuestions)).unique_queries;
+      newGapQuestions = (await dedupQueries(newGapQuestions, allQuestions, context.tokenTracker)).unique_queries;
       if (newGapQuestions.length > 0) {
         // found new gap questions
         diaryContext.push(`
@@ -514,17 +514,18 @@ But then you realized you have asked them before. You decided to to think out of
       }
     } else if (thisStep.action === 'search' && thisStep.searchQuery) {
       // rewrite queries
-      let {queries: keywordsQueries} = await rewriteQuery(thisStep);
+      let {queries: keywordsQueries} = await rewriteQuery(thisStep, context.tokenTracker);
 
       const oldKeywords = keywordsQueries;
       // avoid exisitng searched queries
-      const {unique_queries: dedupedQueries} = await dedupQueries(keywordsQueries, allKeywords);
+      const {unique_queries: dedupedQueries} = await dedupQueries(keywordsQueries, allKeywords, context.tokenTracker);
       keywordsQueries = dedupedQueries;
 
       if (keywordsQueries.length > 0) {
         // let googleGrounded = '';
         const searchResults = [];
         for (const query of keywordsQueries) {
+          context.actionTracker.trackThink(`Let me search for "${query}" to gather more information.`)
           console.log(`Search query: ${query}`);
 
           let results;
@@ -621,6 +622,7 @@ You decided to think out of the box or cut from a completely different angle.
         const urlResults = await Promise.all(
           uniqueURLs.map(async (url: string) => {
             try {
+              context.actionTracker.trackThink(`Let me visit ${url} to gather more information.`)
               const {response, tokens} = await readUrl(url, context.tokenTracker);
               allKnowledge.push({
                 question: `What is in ${response.data?.url || 'the URL'}?`,
