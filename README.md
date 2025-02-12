@@ -55,16 +55,22 @@ npm run dev $QUERY
 
 ### Official API
 
-You can also use our official deepsearch API, hosted and optimized by Jina AI:
+You can also use our official DeepSearch API, hosted and optimized by Jina AI:
 
 ```
 https://deepsearch.jina.ai/v1/chat/completions
 ```
 
-This API is fully compatible with OpenAI API, so you can use it with any OpenAI-compatible client. 
+You can use it with any OpenAI-compatible client. For the authentication Bearer, get your Jina API key from https://jina.ai
 
-For the authentication Bearer token, you can get Jina API key from https://jina.ai
+#### Client integration guidelines
 
+If you are building a web/local/mobile client that uses `Jina DeepSearch API`, here are some design guidelines:
+- Our API is fully compatible with OpenAI API, this should greatly simplify the integration process. The model name is `jina-deepsearch-v1`.
+- DeepSearch API is a reasoning+search grounding LLM, so it's best for questions that require deep reasoning and search.
+- Two special tokens are introduced `<think>...</think>`, `<references>...</references>`. Please render them with care.
+- Guide the user to get a Jina API key from https://jina.ai
+- [Download Jina AI logo here](https://jina.ai/logo-Jina-1024.zip)
 
 ## Demo
 > was recorded with `gemini-1.5-flash`, the latest `gemini-2.0-flash` leads to much better results!
