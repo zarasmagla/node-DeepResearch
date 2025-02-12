@@ -128,7 +128,7 @@ The server will start on http://localhost:3000 with the following endpoint:
 curl http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "jina-deepsearch-v1",
     "messages": [
       {
         "role": "user",
@@ -142,7 +142,7 @@ curl http://localhost:3000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your_secret_token" \
   -d '{
-    "model": "gpt-4o-mini",
+    "model": "jina-deepsearch-v1",
     "messages": [
       {
         "role": "user",
@@ -159,7 +159,7 @@ Response format:
   "id": "chatcmpl-123",
   "object": "chat.completion",
   "created": 1677652288,
-  "model": "gpt-4o-mini",
+  "model": "jina-deepsearch-v1",
   "system_fingerprint": "fp_44709d6fcb",
   "choices": [{
     "index": 0,
@@ -189,7 +189,7 @@ For streaming responses (stream: true), the server sends chunks in this format:
   "id": "chatcmpl-123",
   "object": "chat.completion.chunk",
   "created": 1694268190,
-  "model": "gpt-4o-mini",
+  "model": "jina-deepsearch-v1",
   "system_fingerprint": "fp_44709d6fcb",
   "choices": [{
     "index": 0,

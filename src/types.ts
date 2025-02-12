@@ -217,6 +217,7 @@ export interface ChatCompletionChunk {
     logprobs: null;
     finish_reason: null | 'stop';
   }>;
+  usage?: any;
 }
 
 // Tracker Types
