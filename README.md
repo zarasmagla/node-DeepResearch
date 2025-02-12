@@ -25,7 +25,7 @@ flowchart LR
 
 ```
 
-Note that this project does *not* try to mimic what OpenAI or Gemini do with their deep research product. **We focus on finding the right answer with this loop cycle.** There is no plan to implement the structural article generation part. So if you want a service that can do deep searches and give you an answer, this is it. If you want a service that mimics long article writing like OpenAI/Gemini, **this isn't it.**
+Unlike OpenAI and Gemini's Deep Research capabilities, we focus solely on **delivering accurate answers through our iterative process**. We don't optimize for long-form articles – if you need quick, precise answers from deep search, you're in the right place. If you're looking for AI-generated reports like OpenAI/Gemini do, this isn't for you.
 
 ## Install
 
@@ -195,12 +195,7 @@ Response format:
   "usage": {
     "prompt_tokens": 9,
     "completion_tokens": 12,
-    "total_tokens": 21,
-    "completion_tokens_details": {
-      "reasoning_tokens": 0,
-      "accepted_prediction_tokens": 0,
-      "rejected_prediction_tokens": 0
-    }
+    "total_tokens": 21
   }
 }
 ```
