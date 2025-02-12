@@ -414,17 +414,26 @@ async function performEvaluation(
   },
   tracker?: TokenTracker
 ): Promise<GenerateObjectResult<any>> {
-  const result = await generateObject({
-    model: params.model,
-    schema: params.schema,
-    prompt: params.prompt,
-    maxTokens: params.maxTokens
-  });
+  try {
+    const result = await generateObject({
+      model: params.model,
+      schema: params.schema,
+      prompt: params.prompt,
+      maxTokens: params.maxTokens
+    });
 
-  (tracker || new TokenTracker()).trackUsage('evaluator', result.usage);
-  console.log(`${evaluationType} Evaluation:`, result.object);
+    (tracker || new TokenTracker()).trackUsage('evaluator', result.usage);
+    console.log(`${evaluationType} Evaluation:`, result.object);
 
-  return result;
+    return result;
+  } catch (error) {
+    const errorResult = await handleGenerateObjectError<any>(error);
+    (tracker || new TokenTracker()).trackUsage('evaluator', errorResult.usage);
+    return {
+        object: errorResult.object,
+        usage: errorResult.usage
+    } as GenerateObjectResult<any>;
+  }
 }
 
 

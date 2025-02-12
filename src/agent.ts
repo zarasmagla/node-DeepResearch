@@ -299,8 +299,8 @@ export async function getResponse(question: string,
   let totalStep = 0;
   let badAttempts = 0;
   let schema: ZodObject<any> = getSchema(true, true, true, true)
-  const gaps: string[] = [question];  // All questions to be answered including the orginal question
-  const allQuestions = [question];
+  const gaps: string[] = [question.trim()];  // All questions to be answered including the orginal question
+  const allQuestions = [question.trim()];
   const allKeywords = [];
   const allKnowledge = [];  // knowledge are intermedidate questions that are answered
   // iterate over historyMessages
@@ -339,7 +339,7 @@ export async function getResponse(question: string,
     console.log(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
     console.log('Gaps:', gaps);
     allowReflect = allowReflect && (gaps.length <= 1);
-    const currentQuestion = gaps.length > 0 ? gaps.shift()! : question;
+    const currentQuestion = gaps.length > 0 ? gaps.shift()! : question.trim();
     if (!evaluationMetrics[currentQuestion]) {
       evaluationMetrics[currentQuestion] = await evaluateQuestion(currentQuestion, context.tokenTracker)
     }
@@ -411,7 +411,7 @@ export async function getResponse(question: string,
       const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep,
         evaluationMetrics[currentQuestion], context.tokenTracker);
 
-      if (currentQuestion === question) {
+      if (currentQuestion.trim() === question.trim()) {
         if (evaluation.pass) {
           diaryContext.push(`
 At step ${step}, you took **answer** action and finally found the answer to the original question:
@@ -466,7 +466,7 @@ ${evaluation.think}
             if (errorAnalysis.questionsToAnswer) {
               gaps.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
               allQuestions.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
-              gaps.push(question);  // always keep the original question in the gaps
+              gaps.push(question.trim());  // always keep the original question in the gaps
             }
 
             badAttempts++;
@@ -512,7 +512,7 @@ You will now figure out the answers to these sub-questions and see if they can h
 `);
         gaps.push(...newGapQuestions);
         allQuestions.push(...newGapQuestions);
-        gaps.push(question);  // always keep the original question in the gaps
+        gaps.push(question.trim());  // always keep the original question in the gaps
       } else {
         diaryContext.push(`
 At step ${step}, you took **reflect** and think about the knowledge gaps. You tried to break down the question "${currentQuestion}" into gap-questions like this: ${oldQuestions.join(', ')} 

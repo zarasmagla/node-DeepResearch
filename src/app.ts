@@ -45,22 +45,147 @@ ${answer.references.map((ref, i) => {
   return `${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}\n\n${refStr}`;
 }
 
+async function* streamTextNaturally(text: string, streamingState: StreamingState) {
+  // Split text into chunks that preserve CJK characters, URLs, and regular words
+  const chunks = splitTextIntoChunks(text);
+  let burstMode = false;
+  let consecutiveShortItems = 0;
 
-// Modified streamTextWordByWord function
-async function* streamTextWordByWord(text: string, streamingState: StreamingState) {
-  const words = text.split(/(\s+)/);
-  for (const word of words) {
-    if (streamingState.currentlyStreaming) {
-      const delay = Math.floor(Math.random() * 100);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      yield word;
-    } else {
-      // If streaming was interrupted, yield all remaining words at once
-      const remainingWords = words.slice(words.indexOf(word)).join('');
-      yield remainingWords;
+  for (const chunk of chunks) {
+    if (!streamingState.currentlyStreaming) {
+      yield chunks.slice(chunks.indexOf(chunk)).join('');
       return;
     }
+
+    const delay = calculateDelay(chunk, burstMode);
+
+    // Handle consecutive short items
+    if (getEffectiveLength(chunk) <= 3 && chunk.trim().length > 0) {
+      consecutiveShortItems++;
+      if (consecutiveShortItems >= 3) {
+        burstMode = true;
+      }
+    } else {
+      consecutiveShortItems = 0;
+      burstMode = false;
+    }
+
+    await new Promise(resolve => setTimeout(resolve, delay));
+    yield chunk;
   }
+}
+
+function splitTextIntoChunks(text: string): string[] {
+  const chunks: string[] = [];
+  let currentChunk = '';
+  let inURL = false;
+
+  const pushCurrentChunk = () => {
+    if (currentChunk) {
+      chunks.push(currentChunk);
+      currentChunk = '';
+    }
+  };
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1] || '';
+
+    // URL detection
+    if (char === 'h' && text.slice(i, i + 8).match(/https?:\/\//)) {
+      pushCurrentChunk();
+      inURL = true;
+    }
+
+    if (inURL) {
+      currentChunk += char;
+      // End of URL detection (whitespace or certain punctuation)
+      if (/[\s\])}"']/.test(nextChar) || i === text.length - 1) {
+        pushCurrentChunk();
+        inURL = false;
+      }
+      continue;
+    }
+
+    // CJK character detection (including kana and hangul)
+    if (/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(char)) {
+      pushCurrentChunk();
+      chunks.push(char);
+      continue;
+    }
+
+    // Whitespace handling
+    if (/\s/.test(char)) {
+      pushCurrentChunk();
+      chunks.push(char);
+      continue;
+    }
+
+    // Regular word building
+    currentChunk += char;
+
+    // Break on punctuation
+    if (/[.!?,;:]/.test(nextChar)) {
+      pushCurrentChunk();
+    }
+  }
+
+  pushCurrentChunk();
+  return chunks.filter(chunk => chunk !== '');
+}
+
+function calculateDelay(chunk: string, burstMode: boolean): number {
+  const trimmedChunk = chunk.trim();
+
+  // Handle whitespace
+  if (trimmedChunk.length === 0) {
+    return Math.random() * 20 + 10;
+  }
+
+  // Special handling for URLs
+  if (chunk.match(/^https?:\/\//)) {
+    return Math.random() * 50 + 100; // Slower typing for URLs
+  }
+
+  // Special handling for CJK characters
+  if (/^[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]$/.test(chunk)) {
+    return Math.random() * 100 + 150; // Longer delay for individual CJK characters
+  }
+
+  // Base delay calculation
+  let baseDelay;
+  if (burstMode) {
+    baseDelay = Math.random() * 30 + 20;
+  } else {
+    const effectiveLength = getEffectiveLength(chunk);
+    const perCharacterDelay = Math.max(10, 40 - effectiveLength * 2);
+    baseDelay = Math.random() * perCharacterDelay + perCharacterDelay;
+  }
+
+  // Add variance based on chunk characteristics
+  if (/[A-Z]/.test(chunk[0])) {
+    baseDelay += Math.random() * 20 + 10;
+  }
+
+  if (/[^a-zA-Z\s]/.test(chunk)) {
+    baseDelay += Math.random() * 30 + 15;
+  }
+
+  // Add pauses for punctuation
+  if (/[.!?]$/.test(chunk)) {
+    baseDelay += Math.random() * 350 + 200;
+  } else if (/[,;:]$/.test(chunk)) {
+    baseDelay += Math.random() * 150 + 100;
+  }
+
+  return baseDelay;
+}
+
+function getEffectiveLength(chunk: string): number {
+  // Count CJK characters as 2 units
+  const cjkCount = (chunk.match(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/g) || []).length;
+  const regularCount = chunk.length - cjkCount;
+  return regularCount + (cjkCount * 2);
 }
 
 // Helper function to emit remaining content immediately
@@ -210,7 +335,7 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
     streamingState.isEmitting = true;
 
     try {
-      for await (const word of streamTextWordByWord(current.content, streamingState)) {
+      for await (const word of streamTextNaturally(current.content, streamingState)) {
         const chunk: ChatCompletionChunk = {
           id: requestId,
           object: 'chat.completion.chunk',
