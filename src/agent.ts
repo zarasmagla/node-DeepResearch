@@ -1,5 +1,5 @@
 import {z, ZodObject} from 'zod';
-import {generateObject} from 'ai';
+import {CoreAssistantMessage, CoreUserMessage, generateObject} from 'ai';
 import {getModel, getMaxTokens, SEARCH_PROVIDER, STEP_SLEEP} from "./config";
 import {readUrl, removeAllLineBreaks} from "./tools/read";
 import {handleGenerateObjectError} from './utils/error-handling';
@@ -16,7 +16,7 @@ import {StepAction, AnswerAction} from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
 // import {grounding} from "./tools/grounding";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import {zodToJsonSchema} from "zod-to-json-schema";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -93,7 +93,7 @@ function getPrompt(
   // Add header section
   sections.push(`Current date: ${new Date().toUTCString()}
 
-You are an advanced AI research analyst specializing in multi-step reasoning. Using your training data and prior lessons learned, answer the following question with absolute certainty:
+You are an advanced AI research agent from Jina AI. You are specialized in multistep reasoning. Using your training data and prior lessons learned, answer the following question with absolute certainty:
 
 <question>
 ${question}
@@ -280,15 +280,17 @@ function updateContext(step: any) {
 }
 
 
-
 function removeHTMLtags(text: string) {
   return text.replace(/<[^>]*>?/gm, '');
 }
 
 
-export async function getResponse(question: string, tokenBudget: number = 1_000_000,
+export async function getResponse(question: string,
+                                  tokenBudget: number = 1_000_000,
                                   maxBadAttempts: number = 3,
-                                  existingContext?: Partial<TrackerContext>): Promise<{ result: StepAction; context: TrackerContext }> {
+                                  existingContext?: Partial<TrackerContext>,
+                                  historyMessages?: Array<CoreAssistantMessage | CoreUserMessage>
+): Promise<{ result: StepAction; context: TrackerContext }> {
   const context: TrackerContext = {
     tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker()
@@ -301,6 +303,20 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
   const allQuestions = [question];
   const allKeywords = [];
   const allKnowledge = [];  // knowledge are intermedidate questions that are answered
+  // iterate over historyMessages
+  // if role is user and content is question, add to allQuestions, the next assistant content should be the answer
+  // put this pair to the allKnowledge
+  historyMessages?.forEach((message, i) => {
+    if (message.role === 'user' && message.content && historyMessages[i + 1]?.role === 'assistant') {
+      allQuestions.push(message.content as string)
+      allKnowledge.push({
+        question: message.content,
+        answer: historyMessages[i + 1]?.content || '',
+        type: 'history-qa'
+      });
+    }
+  })
+
   const badContext = [];
   let diaryContext = [];
   let allowAnswer = true;
@@ -448,9 +464,9 @@ ${evaluation.think}
             });
 
             if (errorAnalysis.questionsToAnswer) {
-                gaps.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
-                allQuestions.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
-                gaps.push(question);  // always keep the original question in the gaps
+              gaps.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
+              allQuestions.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
+              gaps.push(question);  // always keep the original question in the gaps
             }
 
             badAttempts++;

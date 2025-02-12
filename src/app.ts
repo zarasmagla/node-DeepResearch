@@ -104,12 +104,12 @@ function getTokenBudgetAndMaxAttempts(
 
   switch (reasoningEffort) {
     case 'low':
-      return {tokenBudget: 500000, maxBadAttempts: 2};
+      return {tokenBudget: 100000, maxBadAttempts: 1};
     case 'high':
-      return {tokenBudget: 2000000, maxBadAttempts: 4};
+      return {tokenBudget: 1000000, maxBadAttempts: 3};
     case 'medium':
     default:
-      return {tokenBudget: 1000000, maxBadAttempts: 3};
+      return {tokenBudget: 500000, maxBadAttempts: 2};
   }
 }
 
@@ -357,7 +357,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   }
 
   try {
-    const {result} = await getResponse(lastMessage.content, tokenBudget, maxBadAttempts, context)
+    const {result} = await getResponse(lastMessage.content as string, tokenBudget, maxBadAttempts, context, body.messages)
 
     const usage = context.tokenTracker.getTotalUsageSnakeCase();
     if (body.stream) {

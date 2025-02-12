@@ -1,5 +1,5 @@
 // Action Types
-import {LanguageModelUsage} from "ai";
+import {CoreAssistantMessage, CoreUserMessage, LanguageModelUsage} from "ai";
 
 type BaseAction = {
   action: "search" | "answer" | "reflect" | "visit";
@@ -156,10 +156,7 @@ export interface Model {
 
 export interface ChatCompletionRequest {
   model: string;
-  messages: Array<{
-    role: string;
-    content: string;
-  }>;
+  messages: Array<CoreUserMessage | CoreAssistantMessage>;
   stream?: boolean;
   reasoning_effort?: 'low' | 'medium' | 'high' | null;
   max_completion_tokens?: number | null;
