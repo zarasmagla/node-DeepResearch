@@ -66,10 +66,10 @@ You can use it with any OpenAI-compatible client. For the authentication Bearer,
 #### Client integration guidelines
 
 If you are building a web/local/mobile client that uses `Jina DeepSearch API`, here are some design guidelines:
-- Our API is fully compatible with OpenAI API, this should greatly simplify the integration process. The model name is `jina-deepsearch-v1`.
-- DeepSearch API is a reasoning+search grounding LLM, so it's best for questions that require deep reasoning and search.
+- Our API is fully compatible with [OpenAI API schema](https://platform.openai.com/docs/api-reference/chat/create), this should greatly simplify the integration process. The model name is `jina-deepsearch-v1`.
+- Our DeepSearch API is a reasoning+search grounding LLM, so it's best for questions that require deep reasoning and search.
 - Two special tokens are introduced `<think>...</think>`, `<references>...</references>`. Please render them with care.
-- Guide the user to get a Jina API key from https://jina.ai
+- Guide the user to get a Jina API key from https://jina.ai, with 1M free tokens for new API key.
 - There are rate limits, [between 10RPM to 30RPM depending on the API key tier](https://jina.ai/contact-sales#rate-limit).
 - [Download Jina AI logo here](https://jina.ai/logo-Jina-1024.zip)
 
