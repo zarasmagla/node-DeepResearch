@@ -17,8 +17,8 @@ WORKDIR /app
 
 # Copy application code
 COPY ./src ./src
-COPY ./config.json ./
 COPY ./tsconfig.json ./tsconfig.json
+COPY ./jina-ai/config.json ./
 RUN npm run build
 
 COPY ./jina-ai/src ./jina-ai/src
