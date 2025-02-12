@@ -30,6 +30,7 @@ function buildMdFromAnswer(answer: AnswerAction) {
   if (answer.references?.length > 0) {
     refStr = `
 <references>
+
 ${answer.references.map((ref, i) => {
   // Escape special markdown characters in the quote
   const escapedQuote = ref.exactQuote
@@ -37,8 +38,9 @@ ${answer.references.map((ref, i) => {
     .replace(/\n/g, ' ')             // Replace line breaks with spaces
     .trim();                         // Remove excess whitespace
   
-  return `[^${i + 1}]: [${escapedQuote}](${ref.url})`;
-}).join('\n')}
+  return `[^${i + 1}]: [${escapedQuote}](${ref.url})\n\n`;
+}).join()}
+
 </references>
 `.trim();
   }
