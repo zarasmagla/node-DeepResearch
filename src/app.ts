@@ -77,7 +77,7 @@ async function emitRemainingContent(
   requestId: string,
   created: number,
   model: string,
-  content: string
+  content: string,
 ) {
   if (!content) return;
 
@@ -92,7 +92,7 @@ async function emitRemainingContent(
       delta: {content},
       logprobs: null,
       finish_reason: null
-    }]
+    }],
   };
   res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 }
@@ -358,6 +358,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       }
     }
 
+    const usage = context.tokenTracker.getUsageDetails();
     if (body.stream) {
       // Complete any ongoing streaming before sending final answer
       await completeCurrentStreaming(streamingState, res, requestId, created, body.model);
@@ -390,12 +391,13 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           delta: {content: result.action === 'answer' ? buildMdFromAnswer(result) : result.think},
           logprobs: null,
           finish_reason: 'stop'
-        }]
+        }],
+        usage
       };
       res.write(`data: ${JSON.stringify(answerChunk)}\n\n`);
       res.end();
     } else {
-      const usage = context.tokenTracker.getUsageDetails();
+
       const response: ChatCompletionResponse = {
         id: requestId,
         object: 'chat.completion',
@@ -473,7 +475,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           delta: {content: errorMessage},
           logprobs: null,
           finish_reason: 'stop'
-        }]
+        }],
+        usage
       };
       res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
       res.end();
