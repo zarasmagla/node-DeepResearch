@@ -160,7 +160,7 @@ async function batchEvaluate(inputFile: string): Promise<void> {
         pass: evaluation.pass,
         reason: evaluation.reason,
         total_steps: context.actionTracker.getState().totalStep,
-        total_tokens: context.tokenTracker.getTotalUsage(),
+        total_tokens: context.tokenTracker.getTotalUsage().totalTokens,
         question,
         expected_answer: expectedAnswer,
         actual_answer: actualAnswer

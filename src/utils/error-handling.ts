@@ -1,8 +1,8 @@
-import {NoObjectGeneratedError} from "ai";
+import {LanguageModelUsage, NoObjectGeneratedError} from "ai";
 
 export interface GenerateObjectResult<T> {
   object: T;
-  totalTokens: number;
+  usage: LanguageModelUsage;
 }
 
 export async function handleGenerateObjectError<T>(error: unknown): Promise<GenerateObjectResult<T>> {
@@ -12,7 +12,7 @@ export async function handleGenerateObjectError<T>(error: unknown): Promise<Gene
       const partialResponse = JSON.parse((error as any).text);
       return {
         object: partialResponse as T,
-        totalTokens: (error as any).usage?.totalTokens || 0
+        usage: (error as any).usage
       };
     } catch (parseError) {
       throw error;

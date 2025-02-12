@@ -93,11 +93,11 @@ Intention: ${action.think}
 `;
 }
 
-export async function rewriteQuery(action: SearchAction, tracker?: TokenTracker): Promise<{ queries: string[], tokens: number }> {
+export async function rewriteQuery(action: SearchAction, tracker?: TokenTracker): Promise<{ queries: string[] }> {
   try {
     const prompt = getPrompt(action);
     let object;
-    let tokens = 0;
+    let usage;
     try {
       const result = await generateObject({
         model,
@@ -106,15 +106,15 @@ export async function rewriteQuery(action: SearchAction, tracker?: TokenTracker)
         maxTokens: getMaxTokens('queryRewriter')
       });
       object = result.object;
-      tokens = result.usage?.totalTokens || 0;
+      usage = result.usage;
     } catch (error) {
       const result = await handleGenerateObjectError<KeywordsResponse>(error);
       object = result.object;
-      tokens = result.totalTokens;
+      usage = result.usage;
     }
     console.log('Query rewriter:', object.queries);
-    (tracker || new TokenTracker()).trackUsage('query-rewriter', tokens);
-    return { queries: object.queries, tokens };
+    (tracker || new TokenTracker()).trackUsage('query-rewriter', usage);
+    return { queries: object.queries };
   } catch (error) {
     console.error('Error in query rewriting:', error);
     throw error;

@@ -314,12 +314,12 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
   const allURLs: Record<string, string> = {};
   const visitedURLs: string[] = [];
   const evaluationMetrics: Record<string, any[]> = {};
-  while (context.tokenTracker.getTotalUsage() < tokenBudget && badAttempts <= maxBadAttempts) {
+  while (context.tokenTracker.getTotalUsage().totalTokens < tokenBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
     await sleep(STEP_SLEEP);
     step++;
     totalStep++;
-    const budgetPercentage = (context.tokenTracker.getTotalUsage() / tokenBudget * 100).toFixed(2);
+    const budgetPercentage = (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget * 100).toFixed(2);
     console.log(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
     console.log('Gaps:', gaps);
     allowReflect = allowReflect && (gaps.length <= 1);
@@ -350,7 +350,6 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     schema = getSchema(allowReflect, allowRead, allowAnswer, allowSearch)
     const model = getModel('agent');
     let object;
-    let totalTokens = 0;
     try {
       const result = await generateObject({
         model,
@@ -359,11 +358,11 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
         maxTokens: getMaxTokens('agent')
       });
       object = result.object;
-      totalTokens = result.usage?.totalTokens || 0;
+      context.tokenTracker.trackUsage('agent', result.usage);
     } catch (error) {
       const result = await handleGenerateObjectError<StepAction>(error);
       object = result.object;
-      totalTokens = result.totalTokens;
+      context.tokenTracker.trackUsage('agent', result.usage);
     }
     thisStep = object as StepAction;
     // print allowed and chose action
@@ -372,7 +371,6 @@ export async function getResponse(question: string, tokenBudget: number = 1_000_
     console.log(thisStep)
 
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
-    context.tokenTracker.trackUsage('agent', totalTokens);
 
     // reset allowAnswer to true
     allowAnswer = true;
@@ -622,7 +620,7 @@ You decided to think out of the box or cut from a completely different angle.
         const urlResults = await Promise.all(
           uniqueURLs.map(async (url: string) => {
             try {
-              const {response, tokens} = await readUrl(url, context.tokenTracker);
+              const {response} = await readUrl(url, context.tokenTracker);
               allKnowledge.push({
                 question: `What is in ${response.data?.url || 'the URL'}?`,
                 answer: removeAllLineBreaks(response.data?.content || 'No content available'),
@@ -631,7 +629,7 @@ You decided to think out of the box or cut from a completely different angle.
               });
               visitedURLs.push(url);
               delete allURLs[url];
-              return {url, result: response, tokens};
+              return {url, result: response};
             } catch (error) {
               console.error('Error reading URL:', error);
             }
@@ -696,7 +694,6 @@ You decided to think out of the box or cut from a completely different angle.`);
     schema = getSchema(false, false, true, false);
     const model = getModel('agentBeastMode');
     let object;
-    let totalTokens;
     try {
       const result = await generateObject({
         model,
@@ -705,16 +702,16 @@ You decided to think out of the box or cut from a completely different angle.`);
         maxTokens: getMaxTokens('agentBeastMode')
       });
       object = result.object;
-      totalTokens = result.usage?.totalTokens || 0;
+      context.tokenTracker.trackUsage('agent', result.usage);
     } catch (error) {
       const result = await handleGenerateObjectError<StepAction>(error);
       object = result.object;
-      totalTokens = result.totalTokens;
+      context.tokenTracker.trackUsage('agent', result.usage);
     }
     await storeContext(prompt, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
     thisStep = object as StepAction;
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
-    context.tokenTracker.trackUsage('agent', totalTokens);
+
     console.log(thisStep)
     return {result: thisStep, context};
   }

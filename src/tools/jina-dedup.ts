@@ -1,5 +1,5 @@
-import axios, { AxiosError } from 'axios';
-import { TokenTracker } from "../utils/token-tracker";
+import axios, {AxiosError} from 'axios';
+import {TokenTracker} from "../utils/token-tracker";
 import {JINA_API_KEY} from "../config";
 
 const JINA_API_URL = 'https://api.jina.ai/v1/embeddings';
@@ -107,27 +107,23 @@ export async function dedupQueries(
   newQueries: string[],
   existingQueries: string[],
   tracker?: TokenTracker
-): Promise<{ unique_queries: string[], tokens: number }> {
+): Promise<{ unique_queries: string[] }> {
   try {
     // Quick return for single new query with no existing queries
     if (newQueries.length === 1 && existingQueries.length === 0) {
-      console.log('Dedup (quick return):', newQueries);
       return {
         unique_queries: newQueries,
-        tokens: 0  // No tokens used since we didn't call the API
       };
     }
 
     // Get embeddings for all queries in one batch
     const allQueries = [...newQueries, ...existingQueries];
-    const { embeddings: allEmbeddings, tokens } = await getEmbeddings(allQueries);
+    const {embeddings: allEmbeddings, tokens} = await getEmbeddings(allQueries);
 
     // If embeddings is empty (due to 402 error), return all new queries
     if (!allEmbeddings.length) {
-      console.log('Dedup (no embeddings):', newQueries);
       return {
         unique_queries: newQueries,
-        tokens: 0
       };
     }
 
@@ -170,11 +166,14 @@ export async function dedupQueries(
     }
 
     // Track token usage from the API
-    (tracker || new TokenTracker()).trackUsage('dedup', tokens);
+    (tracker || new TokenTracker()).trackUsage('dedup', {
+        promptTokens: tokens,
+        completionTokens: 0,
+        totalTokens: tokens
+    });
     console.log('Dedup:', uniqueQueries);
     return {
       unique_queries: uniqueQueries,
-      tokens
     };
   } catch (error) {
     console.error('Error in deduplication analysis:', error);

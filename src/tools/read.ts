@@ -3,7 +3,7 @@ import { TokenTracker } from "../utils/token-tracker";
 import { ReadResponse } from '../types';
 import { JINA_API_KEY } from "../config";
 
-export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response: ReadResponse, tokens: number }> {
+export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response: ReadResponse }> {
   return new Promise((resolve, reject) => {
     if (!url.trim()) {
       reject(new Error('URL cannot be empty'));
@@ -72,9 +72,13 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
 
         const tokens = response.data.usage?.tokens || 0;
         const tokenTracker = tracker || new TokenTracker();
-        tokenTracker.trackUsage('read', tokens);
+        tokenTracker.trackUsage('read', {
+            totalTokens: tokens,
+            promptTokens: url.length,
+            completionTokens: tokens
+        });
 
-        resolve({ response, tokens });
+        resolve({ response });
       });
     });
 

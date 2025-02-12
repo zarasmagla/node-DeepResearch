@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {generateObject} from 'ai';
+import {generateObject, GenerateObjectResult} from 'ai';
 import {getModel, getMaxTokens} from "../config";
 import {TokenTracker} from "../utils/token-tracker";
 import {AnswerAction, EvaluationResponse} from '../types';
@@ -383,7 +383,7 @@ export async function evaluateQuestion(
       maxTokens: getMaxTokens('evaluator')
     });
 
-    (tracker || new TokenTracker()).trackUsage('evaluator', result.usage?.totalTokens || 0);
+    (tracker || new TokenTracker()).trackUsage('evaluator', result.usage);
     console.log('Question Evaluation:', result.object);
 
     // Always include definitive in types
@@ -397,7 +397,7 @@ export async function evaluateQuestion(
     return types;
   } catch (error) {
     const errorResult = await handleGenerateObjectError<EvaluationResponse>(error);
-    (tracker || new TokenTracker()).trackUsage('evaluator', errorResult.totalTokens || 0);
+    (tracker || new TokenTracker()).trackUsage('evaluator', errorResult.usage);
     return ['definitive', 'freshness', 'plurality'];
   }
 }
@@ -413,7 +413,7 @@ async function performEvaluation(
     maxTokens: number;
   },
   tracker?: TokenTracker
-): Promise<GenerateObjectResult> {
+): Promise<GenerateObjectResult<any>> {
   const result = await generateObject({
     model: params.model,
     schema: params.schema,
@@ -421,18 +421,12 @@ async function performEvaluation(
     maxTokens: params.maxTokens
   });
 
-  (tracker || new TokenTracker()).trackUsage('evaluator', result.usage?.totalTokens || 0);
+  (tracker || new TokenTracker()).trackUsage('evaluator', result.usage);
   console.log(`${evaluationType} Evaluation:`, result.object);
 
   return result;
 }
 
-interface GenerateObjectResult {
-  object: EvaluationResponse;
-  usage?: {
-    totalTokens: number;
-  };
-}
 
 // Main evaluation function
 export async function evaluateAnswer(
@@ -441,7 +435,7 @@ export async function evaluateAnswer(
   evaluationOrder: EvaluationType[] = ['definitive', 'freshness', 'plurality'],
   tracker?: TokenTracker
 ): Promise<{ response: EvaluationResponse }> {
-  let result: GenerateObjectResult;
+  let result;
 
   // Only add attribution if we have valid references
   if (action.references && action.references.length > 0) {
@@ -525,7 +519,7 @@ export async function evaluateAnswer(
       }
     } catch (error) {
       const errorResult = await handleGenerateObjectError<EvaluationResponse>(error);
-      (tracker || new TokenTracker()).trackUsage('evaluator', errorResult.totalTokens || 0);
+      (tracker || new TokenTracker()).trackUsage('evaluator', errorResult.usage);
       return {response: errorResult.object};
     }
   }

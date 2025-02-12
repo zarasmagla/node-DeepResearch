@@ -1,6 +1,7 @@
-import { EventEmitter } from 'events';
+import {EventEmitter} from 'events';
 
-import { TokenUsage, TokenCategory } from '../types';
+import {TokenUsage} from '../types';
+import {LanguageModelUsage} from "ai";
 
 export class TokenTracker extends EventEmitter {
   private usages: TokenUsage[] = [];
@@ -17,72 +18,46 @@ export class TokenTracker extends EventEmitter {
           asyncLocalContext.ctx.chargeAmount = this.getTotalUsage();
         }
       });
-      
+
     }
   }
 
-  trackUsage(tool: string, tokens: number, category?: TokenCategory) {
-    const currentTotal = this.getTotalUsage();
-    if (this.budget && currentTotal + tokens > this.budget) {
-      console.error(`Token budget exceeded: ${currentTotal + tokens} > ${this.budget}`);
-    }
-    // Only track usage if we're within budget
-    if (!this.budget || currentTotal + tokens <= this.budget) {
-      const usage = { tool, tokens, category };
-      this.usages.push(usage);
-      this.emit('usage', usage);
-    }
+  trackUsage(tool: string, usage: LanguageModelUsage) {
+    const u = {tool, usage};
+    this.usages.push(u);
+    this.emit('usage', usage);
   }
 
-  getTotalUsage(): number {
-    return this.usages.reduce((sum, usage) => sum + usage.tokens, 0);
+  getTotalUsage(): LanguageModelUsage {
+    return this.usages.reduce((acc, {usage}) => {
+      acc.promptTokens += usage.promptTokens;
+      acc.completionTokens += usage.completionTokens;
+      acc.totalTokens += usage.totalTokens;
+      return acc;
+    }, {promptTokens: 0, completionTokens: 0, totalTokens: 0});
+  }
+
+  getTotalUsageSnakeCase(): {prompt_tokens: number, completion_tokens: number, total_tokens: number} {
+    return this.usages.reduce((acc, {usage}) => {
+      acc.prompt_tokens += usage.promptTokens;
+      acc.completion_tokens += usage.completionTokens;
+      acc.total_tokens += usage.totalTokens;
+      return acc;
+    }, {prompt_tokens: 0, completion_tokens: 0, total_tokens: 0});
   }
 
   getUsageBreakdown(): Record<string, number> {
-    return this.usages.reduce((acc, { tool, tokens }) => {
-      acc[tool] = (acc[tool] || 0) + tokens;
+    return this.usages.reduce((acc, {tool, usage}) => {
+      acc[tool] = (acc[tool] || 0) + usage.totalTokens;
       return acc;
     }, {} as Record<string, number>);
   }
 
-  getUsageDetails(): {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-    completion_tokens_details?: {
-      reasoning_tokens: number;
-      accepted_prediction_tokens: number;
-      rejected_prediction_tokens: number;
-    };
-  } {
-    const categoryBreakdown = this.usages.reduce((acc, { tokens, category }) => {
-      if (category) {
-        acc[category] = (acc[category] || 0) + tokens;
-      }
-      return acc;
-    }, {} as Record<string, number>);
-
-    const prompt_tokens = categoryBreakdown.prompt || 0;
-    const completion_tokens =
-      (categoryBreakdown.reasoning || 0) +
-      (categoryBreakdown.accepted || 0) +
-      (categoryBreakdown.rejected || 0);
-
-    return {
-      prompt_tokens,
-      completion_tokens,
-      total_tokens: prompt_tokens + completion_tokens,
-      completion_tokens_details: {
-        reasoning_tokens: categoryBreakdown.reasoning || 0,
-        accepted_prediction_tokens: categoryBreakdown.accepted || 0,
-        rejected_prediction_tokens: categoryBreakdown.rejected || 0
-      }
-    };
-  }
 
   printSummary() {
     const breakdown = this.getUsageBreakdown();
     console.log('Token Usage Summary:', {
+      budget: this.budget,
       total: this.getTotalUsage(),
       breakdown
     });

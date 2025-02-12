@@ -1,9 +1,9 @@
-import { z } from 'zod';
-import { generateObject } from 'ai';
-import { getModel, getMaxTokens } from "../config";
-import { TokenTracker } from "../utils/token-tracker";
-import { ErrorAnalysisResponse } from '../types';
-import { handleGenerateObjectError } from '../utils/error-handling';
+import {z} from 'zod';
+import {generateObject} from 'ai';
+import {getModel, getMaxTokens} from "../config";
+import {TokenTracker} from "../utils/token-tracker";
+import {ErrorAnalysisResponse} from '../types';
+import {handleGenerateObjectError} from '../utils/error-handling';
 
 const model = getModel('errorAnalyzer');
 
@@ -12,11 +12,10 @@ const responseSchema = z.object({
   blame: z.string().describe('Which action or the step was the root cause of the answer rejection'),
   improvement: z.string().describe('Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe.'),
   questionsToAnswer: z.array(
-      z.string().describe("each question must be a single line, concise and clear. not composite or compound, less than 20 words.")
-    ).max(2)
-      .describe("List of most important reflect questions to fill the knowledge gaps"),
+    z.string().describe("each question must be a single line, concise and clear. not composite or compound, less than 20 words.")
+  ).max(2)
+    .describe("List of most important reflect questions to fill the knowledge gaps"),
 });
-
 
 
 function getPrompt(diaryContext: string[]): string {
@@ -112,11 +111,11 @@ ${diaryContext.join('\n')}
 `;
 }
 
-export async function analyzeSteps(diaryContext: string[], tracker?: TokenTracker): Promise<{ response: ErrorAnalysisResponse, tokens: number }> {
+export async function analyzeSteps(diaryContext: string[], tracker?: TokenTracker): Promise<{ response: ErrorAnalysisResponse }> {
   try {
     const prompt = getPrompt(diaryContext);
     let object;
-    let tokens = 0;
+    let usage;
     try {
       const result = await generateObject({
         model,
@@ -125,18 +124,18 @@ export async function analyzeSteps(diaryContext: string[], tracker?: TokenTracke
         maxTokens: getMaxTokens('errorAnalyzer')
       });
       object = result.object;
-      tokens = result.usage?.totalTokens || 0;
+      usage = result.usage;
     } catch (error) {
       const result = await handleGenerateObjectError<ErrorAnalysisResponse>(error);
       object = result.object;
-      tokens = result.totalTokens;
+      usage = result.usage;
     }
     console.log('Error analysis:', {
       is_valid: !object.blame,
       reason: object.blame || 'No issues found'
     });
-    (tracker || new TokenTracker()).trackUsage('error-analyzer', tokens);
-    return { response: object, tokens };
+    (tracker || new TokenTracker()).trackUsage('error-analyzer', usage);
+    return {response: object};
   } catch (error) {
     console.error('Error in answer evaluation:', error);
     throw error;

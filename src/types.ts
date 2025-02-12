@@ -1,4 +1,6 @@
 // Action Types
+import {LanguageModelUsage} from "ai";
+
 type BaseAction = {
   action: "search" | "answer" | "reflect" | "visit";
   think: string;
@@ -30,25 +32,11 @@ export type VisitAction = BaseAction & {
 
 export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitAction;
 
-// Response Types
-export const TOKEN_CATEGORIES = {
-  PROMPT: 'prompt',
-  REASONING: 'reasoning',
-  ACCEPTED: 'accepted',
-  REJECTED: 'rejected'
-} as const;
-
-export type TokenCategory = typeof TOKEN_CATEGORIES[keyof typeof TOKEN_CATEGORIES];
 
 // Following Vercel AI SDK's token counting interface
 export interface TokenUsage {
   tool: string;
-  tokens: number;
-  category?: TokenCategory;
-  // Following Vercel AI SDK's token counting interface
-  prompt_tokens?: number;
-  completion_tokens?: number;
-  total_tokens?: number;
+  usage: LanguageModelUsage;
 }
 
 export interface SearchResponse {
