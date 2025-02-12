@@ -24,6 +24,7 @@
   "license": "Apache-2.0",
   "description": "",
   "dependencies": {
+    "@ai-sdk/google-vertex": "^2.1.12",
     "@google-cloud/firestore": "^7.11.0",
     "civkit": "^0.8.3-15926cb",
     "dayjs": "^1.11.13",

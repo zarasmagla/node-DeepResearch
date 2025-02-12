@@ -10,10 +10,16 @@
   },
   "defaults": {
     "search_provider": "brave",
-    "llm_provider": "gemini",
+    "llm_provider": "vertex",
     "step_sleep": 0
   },
   "providers": {
+    "vertex": {
+      "createClient": "createGoogleVertex",
+      "clientConfig": {
+        "location": "us-central1"
+      }
+    },
     "gemini": {
       "createClient": "createGoogleGenerativeAI"
     },
