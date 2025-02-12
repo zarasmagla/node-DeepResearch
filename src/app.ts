@@ -30,8 +30,15 @@ function buildMdFromAnswer(answer: AnswerAction) {
   if (answer.references?.length > 0) {
     refStr = `
 <references>
-${answer.references.map((ref, i) => `
-${i + 1}. [${ref.exactQuote}](${ref.url})`).join('')}
+${answer.references.map((ref, i) => {
+  // Escape special markdown characters in the quote
+  const escapedQuote = ref.exactQuote
+    .replace(/([[\]_*`])/g, '\\$1')  // Escape markdown syntax chars
+    .replace(/\n/g, ' ')             // Replace line breaks with spaces
+    .trim();                         // Remove excess whitespace
+  
+  return `[^${i + 1}]: [${escapedQuote}](${ref.url})`;
+}).join('\n')}
 </references>
 `.trim();
   }
