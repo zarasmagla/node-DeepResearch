@@ -220,8 +220,8 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
       const newlineChunk: ChatCompletionChunk = {
         id: requestId,
         object: 'chat.completion.chunk',
-        created: Math.floor(Date.now() / 1000),
-        model: model,
+        created,
+        model,
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
