@@ -1,5 +1,7 @@
 # DeepResearch
 
+[API](#official-api) | [Evaluation](#evaluation)
+
 Keep searching, reading webpages, reasoning until an answer is found (or the token budget is exceeded). Useful for deeply investigating a query.
 
 ```mermaid
@@ -23,7 +25,7 @@ flowchart LR
 
 ```
 
-Note that this project doesn't try to mimic what OpenAI or Gemini do with their deep research product. The idea in this project is about using this loop cycle to repeat the search until finding the answer. This project doesn't implement the structural article generation part. So if you want a service that can do deep searches and give you an answer, this is it. If you want a service that mimics long article writing like OpenAI/Gemini, **this isn't it.**
+Note that this project does *not* try to mimic what OpenAI or Gemini do with their deep research product. **We focus on finding the right answer with this loop cycle.** There is no plan to implement the structural article generation part. So if you want a service that can do deep searches and give you an answer, this is it. If you want a service that mimics long article writing like OpenAI/Gemini, **this isn't it.**
 
 ## Install
 
@@ -50,6 +52,19 @@ export JINA_API_KEY=jina_...  # free jina api key, get from https://jina.ai/read
 
 npm run dev $QUERY
 ```
+
+### Official API
+
+You can also use our official deepsearch API, hosted and optimized by Jina AI:
+
+```
+https://deepsearch.jina.ai/v1/chat/completions
+```
+
+This API is fully compatible with OpenAI API, so you can use it with any OpenAI-compatible client. 
+
+For the authentication Bearer token, you can get Jina API key from https://jina.ai
+
 
 ## Demo
 > was recorded with `gemini-1.5-flash`, the latest `gemini-2.0-flash` leads to much better results!

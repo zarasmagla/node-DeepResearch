@@ -208,7 +208,7 @@ export class JinaEmbeddingsAuthDTO extends AutoCastable {
     async getBrief(ignoreCache?: boolean | string) {
         if (!this.bearerToken) {
             throw new AuthenticationRequiredError({
-                message: 'Absence of bearer token'
+                message: 'Jina API key is required to authenticate. Please get one from https://jina.ai'
             });
         }
 
@@ -250,7 +250,7 @@ export class JinaEmbeddingsAuthDTO extends AutoCastable {
 
             if (err?.status === 401) {
                 throw new AuthenticationFailedError({
-                    message: 'Invalid bearer token'
+                    message: 'Invalid API key, please get a new one from https://jina.ai'
                 });
             }
 
