@@ -51,7 +51,7 @@ ${i + 1}. [${ref.exactQuote}](${ref.url})`).join('')}
 </references>
 `.trim();
   }
-  return `${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}\n${refStr}`;
+  return `${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}\n\n${refStr}`;
 }
 
 
