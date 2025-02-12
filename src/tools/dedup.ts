@@ -1,9 +1,9 @@
-import { z } from 'zod';
-import { generateObject } from 'ai';
-import { getModel, getMaxTokens } from "../config";
-import { TokenTracker } from "../utils/token-tracker";
-import { handleGenerateObjectError } from '../utils/error-handling';
-import type { DedupResponse } from '../types';
+import {z} from 'zod';
+import {generateObject} from 'ai';
+import {getModel, getMaxTokens} from "../config";
+import {TokenTracker} from "../utils/token-tracker";
+import {handleGenerateObjectError} from '../utils/error-handling';
+import type {DedupResponse} from '../types';
 
 const model = getModel('dedup');
 
@@ -65,11 +65,11 @@ SetA: ${JSON.stringify(newQueries)}
 SetB: ${JSON.stringify(existingQueries)}`;
 }
 
-export async function dedupQueries(newQueries: string[], existingQueries: string[], tracker?: TokenTracker): Promise<{ unique_queries: string[], tokens: number }> {
+export async function dedupQueries(newQueries: string[], existingQueries: string[], tracker?: TokenTracker): Promise<{ unique_queries: string[] }> {
   try {
     const prompt = getPrompt(newQueries, existingQueries);
     let object;
-    let tokens = 0;
+    let usage;
     try {
       const result = await generateObject({
         model,
@@ -78,32 +78,18 @@ export async function dedupQueries(newQueries: string[], existingQueries: string
         maxTokens: getMaxTokens('dedup')
       });
       object = result.object;
-      tokens = result.usage?.totalTokens || 0;
+      usage = result.usage
     } catch (error) {
       const result = await handleGenerateObjectError<DedupResponse>(error);
       object = result.object;
-      tokens = result.totalTokens;
+      usage = result.usage
     }
     console.log('Dedup:', object.unique_queries);
-    (tracker || new TokenTracker()).trackUsage('dedup', tokens);
-    return { unique_queries: object.unique_queries, tokens };
+    (tracker || new TokenTracker()).trackUsage('dedup', usage);
+
+    return {unique_queries: object.unique_queries};
   } catch (error) {
     console.error('Error in deduplication analysis:', error);
     throw error;
   }
-}
-
-export async function main() {
-  const newQueries = process.argv[2] ? JSON.parse(process.argv[2]) : [];
-  const existingQueries = process.argv[3] ? JSON.parse(process.argv[3]) : [];
-
-  try {
-    await dedupQueries(newQueries, existingQueries);
-  } catch (error) {
-    console.error('Failed to deduplicate queries:', error);
-  }
-}
-
-if (require.main === module) {
-  main().catch(console.error);
 }

@@ -161,6 +161,8 @@ export interface ChatCompletionRequest {
     content: string;
   }>;
   stream?: boolean;
+  reasoning_effort?: 'low' | 'medium' | 'high' | null;
+  max_completion_tokens?: number | null;
 }
 
 export interface ChatCompletionResponse {

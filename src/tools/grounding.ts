@@ -27,7 +27,7 @@ Must include the date and time of the latest answer.`,
       ?.map(support => support.segment.text)
       .join(' ') || '';
 
-    (tracker || new TokenTracker()).trackUsage('grounding', usage.totalTokens);
+    (tracker || new TokenTracker()).trackUsage('grounding', usage);
     console.log('Grounding:', {text, groundedText});
     return text + '|' + groundedText;
 
