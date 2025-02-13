@@ -8,6 +8,7 @@ import { JinaEmbeddingsAuthDTO } from "./dto/jina-embeddings-auth";
 import rateLimitControl, { API_CALL_STATUS, RateLimitDesc } from "./rate-limit";
 import asyncLocalContext from "./lib/async-context";
 import globalLogger from "./lib/logger";
+import { InsufficientBalanceError } from "./lib/errors";
 
 globalLogger.serviceReady();
 const logger = globalLogger.child({ service: 'BillingMiddleware' });
@@ -35,6 +36,9 @@ export const jinaAiBillingMiddleware = (req: Request, res: Response, next: NextF
             });
 
             const user = await authDto.assertUser();
+            if (!(user.wallet.total_balance > 0)) {
+                throw new InsufficientBalanceError(`Account balance not enough to run this query, please recharge.`);
+            }
             await rateLimitControl.serviceReady();
             const rateLimitPolicy = authDto.getRateLimits(appName) || [
                 parseInt(user.metadata?.speed_level) >= 2 ?
