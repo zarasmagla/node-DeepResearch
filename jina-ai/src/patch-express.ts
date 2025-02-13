@@ -10,6 +10,7 @@ import asyncLocalContext from "./lib/async-context";
 import globalLogger from "./lib/logger";
 import { InsufficientBalanceError } from "./lib/errors";
 import { FirestoreRecord } from "./lib/firestore";
+import cors from "cors";
 
 globalLogger.serviceReady();
 const logger = globalLogger.child({ service: 'JinaAISaaSMiddleware' });
@@ -59,7 +60,7 @@ export class KnowledgeItem extends FirestoreRecord {
     })
     updatedAt!: Date;
 }
-
+const corsMiddleware = cors();
 export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction) => {
     if (req.path === '/ping') {
         res.status(200).end('pone');
@@ -141,6 +142,7 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
 
         } catch (err: any) {
             if (!res.headersSent) {
+                corsMiddleware(req, res, () => 'noop');
                 if (err instanceof ApplicationError) {
                     res.status(parseInt(err.code as string) || 500).json({ error: err.message });
 
