@@ -719,6 +719,12 @@ You decided to think out of the box or cut from a completely different angle.`);
 }
 
 async function storeContext(prompt: string, schema: any, memory: any[][], step: number) {
+  if ((process as any).asyncLocalContext?.available?.()) {
+    const [context, keywords, questions, knowledge] = memory;
+    (process as any).asyncLocalContext.ctx.promptContext = { prompt, schema, context, keywords, questions, knowledge, step };
+    return;
+  }
+
   try {
     await fs.writeFile(`prompt-${step}.txt`, `
 Prompt:

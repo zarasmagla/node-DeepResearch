@@ -1,12 +1,12 @@
 import 'reflect-metadata'
 import express from 'express';
-import { jinaAiBillingMiddleware } from "./patch-express";
+import { jinaAiMiddleware } from "./patch-express";
 import { Server } from 'http';
 
 const app = require('../..').default;
 
 const rootApp = express();
-rootApp.use(jinaAiBillingMiddleware, app);
+rootApp.use(jinaAiMiddleware, app);
 
 
 const port = process.env.PORT || 3000;
