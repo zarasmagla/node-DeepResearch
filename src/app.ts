@@ -41,13 +41,13 @@ function buildMdFromAnswer(answer: AnswerAction) {
     return `[^${i + 1}]: [${escapedQuote}](${ref.url})`;
   }).join('\n\n');
 
-  return `${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}
+  return `
+${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}
 
-<references>
 
 ${references}
 
-</references>`;
+`.trim();
 }
 
 async function* streamTextNaturally(text: string, streamingState: StreamingState) {
