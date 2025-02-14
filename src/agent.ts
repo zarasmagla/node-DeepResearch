@@ -40,7 +40,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowAnswer) {
     actions.push("answer");
     properties.answer = z.string()
-      .describe(`Required when action='answer'. Must in ${languageStyle}`).optional();
+      .describe(`Required when action='answer'. Must in ${languageStyle}. Use markdown footnote syntax like [^1], [^2] to refer the corresponding reference item`).optional();
     properties.references = z.array(
       z.object({
         exactQuote: z.string().describe("Exact relevant quote from the document"),
@@ -219,7 +219,6 @@ ${allKeywords.join('\n')}
 <action-answer>
 - If <question> is a simple greeting, chit-chat, or general knowledge, provide the answer directly;
 - Must provide "references" and each must specify "exactQuote" and "url";
-- In the answer, use markdown footnote syntax like [^1], [^2] to refer to the references;
 - Responses must be definitive (no ambiguity, uncertainty, or disclaimers) and in the style of ${languageStyle};
 - Provide final response only when 100% certain;${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
 </action-answer>

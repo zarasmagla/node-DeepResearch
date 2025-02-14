@@ -33,20 +33,36 @@ function buildMdFromAnswer(answer: AnswerAction) {
   }
 
   const references = answer.references.map((ref, i) => {
-    const escapedQuote = ref.exactQuote
-      .replace(/([[\]_*`])/g, '\\$1')
-      .replace(/\n/g, ' ')
+    // Clean up the quote text
+    const cleanQuote = ref.exactQuote
+      // Remove HTML artifacts
+      .replace(/<[^>]+>/g, '')
+      // Remove multiple spaces
+      .replace(/\s+/g, ' ')
+      // Remove special characters and markdown conflicts
+      .replace(/[[\]_*`]/g, '')
+      // Clean up any remaining artifacts
+      .replace(/=+/g, '')
+      .replace(/_[^_]+_/g, '$1')
+      // Remove navigation artifacts
+      .replace(/arrow_drop_down/g, '')
+      .replace(/language/g, '')
+      // Trim whitespace
       .trim();
 
-    return `[^${i + 1}]: [${escapedQuote}](${ref.url})`;
+    // If the quote is too long, truncate it
+    const maxLength = 20;
+    const truncatedQuote = cleanQuote.length > maxLength
+      ? cleanQuote.substring(0, maxLength) + '...'
+      : cleanQuote;
+
+    return `[^${i + 1}]: [${truncatedQuote}](${ref.url})`;
   }).join('\n\n');
 
   return `
 ${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}
 
-
 ${references}
-
 `.trim();
 }
 
