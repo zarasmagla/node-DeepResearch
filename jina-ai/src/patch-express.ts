@@ -128,7 +128,7 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                 chargeAmount,
             });
 
-            if (ctx.promptContext.knowledge?.length) {
+            if (ctx.promptContext?.knowledge?.length) {
                 Promise.all(ctx.promptContext.knowledge.map((x: any) => KnowledgeItem.save(
                     KnowledgeItem.from({
                         ...x,
