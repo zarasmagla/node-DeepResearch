@@ -9,7 +9,7 @@ import rateLimitControl, { API_CALL_STATUS, RateLimitDesc } from "./rate-limit";
 import asyncLocalContext from "./lib/async-context";
 import globalLogger from "./lib/logger";
 import { InsufficientBalanceError } from "./lib/errors";
-import { FirestoreRecord } from "./lib/firestore";
+import { firebaseDefaultBucket, FirestoreRecord } from "./lib/firestore";
 import cors from "cors";
 
 globalLogger.serviceReady();
@@ -137,6 +137,18 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                     })
                 ))).catch((err: any) => {
                     logger.warn(`Failed to save knowledge`, { err: marshalErrorLike(err) });
+                });
+            }
+            if (ctx.promptContext) {
+                firebaseDefaultBucket.file(`promptContext/${ctx.traceId}.json`).save(
+                    JSON.stringify(ctx.promptContext),
+                    {
+                        metadata: {
+                            contentType: 'application/json',
+                        },
+                    }
+                ).catch((err: any) => {
+                    logger.warn(`Failed to save promptContext`, { err: marshalErrorLike(err) });
                 });
             }
 

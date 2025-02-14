@@ -4,6 +4,9 @@ import {
     Firestore, FieldValue, DocumentReference,
     Query, Timestamp, SetOptions, DocumentSnapshot,
 } from '@google-cloud/firestore';
+import { Storage } from '@google-cloud/storage';
+
+export const firebaseDefaultBucket = new Storage().bucket(`${process.env.GCLOUD_PROJECT}.appspot.com`);
 
 // Firestore doesn't support JavaScript objects with custom prototypes (i.e. objects that were created via the \"new\" operator)
 function patchFireStoreArrogance(func: Function) {

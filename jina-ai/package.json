@@ -26,6 +26,7 @@
   "dependencies": {
     "@ai-sdk/google-vertex": "^2.1.12",
     "@google-cloud/firestore": "^7.11.0",
+    "@google-cloud/storage": "^7.15.1",
     "civkit": "^0.8.3-15926cb",
     "dayjs": "^1.11.13",
     "lodash": "^4.17.21",
