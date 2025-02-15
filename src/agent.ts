@@ -87,7 +87,6 @@ function getPrompt(
   knowledge?: KnowledgeItem[],
   allURLs?: Record<string, string>,
   beastMode?: boolean,
-  languageStyle?: string
 ): string {
   const sections: string[] = [];
   const actionSections: string[] = [];
@@ -226,9 +225,8 @@ ${allKeywords?.length ? `
 ${allKeywords.join('\n')}
 </bad-queries>
 `.trim() : ''}
-- Propose some unique new queries that might help you find the answer to the question
+- Propose some unique new keywords queries that might help you find the answer to the question
 - Focus on solving one specific aspect of the original question
-- Only use keywords, not full sentences
 </action-search>
 `);
   }
@@ -386,7 +384,6 @@ export async function getResponse(question: string,
       allKnowledge,
       allURLs,
       false,
-      evaluationMetrics[currentQuestion].languageStyle
     );
     schema = getSchema(allowReflect, allowRead, allowAnswer, allowSearch,
       evaluationMetrics[currentQuestion].languageStyle)
@@ -550,6 +547,9 @@ But then you realized you have asked them before. You decided to to think out of
     } else if (thisStep.action === 'search' && thisStep.searchQuery) {
       // rewrite queries
       let {queries: keywordsQueries} = await rewriteQuery(thisStep, context.tokenTracker);
+
+      // add the original query before rewrite to the keywordsQueries
+      keywordsQueries.push(thisStep.searchQuery)
 
       const oldKeywords = keywordsQueries;
       // avoid exisitng searched queries
@@ -727,7 +727,6 @@ You decided to think out of the box or cut from a completely different angle.`);
       allKnowledge,
       allURLs,
       true,
-      evaluationMetrics[question]?.languageStyle || 'same language as the question'
     );
 
     schema = getSchema(false, false, true, false,

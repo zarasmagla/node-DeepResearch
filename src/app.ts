@@ -32,8 +32,59 @@ function buildMdFromAnswer(answer: AnswerAction) {
     return answer.answer;
   }
 
+  // Extract all footnotes from answer
+  const footnotes: string[] = [];
+  const footnoteRegex = /\[\^(\d+)]/g;
+  let match;
+  while ((match = footnoteRegex.exec(answer.answer)) !== null) {
+    footnotes.push(match[1]);
+  }
+
+  // Check if correction is needed
+  const needsCorrection = (() => {
+    // No footnotes found
+    if (footnotes.length === 0) return false;
+
+    // Case 1 & 3: All footnotes are same number AND matches reference count
+    if (footnotes.length === answer.references.length &&
+        footnotes.every(n => n === footnotes[0])) {
+      return true;
+    }
+
+    // Case 2: All footnotes are same number AND number is too high
+    return footnotes.every(n => n === footnotes[0]) &&
+      parseInt(footnotes[0]) > answer.references.length;
+
+
+  })();
+
+  if (!needsCorrection) {
+    const references = answer.references.map((ref, i) => {
+      const cleanQuote = ref.exactQuote
+        .replace(/[^a-zA-Z0-9]+/g, ' ')
+        .trim();
+
+      if (ref.url.startsWith('http')) {
+        return `[^${i + 1}]: [${cleanQuote}](${ref.url})`;
+      } else {
+        return `[^${i + 1}]: ${cleanQuote}`;
+      }
+    }).join('\n\n');
+
+    return `
+${answer.answer}
+
+${references}
+`.trim();
+  }
+
+  // Apply correction: sequentially number the footnotes
+  let currentIndex = 0;
+  const correctedAnswer = answer.answer.replace(footnoteRegex, () =>
+    `[^${++currentIndex}]`
+  );
+
   const references = answer.references.map((ref, i) => {
-    // Clean up the quote text
     const cleanQuote = ref.exactQuote
       .replace(/[^a-zA-Z0-9]+/g, ' ')
       .trim();
@@ -46,7 +97,7 @@ function buildMdFromAnswer(answer: AnswerAction) {
   }).join('\n\n');
 
   return `
-${answer.answer.replace(/\(REF_(\d+)\)/g, (_, num) => `[^${num}]`)}
+${correctedAnswer}
 
 ${references}
 `.trim();
