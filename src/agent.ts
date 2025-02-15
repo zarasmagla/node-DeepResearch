@@ -76,6 +76,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
 function getPrompt(
   question: string,
   context?: string[],
+  allChatHistory?: { user: string, assistant: string }[],
   allQuestions?: string[],
   allKeywords?: string[],
   allowReflect: boolean = true,
@@ -101,15 +102,20 @@ ${question}
 </question>
 `);
 
-  // Add context section if exists
-  if (context?.length) {
+  // add chat history if exist
+  if (allChatHistory?.length) {
     sections.push(`
-You have conducted the following actions:
-<context>
-${context.join('\n')}
-
-</context>
-`);
+You have conducted the following chat history with the user:
+<chat-history>
+${allChatHistory.map(({user, assistant}) => `
+<user>
+${user}
+</user>
+<you>
+${assistant}
+</you>
+`).join('\n')}
+</chat-history>`);
   }
 
   // Add knowledge section if exists
@@ -142,6 +148,19 @@ ${knowledgeItems}
 `);
   }
 
+
+
+  // Add context section if exists
+  if (context?.length) {
+    sections.push(`
+You have conducted the following actions:
+<context>
+${context.join('\n')}
+
+</context>
+`);
+  }
+
   // Add bad context section if exists
   if (badContext?.length) {
     const attempts = badContext
@@ -159,7 +178,7 @@ ${knowledgeItems}
     const learnedStrategy = badContext.map(c => c.improvement).join('\n');
 
     sections.push(`
-Your have tried the following actions but failed to find the answer to the question:
+Also, you have tried the following actions but failed to find the answer to the question:
 <bad-attempts>    
 
 ${attempts}
@@ -303,6 +322,7 @@ export async function getResponse(question: string,
   const gaps: string[] = [question];  // All questions to be answered including the orginal question
   const allQuestions = [question];
   const allKeywords = [];
+  const allChatHistory: { user: string, assistant: string }[] = [];
   const allKnowledge: KnowledgeItem[] = [];  // knowledge are intermedidate questions that are answered
   // iterate over historyMessages
   // if role is user and content is question, add to allQuestions, the next assistant content should be the answer
@@ -310,12 +330,15 @@ export async function getResponse(question: string,
   historyMessages?.forEach((message, i) => {
     if (message.role === 'user' && message.content && historyMessages[i + 1]?.role === 'assistant') {
       allQuestions.push(message.content as string)
-      allKnowledge.push({
-        question: message.content as string,
-        answer: (historyMessages[i + 1]?.content || '') as string,
-        type: 'chat-history',
-        updated: new Date().toISOString()
-      });
+      const answerContent = (historyMessages[i + 1]?.content || '') as string;
+      // Remove <think></think> tags and their content using regex
+      const cleanedAnswer = answerContent.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      if (cleanedAnswer) {
+        allChatHistory.push({
+          user: message.content as string,
+          assistant: cleanedAnswer,
+        });
+      }
     }
   })
 
@@ -353,6 +376,7 @@ export async function getResponse(question: string,
     prompt = getPrompt(
       currentQuestion,
       diaryContext,
+      allChatHistory,
       allQuestions,
       allKeywords,
       allowReflect,
@@ -693,6 +717,7 @@ You decided to think out of the box or cut from a completely different angle.`);
     const prompt = getPrompt(
       question,
       diaryContext,
+      allChatHistory,
       allQuestions,
       allKeywords,
       false,

@@ -28,35 +28,21 @@ app.get('/health', (req, res) => {
 });
 
 function buildMdFromAnswer(answer: AnswerAction) {
-  if (!answer.references?.length || !answer.references.some(ref => ref.url.startsWith('http'))) {
+  if (!answer.references?.length) {
     return answer.answer;
   }
 
   const references = answer.references.map((ref, i) => {
     // Clean up the quote text
     const cleanQuote = ref.exactQuote
-      // Remove HTML artifacts
-      .replace(/<[^>]+>/g, '')
-      // Remove multiple spaces
-      .replace(/\s+/g, ' ')
-      // Remove special characters and markdown conflicts
-      .replace(/[[\]_*`]/g, '')
-      // Clean up any remaining artifacts
-      .replace(/=+/g, '')
-      .replace(/_[^_]+_/g, '$1')
-      // Remove navigation artifacts
-      .replace(/arrow_drop_down/g, '')
-      .replace(/language/g, '')
-      // Trim whitespace
+      .replace(/[^a-zA-Z0-9]+/g, ' ')
       .trim();
 
-    // If the quote is too long, truncate it
-    const maxLength = 20;
-    const truncatedQuote = cleanQuote.length > maxLength
-      ? cleanQuote.substring(0, maxLength) + '...'
-      : cleanQuote;
-
-    return `[^${i + 1}]: [${truncatedQuote}](${ref.url})`;
+    if (ref.url.startsWith('http')) {
+      return `[^${i + 1}]: [${cleanQuote}](${ref.url})`;
+    } else {
+      return `[^${i + 1}]: ${cleanQuote}`;
+    }
   }).join('\n\n');
 
   return `
