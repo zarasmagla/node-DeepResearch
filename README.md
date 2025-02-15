@@ -4,6 +4,9 @@
 
 Keep searching, reading webpages, reasoning until an answer is found (or the token budget is exceeded). Useful for deeply investigating a query.
 
+> [!IMPORTANT]  
+> Unlike OpenAI/Gemini/Perplexity's "Deep Research", we focus solely on **finding the right answers via our iterative process**. We don't optimize for long-form articles, that's a **completely different problem** – so if you need quick, concise answers from deep search, you're in the right place. If you're looking for AI-generated long reports like OpenAI/Gemini/Perplexity does, this isn't for you.
+
 ```mermaid
 ---
 config:
@@ -24,8 +27,6 @@ flowchart LR
     Loop --> Answer(["Answer"])
 
 ```
-
-Unlike OpenAI and Gemini's Deep Research capabilities, we focus solely on **delivering accurate answers through our iterative process**. We don't optimize for long-form articles – if you need quick, precise answers from deep search, you're in the right place. If you're looking for AI-generated reports like OpenAI/Gemini do, this isn't for you.
 
 ## Install
 
