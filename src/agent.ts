@@ -39,14 +39,14 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
 
   if (allowAnswer) {
     actions.push("answer");
-    properties.answer = z.string()
-      .describe(`Required when action='answer'. Must in ${languageStyle}. Use markdown footnote syntax like [^1], [^2] to refer the corresponding reference item`).optional();
     properties.references = z.array(
       z.object({
         exactQuote: z.string().describe("Exact relevant quote from the document"),
         url: z.string().describe("source URL; must be directly from the context")
       }).required()
     ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document").optional();
+    properties.answer = z.string()
+      .describe(`Required when action='answer'. Must in ${languageStyle}. Use markdown footnote syntax like [^1], [^2] to refer the corresponding reference item`).optional();
   }
 
   if (allowReflect) {
