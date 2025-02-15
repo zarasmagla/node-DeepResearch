@@ -28,30 +28,53 @@ app.get('/health', (req, res) => {
 });
 
 function buildMdFromAnswer(answer: AnswerAction) {
+  const footnoteRegex = /\[\^(\d+)]/g;
+
+  // First case: no references - remove any footnote citations if they exist
   if (!answer.references?.length) {
-    return answer.answer;
+    return answer.answer.replace(footnoteRegex, '');
   }
 
   // Extract all footnotes from answer
   const footnotes: string[] = [];
-  const footnoteRegex = /\[\^(\d+)]/g;
   let match;
   while ((match = footnoteRegex.exec(answer.answer)) !== null) {
     footnotes.push(match[1]);
   }
 
+  // No footnotes in answer but we have references - append them at the end
+  if (footnotes.length === 0) {
+    const appendedCitations = Array.from(
+      { length: answer.references.length },
+      (_, i) => `[^${i + 1}]`
+    ).join('');
+
+    const references = answer.references.map((ref, i) => {
+      const cleanQuote = ref.exactQuote
+        .replace(/[^a-zA-Z0-9]+/g, ' ')
+        .trim();
+
+      if (ref.url.startsWith('http')) {
+        return `[^${i + 1}]: [${cleanQuote}](${ref.url})`;
+      } else {
+        return `[^${i + 1}]: ${cleanQuote}`;
+      }
+    }).join('\n\n');
+
+    return `
+${answer.answer} ${appendedCitations}
+
+${references}
+`.trim();
+  }
+
   // Check if correction is needed
   const needsCorrection = (() => {
-    // No footnotes found
-    if (footnotes.length === 0) return false;
-
-    // Case 1 & 3: All footnotes are same number AND matches reference count
     if (footnotes.length === answer.references.length &&
         footnotes.every(n => n === footnotes[0])) {
       return true;
     }
 
-    // Case 2: All footnotes are same number AND number is too high
     return footnotes.every(n => n === footnotes[0]) &&
       parseInt(footnotes[0]) > answer.references.length;
 
