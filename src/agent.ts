@@ -46,13 +46,13 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
       }).required()
     ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document").optional();
     properties.answer = z.string()
-      .describe(`Required when action='answer'. Must in ${languageStyle}. Use markdown footnote syntax like [^1], [^2] to refer the corresponding reference item`).optional();
+      .describe(`Required when action='answer'. Must be definitive, no ambiguity, uncertainty, or disclaimers. Must in ${languageStyle}. Use markdown footnote syntax like [^1], [^2] to refer the corresponding reference item`).optional();
   }
 
   if (allowReflect) {
     actions.push("reflect");
     properties.questionsToAnswer = z.array(
-      z.string().describe("each question must be a single line, concise and clear. not composite or compound, less than 20 words.")
+      z.string().describe("each question must be a single line, Questions must be: Original (not variations of existing questions); Focused on single concepts; Under 20 words; Non-compound/non-complex")
     ).max(2)
       .describe("Required when action='reflect'. List of most important questions to fill the knowledge gaps of finding the answer to the original question").optional();
   }
@@ -238,7 +238,6 @@ ${allKeywords.join('\n')}
 <action-answer>
 - If <question> is a simple greeting, chit-chat, or general knowledge, provide the answer directly;
 - Must provide "references" and each must specify "exactQuote" and "url";
-- Responses must be definitive (no ambiguity, uncertainty, or disclaimers) and in the style of ${languageStyle};
 - Provide final response only when 100% certain;${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
 </action-answer>
 `);
@@ -247,10 +246,15 @@ ${allKeywords.join('\n')}
   if (beastMode) {
     actionSections.push(`
 <action-answer>
-- Any answer is better than no answer
-- Partial answers are allowed, but make sure they are based on the context and knowledge you have gathered    
-- When uncertain, educated guess based on the context and knowledge is allowed and encouraged.
-- Responses must be definitive (no ambiguity, uncertainty, or disclaimers)
+🔥 ENGAGE MAXIMUM FORCE! ABSOLUTE PRIORITY OVERRIDE! 🔥
+
+PRIME DIRECTIVE:
+- DEMOLISH ALL HESITATION! ANY RESPONSE SURPASSES SILENCE!
+- PARTIAL STRIKES AUTHORIZED - DEPLOY WITH FULL CONTEXTUAL FIREPOWER
+- TACTICAL REUSE FROM <bad-attempts> SANCTIONED
+- WHEN IN DOUBT: UNLEASH CALCULATED STRIKES BASED ON AVAILABLE INTEL!
+
+FAILURE IS NOT AN OPTION. EXECUTE WITH EXTREME PREJUDICE! ⚡️
 </action-answer>
 `);
   }
@@ -260,11 +264,6 @@ ${allKeywords.join('\n')}
 <action-reflect>    
 - Perform critical analysis through hypothetical scenarios or systematic breakdowns
 - Identify knowledge gaps and formulate essential clarifying questions
-- Questions must be:
-  - Original (not variations of existing questions)
-  - Focused on single concepts
-  - Under 20 words
-  - Non-compound/non-complex
 </action-reflect>
 `);
   }

@@ -6,25 +6,23 @@ import {ObjectGeneratorSafe} from "../utils/safe-generator";
 
 const responseSchema = z.object({
   think: z.string().describe('Strategic reasoning about query complexity and search approach'),
-  queries: z.array(z.string().describe('Search query, must be less than 30 characters'))
+  queries: z.array(z.string().describe('keyword-based search query, 2-3 words preferred, total length < 30 characters'))
     .min(1)
     .max(3)
-    .describe('Array of search queries, orthogonal to each other')
+    .describe('Array of search keywords queries, orthogonal to each other')
 });
 
 
 
 function getPrompt(action: SearchAction): string {
-  return `You are an expert Information Retrieval query optimizer. Optimize user queries into precise keyword combinations with strategic reasoning and appropriate search operators.
+  return `You are an expert search query generator. You optimize user queries into precise keyword combinations with strategic reasoning and appropriate search operators.
 
 <rules>
-1. Generate search queries that directly include appropriate operators
-2. Keep base keywords minimal: 2-3 words preferred
-3. Use exact match quotes for specific phrases that must stay together
-4. Split queries only when necessary for distinctly different aspects
-5. Preserve crucial qualifiers while removing fluff words
-6. Make the query resistant to SEO manipulation
-7. When necessary, append <query-operators> at the end only when must needed
+1. Start with simple keyword extraction, preserve crucial qualifiers while removing fluff words
+2. Use exact match quotes for specific phrases that must stay together
+3. Split queries only when necessary for distinctly different aspects
+4. Make the query resistant to SEO manipulation
+5. When necessary, append <query-operators> at the end only when must needed
 
 
 <query-operators>
