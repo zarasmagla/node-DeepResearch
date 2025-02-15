@@ -4,7 +4,7 @@ import {TokenTracker} from "../utils/token-tracker";
 import {AnswerAction, EvaluationCriteria, EvaluationResponse, EvaluationType} from '../types';
 import {readUrl, removeAllLineBreaks} from "./read";
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
-
+import {ActionTracker} from "../utils/action-tracker";
 
 
 const baseSchema = {
@@ -173,7 +173,7 @@ function getFreshnessPrompt(question: string, answer: string, currentTime: strin
      * It mentions specific dates/events that have been superseded
      * It contains time-sensitive information (e.g., "current CEO", "latest version") from more than 60 days ago
    - For product versions, releases, or announcements, max age is 30 days
-   - For company positions, leadership, or general facts, max age is 60 days
+   - For company positions, leadership, or general facts, max age is 90 days
 
 2. Context Hints:
    - Words indicating recency: "latest", "current", "newest", "just released", "recently"
@@ -182,6 +182,20 @@ function getFreshnessPrompt(question: string, answer: string, currentTime: strin
 </rules>
 
 <examples>
+Question: "What was Jina AI's closing stock price yesterday?"
+Answer: "Jina AI's stock closed at $45.30 per share at yesterday's market close."
+Current Time: "2024-03-07T14:30:00Z"
+Evaluation: {
+  "pass": true,
+  "think": "The question specifically asks for yesterday's closing price, and the answer provides exactly that information. Since it's asking for a historical data point rather than current price, yesterday's closing price is the correct timeframe.",
+  "freshness_analysis": {
+    "likely_outdated": false,
+    "dates_mentioned": ["2024-03-06"],
+    "current_time": "2024-03-07T14:30:00Z",
+    "max_age_days": 1
+  }
+}
+
 Question: "What is Jina AI's latest embedding model?"
 Answer: "The latest embedding model from Jina AI is jina-embeddings-v2, released on March 15, 2024."
 Current Time: "2024-10-06T00:00:00Z"
@@ -206,7 +220,7 @@ Evaluation: {
     "likely_outdated": false,
     "dates_mentioned": ["2023-12"],
     "current_time": "2024-02-06T00:00:00Z",
-    "max_age_days": 60
+    "max_age_days": 90
   }
 }
 </examples>
@@ -300,7 +314,7 @@ Answer: ${JSON.stringify(answer)}`;
 const questionEvaluationSchema = z.object({
   needsFreshness: z.boolean().describe('Whether the question requires freshness check'),
   needsPlurality: z.boolean().describe('Whether the question requires plurality check'),
-  reasoning: z.string().describe('Explanation of why these checks are needed or not needed'),
+  think: z.string().describe('Explanation of why these checks are needed or not needed'),
   languageStyle: z.string().describe('The language being used and the overall vibe/mood of the question'),
 });
 
@@ -341,7 +355,7 @@ Question: "fam PLEASE help me calculate the eigenvalues of this 4x4 matrix ASAP!
 Evaluation: {
     "needsFreshness": false,
     "needsPlurality": true,
-    "reasoning": "Multiple eigenvalues needed but no time-sensitive information required",
+    "think": "Multiple eigenvalues needed but no time-sensitive information required",
     "languageStyle": "panicked student English with math jargon"
 }
 
@@ -349,7 +363,7 @@ Question: "Can someone explain how tf did Ferrari mess up their pit stop strateg
 Evaluation: {
     "needsFreshness": true,
     "needsPlurality": true,
-    "reasoning": "Refers to recent race event and requires analysis of multiple strategic decisions",
+    "think": "Refers to recent race event and requires analysis of multiple strategic decisions",
     "languageStyle": "frustrated fan English with F1 terminology"
 }
 
@@ -357,7 +371,7 @@ Question: "肖老师您好，请您介绍一下最近量子计算领域的三个
 Evaluation: {
     "needsFreshness": true,
     "needsPlurality": true,
-    "reasoning": "Asks for recent breakthroughs (freshness) and specifically requests three examples (plurality)",
+    "think": "Asks for recent breakthroughs (freshness) and specifically requests three examples (plurality)",
     "languageStyle": "formal technical Chinese with academic undertones"
 }
 
@@ -365,7 +379,7 @@ Question: "Bruder krass, kannst du mir erklären warum meine neural network trai
 Evaluation: {
     "needsFreshness": false,
     "needsPlurality": true,
-    "reasoning": "Requires comprehensive debugging analysis of multiple potential issues",
+    "think": "Requires comprehensive debugging analysis of multiple potential issues",
     "languageStyle": "frustrated German-English tech slang"
 }
 
@@ -373,7 +387,7 @@ Question: "Does anyone have insights into the sociopolitical implications of GPT
 Evaluation: {
     "needsFreshness": true,
     "needsPlurality": true,
-    "reasoning": "Requires analysis of current impacts (freshness) across multiple dimensions: sociopolitical, cultural, and linguistic (plurality)",
+    "think": "Requires analysis of current impacts (freshness) across multiple dimensions: sociopolitical, cultural, and linguistic (plurality)",
     "languageStyle": "formal academic English with sociological terminology"
 }
 </examples>
@@ -423,19 +437,21 @@ async function performEvaluation<T>(
     schema: z.ZodType<T>;
     prompt: string;
   },
-  tracker?: TokenTracker
+  trackers: [TokenTracker, ActionTracker],
 ): Promise<GenerateObjectResult<T>> {
-  const generator = new ObjectGeneratorSafe(tracker);
+  const generator = new ObjectGeneratorSafe(trackers[0]);
 
   const result = await generator.generateObject({
     model: TOOL_NAME,
     schema: params.schema,
     prompt: params.prompt,
-  });
+  }) as GenerateObjectResult<any>;
+
+  trackers[1].trackThink(result.object.think)
 
   console.log(`${evaluationType} ${TOOL_NAME}`, result.object);
 
-  return result as GenerateObjectResult<any>;
+  return result;
 }
 
 
@@ -444,7 +460,7 @@ export async function evaluateAnswer(
   question: string,
   action: AnswerAction,
   evaluationCri: EvaluationCriteria,
-  tracker?: TokenTracker
+  trackers: [TokenTracker, ActionTracker]
 ): Promise<{ response: EvaluationResponse }> {
   let result;
 
@@ -459,7 +475,7 @@ export async function evaluateAnswer(
         // Safely handle references and ensure we have content
         const urls = action.references?.map(ref => ref.url) ?? [];
         const uniqueURLs = [...new Set(urls)];
-        const allKnowledge = await fetchSourceContent(uniqueURLs, tracker);
+        const allKnowledge = await fetchSourceContent(uniqueURLs, trackers);
 
         if (!allKnowledge.trim()) {
           return {
@@ -477,7 +493,7 @@ export async function evaluateAnswer(
             schema: attributionSchema,
             prompt: getAttributionPrompt(question, action.answer, allKnowledge),
           },
-          tracker
+          trackers
         );
         break;
       }
@@ -489,7 +505,7 @@ export async function evaluateAnswer(
             schema: definitiveSchema,
             prompt: getDefinitivePrompt(question, action.answer),
           },
-          tracker
+          trackers
         );
         break;
 
@@ -500,7 +516,7 @@ export async function evaluateAnswer(
             schema: freshnessSchema,
             prompt: getFreshnessPrompt(question, action.answer, new Date().toISOString()),
           },
-          tracker
+          trackers
         );
         break;
 
@@ -511,7 +527,7 @@ export async function evaluateAnswer(
             schema: pluralitySchema,
             prompt: getPluralityPrompt(question, action.answer),
           },
-          tracker
+          trackers
         );
         break;
     }
@@ -525,14 +541,14 @@ export async function evaluateAnswer(
 }
 
 // Helper function to fetch and combine source content
-async function fetchSourceContent(urls: string[], tracker?: TokenTracker): Promise<string> {
+async function fetchSourceContent(urls: string[], trackers: [TokenTracker, ActionTracker]): Promise<string> {
   if (!urls.length) return '';
-
+  trackers[1].trackThink('Let me fetch the source content to verify the answer.');
   try {
     const results = await Promise.all(
       urls.map(async (url) => {
         try {
-          const {response} = await readUrl(url, tracker);
+          const {response} = await readUrl(url, trackers[0]);
           const content = response?.data?.content || '';
           return removeAllLineBreaks(content);
         } catch (error) {

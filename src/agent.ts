@@ -401,8 +401,10 @@ export async function getResponse(question: string,
         ...thisStep,
       });
 
+      context.actionTracker.trackThink(`But wait, let me evaluate the answer first.`)
+
       const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep,
-        evaluationMetrics[currentQuestion], context.tokenTracker);
+        evaluationMetrics[currentQuestion], [context.tokenTracker, context.actionTracker]);
 
       if (currentQuestion.trim() === question) {
         if (evaluation.pass) {
