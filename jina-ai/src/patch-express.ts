@@ -1,11 +1,11 @@
-import { ApplicationError, Prop, RPC_CALL_ENVIRONMENT } from "civkit/civ-rpc";
+import { ApplicationError, OperationNotAllowedError, Prop, RPC_CALL_ENVIRONMENT } from "civkit/civ-rpc";
 import { marshalErrorLike } from "civkit/lang";
 import { randomUUID } from "crypto";
 import { once } from "events";
 import type { NextFunction, Request, Response } from "express";
 
 import { JinaEmbeddingsAuthDTO } from "./dto/jina-embeddings-auth";
-import rateLimitControl, { API_CALL_STATUS, RateLimitDesc } from "./rate-limit";
+import rateLimitControl, { API_CALL_STATUS, APICall, RateLimitDesc } from "./rate-limit";
 import asyncLocalContext from "./lib/async-context";
 import globalLogger from "./lib/logger";
 import { InsufficientBalanceError } from "./lib/errors";
@@ -86,27 +86,52 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                 [RPC_CALL_ENVIRONMENT]: { req, res }
             });
 
-            const user = await authDto.assertUser();
-            const uid = await authDto.assertUID();
-            if (!(user.wallet.total_balance > 0)) {
-                throw new InsufficientBalanceError(`Account balance not enough to run this query, please recharge.`);
+            const uid = await authDto.solveUID();
+            if (!uid && !ctx.ip) {
+                throw new OperationNotAllowedError(`Missing IP information for anonymous user`);
             }
-            await rateLimitControl.serviceReady();
-            const rateLimitPolicy = authDto.getRateLimits(appName) || [
-                parseInt(user.metadata?.speed_level) >= 2 ?
+            let rateLimitPolicy
+            if (uid) {
+                const user = await authDto.assertUser();
+                if (!(user.wallet.total_balance > 0)) {
+                    throw new InsufficientBalanceError(`Account balance not enough to run this query, please recharge.`);
+                }
+                rateLimitPolicy = authDto.getRateLimits(appName) || [
+                    parseInt(user.metadata?.speed_level) >= 2 ?
+                        RateLimitDesc.from({
+                            occurrence: 30,
+                            periodSeconds: 60
+                        }) :
+                        RateLimitDesc.from({
+                            occurrence: 10,
+                            periodSeconds: 60
+                        })
+                ];
+            } else {
+                rateLimitPolicy = [
                     RateLimitDesc.from({
-                        occurrence: 30,
-                        periodSeconds: 60
-                    }) :
-                    RateLimitDesc.from({
-                        occurrence: 10,
+                        occurrence: 3,
                         periodSeconds: 60
                     })
-            ];
-            const criterions = rateLimitPolicy.map((c) => rateLimitControl.rateLimitDescToCriterion(c));
-            await Promise.all(criterions.map(([pointInTime, n]) => rateLimitControl.assertUidPeriodicLimit(uid, pointInTime, n, appName)));
+                ]
+            }
 
-            const apiRoll = rateLimitControl.record({ uid, tags: [appName] })
+            const criterions = rateLimitPolicy.map((c) => rateLimitControl.rateLimitDescToCriterion(c));
+            await Promise.all(
+                criterions.map(
+                    ([pointInTime, n]) => uid ?
+                        rateLimitControl.assertUidPeriodicLimit(uid, pointInTime, n, appName) :
+                        rateLimitControl.assertIPPeriodicLimit(ctx.ip!, pointInTime, n, appName)
+                )
+            );
+            const draftApiCall: Partial<APICall> = { tags: [appName] };
+            if (uid) {
+                draftApiCall.uid = uid;
+            } else {
+                draftApiCall.ip = ctx.ip;
+            }
+
+            const apiRoll = rateLimitControl.record(draftApiCall);
             apiRoll.save().catch((err) => logger.warn(`Failed to save rate limit record`, { err: marshalErrorLike(err) }));
 
             const pResClose = once(res, 'close');
@@ -117,7 +142,7 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
             const chargeAmount = ctx.chargeAmount;
             if (chargeAmount) {
                 authDto.reportUsage(chargeAmount, `reader-${appName}`).catch((err) => {
-                    logger.warn(`Unable to report usage for ${uid}`, { err: marshalErrorLike(err) });
+                    logger.warn(`Unable to report usage for ${uid || ctx.ip}`, { err: marshalErrorLike(err) });
                 });
                 apiRoll.chargeAmount = chargeAmount;
             }
@@ -125,10 +150,11 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
             apiRoll.save().catch((err) => logger.warn(`Failed to save rate limit record`, { err: marshalErrorLike(err) }));
             logger.info(`HTTP ${res.statusCode} for request ${ctx.traceId} after ${Date.now() - ctx.traceT0.valueOf()}ms`, {
                 uid,
+                ip: ctx.ip,
                 chargeAmount,
             });
 
-            if (ctx.promptContext?.knowledge?.length) {
+            if (uid && ctx.promptContext.knowledge?.length) {
                 Promise.all(ctx.promptContext.knowledge.map((x: any) => KnowledgeItem.save(
                     KnowledgeItem.from({
                         ...x,
