@@ -234,9 +234,8 @@ ${allKeywords.join('\n')}
   if (allowAnswer) {
     actionSections.push(`
 <action-answer>
-- If <question> is a simple greeting, chit-chat, or general knowledge, provide the answer directly;
-- Must provide "references" and each must specify "exactQuote" and "url";
-- Provide final response only when 100% certain;${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
+- If <question> is a simple greeting, chit-chat, or general knowledge, provide the answer directly; No references needed.
+- Otherwise, provide final answer after investigation and only when you are 100% certain. Must provide "references" and each must specify "exactQuote" and "url";${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
 </action-answer>
 `);
   }
