@@ -225,8 +225,8 @@ ${urlList}
   if (allowCoding) {
     actionSections.push(`
 <action-coding>
-- This action allows you to solve the problem with coding in javascript. This is useful when you need some programming logic, like counting, filtering, or transforming, sorting, regex extraction, pre-processing, or post-processing of the data.
-- You only need to describe the issue you aim to solve in the "codingIssue" field. Specify the input either with real values or variable names. 
+- This action allows you to solve the problem with coding in javascript. This is useful when you need some programming logic, like counting, filtering, transforming, sorting, regex extraction, pre-processing, or post-processing of the data.
+- You only need to describe the target issue in the "codingIssue" field. Specify the input either with real values (when it's short) or variable names (when it's too big or too long). 
 - You do not need to generate any actual code. Some senior engineers will help you with actual implementation.
 </action-coding>`);
   }
@@ -418,11 +418,12 @@ export async function getResponse(question: string,
 
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
 
-    // reset allowAnswer to true
+    // reset allow* to true
     allowAnswer = true;
     allowReflect = true;
     allowRead = true;
     allowSearch = true;
+    allowCoding = true;
 
     // execute the step and action
     if (thisStep.action === 'answer') {
