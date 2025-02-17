@@ -460,12 +460,13 @@ export async function evaluateAnswer(
   question: string,
   action: AnswerAction,
   evaluationCri: EvaluationCriteria,
-  trackers: [TokenTracker, ActionTracker]
+  trackers: [TokenTracker, ActionTracker],
+  visitedURLs: string[] = []
 ): Promise<{ response: EvaluationResponse }> {
   let result;
 
   // Only add attribution if we have valid references
-  if (action.references && action.references.length > 0) {
+  if (action.references && action.references.length > 0 && action.references.some(ref => ref.url.startsWith('http'))) {
     evaluationCri.types = ['attribution', ...evaluationCri.types];
   }
 
@@ -473,7 +474,7 @@ export async function evaluateAnswer(
     switch (evaluationType) {
       case 'attribution': {
         // Safely handle references and ensure we have content
-        const urls = action.references?.map(ref => ref.url) ?? [];
+        const urls = action.references?.filter(ref => ref.url.startsWith('http') && !visitedURLs.includes(ref.url)).map(ref => ref.url) || [];
         const uniqueURLs = [...new Set(urls)];
         const allKnowledge = await fetchSourceContent(uniqueURLs, trackers);
 

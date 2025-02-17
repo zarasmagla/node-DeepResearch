@@ -17,6 +17,7 @@ import {search} from "./tools/jina-search";
 // import {grounding} from "./tools/grounding";
 import {zodToJsonSchema} from "zod-to-json-schema";
 import {ObjectGeneratorSafe} from "./utils/safe-generator";
+import {CodeSandbox} from "./tools/code-sandbox";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -24,7 +25,7 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, languageStyle: string = 'same language as the question') {
+function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean, languageStyle: string = 'same language as the question') {
   const actions: string[] = [];
   const properties: Record<string, z.ZodTypeAny> = {
     action: z.enum(['placeholder']), // Will update later with actual actions
@@ -37,11 +38,17 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
       .describe("Required when action='search'. Must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Existing queries must be avoided").optional();
   }
 
+  if (allowCoding) {
+    actions.push("coding");
+    properties.codingIssue = z.string().max(500)
+      .describe("Required when action='coding'. Describe what issue to solve with coding, format like a github issue ticket. Specify the input value when it is short.").optional();
+  }
+
   if (allowAnswer) {
     actions.push("answer");
     properties.references = z.array(
       z.object({
-        exactQuote: z.string().describe("Exact relevant quote from the document"),
+        exactQuote: z.string().describe("Exact relevant quote from the document, must be a soundbite, short and to the point, no fluff").max(30),
         url: z.string().describe("source URL; must be directly from the context")
       }).required()
     ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document").optional();
@@ -83,6 +90,7 @@ function getPrompt(
   allowAnswer: boolean = true,
   allowRead: boolean = true,
   allowSearch: boolean = true,
+  allowCoding: boolean = true,
   badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
   knowledge?: KnowledgeItem[],
   allURLs?: Record<string, string>,
@@ -146,7 +154,6 @@ ${knowledgeItems}
 </knowledge>
 `);
   }
-
 
 
   // Add context section if exists
@@ -215,6 +222,15 @@ ${urlList}
 `);
   }
 
+  if (allowCoding) {
+    actionSections.push(`
+<action-coding>
+- This action allows you to solve the problem with coding in javascript. This is useful when you need some programming logic, like counting, filtering, or transforming, sorting, regex extraction, pre-processing, or post-processing of the data.
+- You only need to describe the issue you aim to solve in the "codingIssue" field. Specify the input either with real values or variable names. 
+- You do not need to generate any actual code. Some senior engineers will help you with actual implementation.
+</action-coding>`);
+  }
+
   if (allowSearch) {
 
     actionSections.push(`
@@ -259,7 +275,7 @@ FAILURE IS NOT AN OPTION. EXECUTE WITH EXTREME PREJUDICE! ⚡️
   if (allowReflect) {
     actionSections.push(`
 <action-reflect>    
-- Perform critical analysis through hypothetical scenarios or systematic breakdowns
+- Perform critical reflection through hypothetical scenarios or systematic breakdowns
 - Identify knowledge gaps and formulate essential clarifying questions
 </action-reflect>
 `);
@@ -313,7 +329,7 @@ export async function getResponse(question: string,
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
-  let schema: ZodObject<any> = getSchema(true, true, true, true)
+  let schema: ZodObject<any> = getSchema(true, true, true, true, true)
   question = question.trim()
   const gaps: string[] = [question];  // All questions to be answered including the orginal question
   const allQuestions = [question];
@@ -344,6 +360,7 @@ export async function getResponse(question: string,
   let allowSearch = true;
   let allowRead = true;
   let allowReflect = true;
+  let allowCoding = true;
   let prompt = '';
   let thisStep: StepAction = {action: 'answer', answer: '', references: [], think: '', isFinal: false};
 
@@ -379,12 +396,13 @@ export async function getResponse(question: string,
       allowAnswer,
       allowRead,
       allowSearch,
+      allowCoding,
       badContext,
       allKnowledge,
       allURLs,
       false,
     );
-    schema = getSchema(allowReflect, allowRead, allowAnswer, allowSearch,
+    schema = getSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding,
       evaluationMetrics[currentQuestion].languageStyle)
     const generator = new ObjectGeneratorSafe(context.tokenTracker);
     const result = await generator.generateObject({
@@ -394,7 +412,7 @@ export async function getResponse(question: string,
     });
     thisStep = result.object as StepAction;
     // print allowed and chose action
-    const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
+    const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect, allowCoding].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
     console.log(`${thisStep.action} <- [${actionsStr}]`);
     console.log(thisStep)
 
@@ -423,7 +441,10 @@ export async function getResponse(question: string,
       context.actionTracker.trackThink(`But wait, let me evaluate the answer first.`)
 
       const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep,
-        evaluationMetrics[currentQuestion], [context.tokenTracker, context.actionTracker]);
+        evaluationMetrics[currentQuestion],
+        [context.tokenTracker, context.actionTracker],
+        visitedURLs
+        );
 
       if (currentQuestion.trim() === question) {
         if (evaluation.pass) {
@@ -530,6 +551,11 @@ You will now figure out the answers to these sub-questions and see if they can h
         gaps.push(...newGapQuestions.slice(0, 2));
         allQuestions.push(...newGapQuestions.slice(0, 2));
         gaps.push(question);  // always keep the original question in the gaps
+        updateContext({
+          totalStep,
+          ...thisStep,
+        });
+
       } else {
         diaryContext.push(`
 At step ${step}, you took **reflect** and think about the knowledge gaps. You tried to break down the question "${currentQuestion}" into gap-questions like this: ${oldQuestions.join(', ')} 
@@ -701,7 +727,40 @@ You decided to think out of the box or cut from a completely different angle.`);
 
         allowRead = false;
       }
+    } else if (thisStep.action === 'coding' && thisStep.codingIssue) {
+      const sandbox = new CodeSandbox({allContext}, context.tokenTracker);
+      try {
+        const result = await sandbox.solve(thisStep.codingIssue);
+        allKnowledge.push({
+          question: `What is the solution to the coding issue: ${thisStep.codingIssue}?`,
+          answer: result.solution.output,
+          type: 'coding',
+          updated: new Date().toISOString()
+        });
+        diaryContext.push(`
+At step ${step}, you took the **coding** action and try to solve the coding issue: ${thisStep.codingIssue}.
+You found the solution and add it to your knowledge for future reference.
+`);
+        updateContext({
+          totalStep,
+          ...thisStep,
+          result: result
+        });
+      } catch (error) {
+        console.error('Error solving coding issue:', error);
+        diaryContext.push(`
+At step ${step}, you took the **coding** action and try to solve the coding issue: ${thisStep.codingIssue}.
+But unfortunately, you failed to solve the issue. You need to think out of the box or cut from a completely different angle.
+`);
+        updateContext({
+          totalStep,
+          ...thisStep,
+          result: 'You have tried all possible solutions and found no new information. You must think out of the box or different angle!!!'
+        });
+        allowCoding = false;
+      }
     }
+
 
     await storeContext(prompt, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
   }
@@ -722,13 +781,14 @@ You decided to think out of the box or cut from a completely different angle.`);
       false,
       false,
       false,
+      false,
       badContext,
       allKnowledge,
       allURLs,
       true,
     );
 
-    schema = getSchema(false, false, true, false,
+    schema = getSchema(false, false, true, false, false,
       evaluationMetrics[question]?.languageStyle || 'same language as the question');
     const generator = new ObjectGeneratorSafe(context.tokenTracker);
     const result = await generator.generateObject({

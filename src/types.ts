@@ -2,7 +2,7 @@
 import {CoreAssistantMessage, CoreUserMessage, LanguageModelUsage} from "ai";
 
 type BaseAction = {
-  action: "search" | "answer" | "reflect" | "visit";
+  action: "search" | "answer" | "reflect" | "visit" | "coding";
   think: string;
 };
 
@@ -29,7 +29,7 @@ export type KnowledgeItem = {
     exactQuote: string;
     url: string;
   }> | Array<any>;
-  type: 'qa' | 'side-info' | 'chat-history' | 'url',
+  type: 'qa' | 'side-info' | 'chat-history' | 'url' | 'coding',
   updated: string,
 }
 
@@ -43,7 +43,12 @@ export type VisitAction = BaseAction & {
   URLTargets: string[];
 };
 
-export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitAction;
+export type CodingAction = BaseAction & {
+  action: "coding";
+  codingIssue: string;
+};
+
+export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitAction | CodingAction;
 
 export type EvaluationType = 'definitive' | 'freshness' | 'plurality' | 'attribution';
 export type EvaluationCriteria = {
