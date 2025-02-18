@@ -31,7 +31,23 @@ app.get('/health', (req, res) => {
 function buildMdFromAnswer(answer: AnswerAction) {
   const footnoteRegex = /\[\^(\d+)]/g;
 
-  // First case: no references - remove any footnote citations if they exist
+  // Helper function to format references
+  const formatReferences = (refs: typeof answer.references) => {
+    return refs.map((ref, i) => {
+      const cleanQuote = ref.exactQuote
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/, ' ');
+
+      const citation = `[^${i + 1}]: ${cleanQuote}`;
+
+      if (!ref.url?.startsWith('http')) return citation;
+
+      const domainName = new URL(ref.url).hostname.replace('www.', '');
+      return `${citation} [${domainName}](${ref.url})`;
+    }).join('\n\n');
+  };
+
+  // First case: no references - remove any footnote citations
   if (!answer.references?.length) {
     return answer.answer.replace(footnoteRegex, '');
   }
@@ -50,17 +66,7 @@ function buildMdFromAnswer(answer: AnswerAction) {
       (_, i) => `[^${i + 1}]`
     ).join('');
 
-    const references = answer.references.map((ref, i) => {
-      const cleanQuote = ref.exactQuote
-        .replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/, ' ')
-        .trim();
-
-      if (ref.url.startsWith('http')) {
-        return `[^${i + 1}]: [${cleanQuote}](${ref.url})`;
-      } else {
-        return `[^${i + 1}]: ${cleanQuote}`;
-      }
-    }).join('\n\n');
+    const references = formatReferences(answer.references);
 
     return `
 ${answer.answer} ${appendedCitations}
@@ -70,35 +76,15 @@ ${references}
   }
 
   // Check if correction is needed
-  const needsCorrection = (() => {
-    if (footnotes.length === answer.references.length &&
-      footnotes.every(n => n === footnotes[0])) {
-      return true;
-    }
-
-    return footnotes.every(n => n === footnotes[0]) &&
-      parseInt(footnotes[0]) > answer.references.length;
-
-
-  })();
+  const needsCorrection =
+    (footnotes.length === answer.references.length && footnotes.every(n => n === footnotes[0])) ||
+    (footnotes.every(n => n === footnotes[0]) && parseInt(footnotes[0]) > answer.references.length);
 
   if (!needsCorrection) {
-    const references = answer.references.map((ref, i) => {
-      const cleanQuote = ref.exactQuote
-        .replace(/[^a-zA-Z0-9]+/g, ' ')
-        .trim();
-
-      if (ref.url.startsWith('http')) {
-        return `[^${i + 1}]: [${cleanQuote}](${ref.url})`;
-      } else {
-        return `[^${i + 1}]: ${cleanQuote}`;
-      }
-    }).join('\n\n');
-
     return `
 ${answer.answer}
 
-${references}
+${formatReferences(answer.references)}
 `.trim();
   }
 
@@ -108,22 +94,10 @@ ${references}
     `[^${++currentIndex}]`
   );
 
-  const references = answer.references.map((ref, i) => {
-    const cleanQuote = ref.exactQuote
-      .replace(/[^a-zA-Z0-9]+/g, ' ')
-      .trim();
-
-    if (ref.url.startsWith('http')) {
-      return `[^${i + 1}]: [${cleanQuote}](${ref.url})`;
-    } else {
-      return `[^${i + 1}]: ${cleanQuote}`;
-    }
-  }).join('\n\n');
-
   return `
 ${correctedAnswer}
 
-${references}
+${formatReferences(answer.references)}
 `.trim();
 }
 
