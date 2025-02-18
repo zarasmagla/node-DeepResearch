@@ -1,6 +1,6 @@
 # DeepResearch
 
-[Demo](https://jina.ai/deepsearch#demo) | [API](#official-api) | [Evaluation](#evaluation)
+[UI](https://search.jina.ai/) | [UI Code](https://github.com/jina-ai/deepsearch-ui) | [API](https://jina.ai/deepsearch) | [Evaluation](#evaluation)
 
 Keep searching, reading webpages, reasoning until an answer is found (or the token budget is exceeded). Useful for deeply investigating a query.
 
