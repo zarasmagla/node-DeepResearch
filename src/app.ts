@@ -17,6 +17,7 @@ const app = express();
 // Get secret from command line args for optional authentication
 const secret = process.argv.find(arg => arg.startsWith('--secret='))?.split('=')[1];
 
+
 app.use(cors());
 app.use(express.json({
   limit: '10mb'
@@ -45,13 +46,13 @@ function buildMdFromAnswer(answer: AnswerAction) {
   // No footnotes in answer but we have references - append them at the end
   if (footnotes.length === 0) {
     const appendedCitations = Array.from(
-      { length: answer.references.length },
+      {length: answer.references.length},
       (_, i) => `[^${i + 1}]`
     ).join('');
 
     const references = answer.references.map((ref, i) => {
       const cleanQuote = ref.exactQuote
-        .replace(/[^a-zA-Z0-9]+/g, ' ')
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/, ' ')
         .trim();
 
       if (ref.url.startsWith('http')) {
@@ -71,7 +72,7 @@ ${references}
   // Check if correction is needed
   const needsCorrection = (() => {
     if (footnotes.length === answer.references.length &&
-        footnotes.every(n => n === footnotes[0])) {
+      footnotes.every(n => n === footnotes[0])) {
       return true;
     }
 

@@ -476,13 +476,26 @@ export async function evaluateAnswer(
         // Safely handle references and ensure we have content
         const urls = action.references?.filter(ref => ref.url.startsWith('http') && !visitedURLs.includes(ref.url)).map(ref => ref.url) || [];
         const uniqueURLs = [...new Set(urls)];
+
+        if (uniqueURLs.length === 0) {
+          // all URLs have been read, or there is no valid urls. no point to read them.
+          result = {
+            object: {
+              pass: true,
+              think: "All provided references have been visited and no new URLs were found to read. The answer is considered valid without further verification.",
+              type: 'attribution',
+            } as EvaluationResponse
+          }
+          break;
+        }
+
         const allKnowledge = await fetchSourceContent(uniqueURLs, trackers);
 
         if (!allKnowledge.trim()) {
           return {
             response: {
               pass: false,
-              think: "The answer does not provide any valid attribution references that could be verified. No accessible source content was found to validate the claims made in the answer.",
+              think: `The answer does provide URL references ${JSON.stringify(uniqueURLs)}, but the content could not be fetched or is empty. Need to found some other references and URLs`,
               type: 'attribution',
             }
           };
