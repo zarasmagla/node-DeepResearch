@@ -6,6 +6,7 @@ import { Server } from 'http';
 const app = require('../..').default;
 
 const rootApp = express();
+rootApp.set('trust proxy', true);
 rootApp.use(jinaAiMiddleware, app);
 
 
