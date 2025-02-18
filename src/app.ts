@@ -36,7 +36,7 @@ function buildMdFromAnswer(answer: AnswerAction) {
     return refs.map((ref, i) => {
       const cleanQuote = ref.exactQuote
         .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-        .replace(/\s+/, ' ');
+        .replace(/\s+/g, ' ');
 
       const citation = `[^${i + 1}]: ${cleanQuote}`;
 
@@ -79,6 +79,24 @@ ${references}
   const needsCorrection =
     (footnotes.length === answer.references.length && footnotes.every(n => n === footnotes[0])) ||
     (footnotes.every(n => n === footnotes[0]) && parseInt(footnotes[0]) > answer.references.length);
+
+  // New case: we have more references than footnotes
+  if (answer.references.length > footnotes.length && !needsCorrection) {
+    // Get the used indices
+    const usedIndices = new Set(footnotes.map(n => parseInt(n)));
+
+    // Create citations for unused references
+    const unusedReferences = Array.from(
+      {length: answer.references.length},
+      (_, i) => !usedIndices.has(i + 1) ? `[^${i + 1}]` : ''
+    ).join('');
+
+    return `
+${answer.answer} ${unusedReferences}
+
+${formatReferences(answer.references)}
+`.trim();
+  }
 
   if (!needsCorrection) {
     return `
