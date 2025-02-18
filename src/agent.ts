@@ -35,7 +35,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   if (allowSearch) {
     actions.push("search");
     properties.searchQuery = z.string().max(30)
-      .describe("Required when action='search'. Must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Existing queries must be avoided").optional();
+      .describe("Required when action='search'. Must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Must in ${languageStyle}.").optional();
   }
 
   if (allowCoding) {

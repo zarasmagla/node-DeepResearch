@@ -226,22 +226,22 @@ function calculateDelay(chunk: string, burstMode: boolean): number {
 
   // Special handling for URLs
   if (chunk.match(/^https?:\/\//)) {
-    return Math.random() * 50 + 100; // Slower typing for URLs
+    return Math.random() * 50 + 10; // Slower typing for URLs
   }
 
   // Special handling for CJK characters
   if (/^[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]$/.test(chunk)) {
-    return Math.random() * 100 + 10; // Longer delay for individual CJK characters
+    return Math.random() * 50 + 10; // Longer delay for individual CJK characters
   }
 
   // Base delay calculation
   let baseDelay;
   if (burstMode) {
-    baseDelay = Math.random() * 30 + 20;
+    baseDelay = Math.random() * 30 + 10;
   } else {
     const effectiveLength = getEffectiveLength(chunk);
     const perCharacterDelay = Math.max(10, 40 - effectiveLength * 2);
-    baseDelay = Math.random() * perCharacterDelay + perCharacterDelay;
+    baseDelay = Math.random() * perCharacterDelay + 10;
   }
 
   // Add variance based on chunk characteristics
@@ -250,14 +250,14 @@ function calculateDelay(chunk: string, burstMode: boolean): number {
   }
 
   if (/[^a-zA-Z\s]/.test(chunk)) {
-    baseDelay += Math.random() * 30 + 15;
+    baseDelay += Math.random() * 30 + 10;
   }
 
   // Add pauses for punctuation
   if (/[.!?]$/.test(chunk)) {
-    baseDelay += Math.random() * 350 + 200;
+    baseDelay += Math.random() * 200 + 10;
   } else if (/[,;:]$/.test(chunk)) {
-    baseDelay += Math.random() * 150 + 100;
+    baseDelay += Math.random() * 100 + 10;
   }
 
   return baseDelay;
@@ -550,6 +550,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       if (step.think) {
         const content = step.think;
         await new Promise<void>(resolve => {
+          streamingState.currentlyStreaming = false;
+
           streamingState.queue.push({
             content,
             resolve
