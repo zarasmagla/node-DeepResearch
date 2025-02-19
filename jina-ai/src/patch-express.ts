@@ -166,8 +166,13 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                 });
             }
             if (ctx.promptContext) {
+                const patchedCtx = { ...ctx.promptContext };
+                if (Array.isArray(patchedCtx.context)) {
+                    patchedCtx.context = patchedCtx.context.map((x: object) => ({ ...x, result: undefined }))
+                }
+
                 firebaseDefaultBucket.file(`promptContext/${ctx.traceId}.json`).save(
-                    JSON.stringify(ctx.promptContext),
+                    JSON.stringify(patchedCtx),
                     {
                         metadata: {
                             contentType: 'application/json',
