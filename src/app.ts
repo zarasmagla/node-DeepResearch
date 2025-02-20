@@ -493,6 +493,12 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     return res.status(400).json({error: 'Last message must be from user'});
   }
 
+  // clean <think> from all assistant messages
+  body.messages?.filter(message => message.role === 'assistant').forEach(message => {
+    message.content = (message.content as string).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  });
+  console.log('messages', body.messages);
+
   const {tokenBudget, maxBadAttempts} = getTokenBudgetAndMaxAttempts(
     body.reasoning_effort,
     body.max_completion_tokens
@@ -566,7 +572,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   }
 
   try {
-    const {result: finalStep} = await getResponse(lastMessage.content as string, tokenBudget, maxBadAttempts, context, body.messages)
+    const {result: finalStep} = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
 
     const usage = context.tokenTracker.getTotalUsageSnakeCase();
     if (body.stream) {

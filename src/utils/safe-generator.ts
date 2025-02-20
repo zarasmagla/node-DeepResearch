@@ -11,7 +11,9 @@ interface GenerateObjectResult<T> {
 interface GenerateOptions<T> {
   model: ToolName;
   schema: z.ZodType<T>;
-  prompt: string;
+  prompt?: string;
+  system?:string;
+  messages?: any;
 }
 
 export class ObjectGeneratorSafe {
@@ -26,6 +28,8 @@ export class ObjectGeneratorSafe {
       model,
       schema,
       prompt,
+      system,
+      messages,
     } = options;
 
     try {
@@ -34,6 +38,8 @@ export class ObjectGeneratorSafe {
         model: getModel(model),
         schema,
         prompt,
+        system,
+        messages,
         maxTokens: getToolConfig(model).maxTokens,
         temperature: getToolConfig(model).temperature,
       });
