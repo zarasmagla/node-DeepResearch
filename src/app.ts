@@ -78,7 +78,8 @@ ${references}
   // Check if correction is needed
   const needsCorrection =
     (footnotes.length === answer.references.length && footnotes.every(n => n === footnotes[0])) ||
-    (footnotes.every(n => n === footnotes[0]) && parseInt(footnotes[0]) > answer.references.length);
+    (footnotes.every(n => n === footnotes[0]) && parseInt(footnotes[0]) > answer.references.length) ||
+    (footnotes.length > 0 && footnotes.every(n => parseInt(n) > answer.references.length));
 
   // New case: we have more references than footnotes
   if (answer.references.length > footnotes.length && !needsCorrection) {
