@@ -6,6 +6,7 @@
     "OPENAI_API_KEY": "",
     "JINA_API_KEY": "",
     "BRAVE_API_KEY": "",
+    "SERPER_API_KEY": "",
     "DEFAULT_MODEL_NAME": ""
   },
   "defaults": {
