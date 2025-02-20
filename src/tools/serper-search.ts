@@ -5,10 +5,9 @@ import { SerperSearchResponse } from '../types';
 
 export async function serperSearch(query: string): Promise<{ response: SerperSearchResponse }> {
     const response = await axios.post<SerperSearchResponse>('https://google.serper.dev/search', {
-        data: JSON.stringify({
-            q: query,
-            autocorrect: false,
-        }),
+        q: query,
+        autocorrect: false,
+    }, {
         headers: {
             'X-API-KEY': SERPER_API_KEY,
             'Content-Type': 'application/json'
