@@ -9,7 +9,7 @@
     "DEFAULT_MODEL_NAME": ""
   },
   "defaults": {
-    "search_provider": "brave",
+    "search_provider": "serper",
     "llm_provider": "vertex",
     "step_sleep": 0
   },

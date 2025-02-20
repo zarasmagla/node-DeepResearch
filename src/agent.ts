@@ -18,6 +18,7 @@ import {search} from "./tools/jina-search";
 import {zodToJsonSchema} from "zod-to-json-schema";
 import {ObjectGeneratorSafe} from "./utils/safe-generator";
 import {CodeSandbox} from "./tools/code-sandbox";
+import { serperSearch } from './tools/serper-search';
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -614,6 +615,22 @@ But then you realized you have asked them before. You decided to to think out of
                 };
               } catch (error) {
                 console.error('Brave search failed:', error);
+                results = {results: []};
+              }
+              await sleep(STEP_SLEEP)
+              break;
+            case 'serper':
+              try {
+                const {response} = await serperSearch(query);
+                results = {
+                  results: response.organic?.map(r => ({
+                    title: r.title,
+                    url: r.link,
+                    description: r.snippet
+                  })) || []
+                };
+              } catch (error) {
+                console.error('Serper search failed:', error);
                 results = {results: []};
               }
               await sleep(STEP_SLEEP)

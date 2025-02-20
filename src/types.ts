@@ -87,6 +87,36 @@ export interface BraveSearchResponse {
   };
 }
 
+export interface SerperSearchResponse {
+  knowledgeGraph?: {
+      title: string;
+      type: string;
+      website: string;
+      imageUrl: string;
+      description: string;
+      descriptionSource: string;
+      descriptionLink: string;
+      attributes: { [k: string]: string; };
+  },
+  organic: {
+      title: string;
+      link: string;
+      snippet: string;
+      date: string;
+      siteLinks?: { title: string; link: string; }[];
+      position: number,
+  }[];
+  topStories?: {
+      title: string;
+      link: string;
+      source: string;
+      data: string;
+      imageUrl: string;
+  }[];
+  relatedSearches?: string[];
+  credits: number;
+}
+
 export type DedupResponse = {
   think: string;
   unique_queries: string[];
