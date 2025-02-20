@@ -69,7 +69,9 @@ function buildMdFromAnswer(answer: AnswerAction) {
     const references = formatReferences(answer.references);
 
     return `
-${answer.answer} ${appendedCitations}
+${answer.answer}
+
+⁜${appendedCitations}
 
 ${references}
 `.trim();
@@ -93,7 +95,9 @@ ${references}
     ).join('');
 
     return `
-${answer.answer} ${unusedReferences}
+${answer.answer} 
+
+⁜${unusedReferences}
 
 ${formatReferences(answer.references)}
 `.trim();
