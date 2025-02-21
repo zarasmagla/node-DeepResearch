@@ -321,7 +321,7 @@ export async function getResponse(question?: string,
   const badContext = [];
   let diaryContext = [];
   let allowAnswer = true;
-  let allowSearch = false;
+  let allowSearch = true;
   let allowRead = true;
   let allowReflect = true;
   let allowCoding = true;
