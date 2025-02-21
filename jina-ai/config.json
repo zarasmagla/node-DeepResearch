@@ -39,15 +39,15 @@
         "maxTokens": 8000
       },
       "tools": {
-        "coder": { "temperature": 0.7 },
+        "coder": { "temperature": 0.7, "maxTokens": 1000 },
         "searchGrounding": { "temperature": 0 },
         "dedup": { "temperature": 0.1 },
-        "evaluator": {},
-        "errorAnalyzer": {},
-        "queryRewriter": { "temperature": 0.1 },
+        "evaluator": {"maxTokens": 500},
+        "errorAnalyzer": {"maxTokens": 500},
+        "queryRewriter": { "temperature": 0.1, "maxTokens": 500 },
         "agent": { "temperature": 0.7 },
         "agentBeastMode": { "temperature": 0.7 },
-        "fallback": { "temperature": 0 }
+        "fallback": { "temperature": 0, "maxTokens": 1000}
       }
     },
     "openai": {

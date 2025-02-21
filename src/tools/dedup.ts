@@ -4,7 +4,7 @@ import {ObjectGeneratorSafe} from "../utils/safe-generator";
 
 
 const responseSchema = z.object({
-  think: z.string().describe('Strategic reasoning about the overall deduplication approach'),
+  think: z.string().describe('Strategic reasoning about the overall deduplication approach').max(500),
   unique_queries: z.array(z.string().describe('Unique query that passed the deduplication process, must be less than 30 characters'))
     .describe('Array of semantically unique queries').max(3)
 });

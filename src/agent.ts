@@ -30,7 +30,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   const actions: string[] = [];
   const properties: Record<string, z.ZodTypeAny> = {
     action: z.enum(['placeholder']), // Will update later with actual actions
-    think: z.string().describe(`Explain why choose this action, what's the chain-of-thought behind choosing this action, use the first-person narrative.`)
+    think: z.string().describe(`Explain why choose this action, what's the chain-of-thought behind choosing this action, use the first-person narrative.`).max(500)
   };
 
   if (allowSearch) {

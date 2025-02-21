@@ -9,7 +9,7 @@ import {ActionTracker} from "../utils/action-tracker";
 
 const baseSchema = {
   pass: z.boolean().describe('Whether the answer passes the evaluation criteria defined by the evaluator'),
-  think: z.string().describe('Explanation the thought process why the answer does not pass the evaluation criteria')
+  think: z.string().describe('Explanation the thought process why the answer does not pass the evaluation criteria').max(500)
 };
 
 const definitiveSchema = z.object({
@@ -263,8 +263,8 @@ Answer: ${JSON.stringify(answer)}`;
 const questionEvaluationSchema = z.object({
   needsFreshness: z.boolean().describe('Whether the question requires freshness check'),
   needsPlurality: z.boolean().describe('Whether the question requires plurality check'),
-  think: z.string().describe('Explanation of why these checks are needed or not needed'),
-  languageStyle: z.string().describe('The language being used and the overall vibe/mood of the question'),
+  think: z.string().describe('Explanation of why these checks are needed').max(500),
+  languageStyle: z.string().describe('The language being used and the overall vibe/mood of the question').max(50),
 });
 
 function getQuestionEvaluationPrompt(question: string): string {

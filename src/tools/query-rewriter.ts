@@ -5,7 +5,7 @@ import {ObjectGeneratorSafe} from "../utils/safe-generator";
 
 
 const responseSchema = z.object({
-  think: z.string().describe('Strategic reasoning about query complexity and search approach'),
+  think: z.string().describe('Strategic reasoning about query complexity and search approach').max(500),
   queries: z.array(z.string().describe('keyword-based search query, 2-3 words preferred, total length < 30 characters'))
     .min(1)
     .max(3)
