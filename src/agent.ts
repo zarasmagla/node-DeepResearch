@@ -189,10 +189,10 @@ ${learnedStrategy}
 
     actionSections.push(`
 <action-visit>
-- This action allows you to access the full content behind any URLs.
-- If the <question> contains a URL, you must visit the URL to gather more information.
+- Access and read full content from URLs
+- Must check URLs mentioned in <question>
 ${urlList ? `    
-- Visit any URLs from below to gather external knowledge, choose the most relevant URLs that might contain the answer
+- Review relevant URLs below for additional information
 <url-list>
 ${urlList}
 </url-list>
@@ -204,9 +204,9 @@ ${urlList}
   if (allowCoding) {
     actionSections.push(`
 <action-coding>
-- This action allows you to solve the problem with coding in javascript. This is useful when you need some programming logic, like counting, filtering, transforming, sorting, regex extraction, pre-processing, or post-processing of the data.
-- You only need to describe the target issue in the "codingIssue" field. Specify the input either with real values (when it's short) or variable names (when it's too big or too long). 
-- You do not need to generate any actual code. Some senior engineers will help you with actual implementation.
+- This JavaScript-based solution helps you handle programming tasks like counting, filtering, transforming, sorting, regex extraction, and data processing.
+- Simply describe your problem in the "codingIssue" field. Include actual values for small inputs or variable names for larger datasets.
+- No code writing is required – senior engineers will handle the implementation.
 </action-coding>`);
   }
 
@@ -214,16 +214,16 @@ ${urlList}
 
     actionSections.push(`
 <action-search>
-- This action allows you to search information on the web. 
-- Since answer might be written in a different language or style than the question, think about the best query & language that might lead to the answer.    
+- Use web search to find relevant information
+- Choose optimal search queries and language based on the expected answer format
+- Focus on one specific aspect of the original question
+- Suggest unique keywords and alternative search angles
 ${allKeywords?.length ? `
-- Avoid the searched queries below as they do not give any useful information, you need to think out of the box and propose queries from a completely different angle:
+- Previous unsuccessful queries to avoid:
 <bad-queries>
 ${allKeywords.join('\n')}
 </bad-queries>
 `.trim() : ''}
-- Propose some unique new keywords queries that might help you find the answer to the question
-- Focus on solving one specific aspect of the original question
 </action-search>
 `);
   }
@@ -231,8 +231,9 @@ ${allKeywords.join('\n')}
   if (allowAnswer) {
     actionSections.push(`
 <action-answer>
-- If <question> is a simple greeting, chit-chat, or general knowledge, provide the answer directly; No references needed.
-- Otherwise, provide final answer after investigation and only when you are 100% certain. Must provide "references" and each must specify "exactQuote" and "url";${allowReflect ? '\n- If doubts remain, use <action-reflect> instead' : ''}
+- For greetings, casual conversation, or general knowledge questions, answer directly without references.
+- For all other questions, provide a verified answer with references. Each reference must include exactQuote and url.
+- If uncertain, use <action-reflect>
 </action-answer>
 `);
   }
@@ -255,9 +256,9 @@ FAILURE IS NOT AN OPTION. EXECUTE WITH EXTREME PREJUDICE! ⚡️
 
   if (allowReflect) {
     actionSections.push(`
-<action-reflect>    
-- Perform critical reflection through hypothetical scenarios or systematic breakdowns
-- Identify knowledge gaps and formulate essential clarifying questions
+<action-reflect>
+- Analyze through scenarios and systematic breakdowns
+- Identify gaps and ask key clarifying questions that related to the original question and lead to the answer
 </action-reflect>
 `);
   }
@@ -270,13 +271,7 @@ ${actionSections.join('\n\n')}
 `);
 
   // Add footer
-  sections.push(`Respond exclusively in valid JSON format matching exact JSON schema.
-
-Critical Requirements:
-- Include ONLY ONE action type
-- Never add unsupported keys
-- Exclude all non-JSON text, markdown, or explanations
-- Maintain strict JSON syntax`);
+  sections.push(`Respond in valid JSON format matching exact JSON schema.`);
 
   return removeExtraLineBreaks(sections.join('\n\n'));
 }
@@ -307,6 +302,7 @@ export async function getResponse(question?: string,
     tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker()
   };
+  const maxGapQuestions = 3;
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
@@ -325,7 +321,7 @@ export async function getResponse(question?: string,
   const badContext = [];
   let diaryContext = [];
   let allowAnswer = true;
-  let allowSearch = true;
+  let allowSearch = false;
   let allowRead = true;
   let allowReflect = true;
   let allowCoding = true;
@@ -390,7 +386,7 @@ export async function getResponse(question?: string,
     allowReflect = true;
     allowRead = true;
     allowSearch = true;
-    allowCoding = true;
+    // allowCoding = true;
 
     // execute the step and action
     if (thisStep.action === 'answer') {
@@ -469,8 +465,8 @@ ${evaluation.think}
 
             if (errorAnalysis.questionsToAnswer) {
               // reranker? maybe
-              gaps.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
-              allQuestions.push(...errorAnalysis.questionsToAnswer.slice(0, 2));
+              gaps.push(...errorAnalysis.questionsToAnswer.slice(0, maxGapQuestions));
+              allQuestions.push(...errorAnalysis.questionsToAnswer.slice(0,maxGapQuestions));
               gaps.push(question);  // always keep the original question in the gaps
             }
 
@@ -516,8 +512,8 @@ ${newGapQuestions.map((q: string) => `- ${q}`).join('\n')}
 
 You will now figure out the answers to these sub-questions and see if they can help you find the answer to the original question.
 `);
-        gaps.push(...newGapQuestions.slice(0, 2));
-        allQuestions.push(...newGapQuestions.slice(0, 2));
+        gaps.push(...newGapQuestions.slice(0, maxGapQuestions));
+        allQuestions.push(...newGapQuestions.slice(0, maxGapQuestions));
         gaps.push(question);  // always keep the original question in the gaps
         updateContext({
           totalStep,
@@ -756,6 +752,8 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
           ...thisStep,
           result: 'You have tried all possible solutions and found no new information. You must think out of the box or different angle!!!'
         });
+      }
+      finally {
         allowCoding = false;
       }
     }
