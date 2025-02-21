@@ -18,7 +18,7 @@ import {search} from "./tools/jina-search";
 import {zodToJsonSchema} from "zod-to-json-schema";
 import {ObjectGeneratorSafe} from "./utils/safe-generator";
 import {CodeSandbox} from "./tools/code-sandbox";
-import { serperSearch } from './tools/serper-search';
+import {serperSearch} from './tools/serper-search';
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -30,13 +30,13 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
   const actions: string[] = [];
   const properties: Record<string, z.ZodTypeAny> = {
     action: z.enum(['placeholder']), // Will update later with actual actions
-    think: z.string().describe("Explain why choose this action, what's the thought process behind choosing this action")
+    think: z.string().describe(`Explain why choose this action, what's the chain-of-thought behind choosing this action, use the first-person narrative.`)
   };
 
   if (allowSearch) {
     actions.push("search");
     properties.searchQuery = z.string().max(30)
-      .describe("Required when action='search'. Must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Must in ${languageStyle}.").optional();
+      .describe(`Required when action='search'. Must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Write the query in the language that potential answers might be written in, then in ${languageStyle}.`).optional();
   }
 
   if (allowCoding) {
@@ -54,7 +54,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
       }).required()
     ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document").optional();
     properties.answer = z.string()
-      .describe(`Required when action='answer'. Must be definitive, no ambiguity, uncertainty, or disclaimers. Must in ${languageStyle}. Use markdown footnote syntax like [^1], [^2] to refer the corresponding reference item`).optional();
+      .describe(`Required when action='answer'. Must be definitive, no ambiguity, uncertainty, or disclaimers. Must in ${languageStyle} and confident. Use markdown footnote syntax like [^1], [^2] to refer the corresponding reference item`).optional();
   }
 
   if (allowReflect) {
@@ -189,7 +189,7 @@ ${learnedStrategy}
 
     actionSections.push(`
 <action-visit>
-- This allows you to access the full content behind any URLs.
+- This action allows you to access the full content behind any URLs.
 - If the <question> contains a URL, you must visit the URL to gather more information.
 ${urlList ? `    
 - Visit any URLs from below to gather external knowledge, choose the most relevant URLs that might contain the answer
@@ -213,7 +213,9 @@ ${urlList}
   if (allowSearch) {
 
     actionSections.push(`
-<action-search>    
+<action-search>
+- This action allows you to search information on the web. 
+- Since answer might be written in a different language or style than the question, think about the best query & language that might lead to the answer.    
 ${allKeywords?.length ? `
 - Avoid the searched queries below as they do not give any useful information, you need to think out of the box and propose queries from a completely different angle:
 <bad-queries>
@@ -410,7 +412,7 @@ export async function getResponse(question?: string,
         evaluationMetrics[currentQuestion],
         [context.tokenTracker, context.actionTracker],
         visitedURLs
-        );
+      );
 
       if (currentQuestion.trim() === question) {
         if (evaluation.pass) {
@@ -653,52 +655,67 @@ You decided to think out of the box or cut from a completely different angle.
         allowSearch = false;
       }
     } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
-
-      let uniqueURLs = thisStep.URLTargets;
-      if (visitedURLs.length > 0) {
-        // check duplicate urls
-        uniqueURLs = uniqueURLs.filter((url: string) => !visitedURLs.includes(url));
-      }
+      const uniqueURLs = visitedURLs.length > 0
+        ? thisStep.URLTargets.filter(url => !visitedURLs.includes(url))
+        : thisStep.URLTargets;
 
       if (uniqueURLs.length > 0) {
         context.actionTracker.trackThink(`Let me read ${uniqueURLs.join(', ')} to gather more information.`);
+
         const urlResults = await Promise.all(
-          uniqueURLs.map(async (url: string) => {
+          uniqueURLs.map(async url => {
             try {
               const {response} = await readUrl(url, context.tokenTracker);
+              const {data} = response;
+
+              // Early return if no valid data
+              if (!data?.url || !data?.content) {
+                throw new Error('No content found');
+              }
+
               allKnowledge.push({
-                question: `What is in ${response.data?.url || 'the URL'}?`,
-                answer: removeAllLineBreaks(response.data?.content || 'No content available'),
-                references: [response.data?.url],
+                question: `What is in ${data.url}?`,
+                answer: removeAllLineBreaks(data.content),
+                references: [data.url],
                 type: 'url',
                 updated: new Date().toISOString()
               });
-              visitedURLs.push(url);
-              delete allURLs[url];
+
               return {url, result: response};
             } catch (error) {
               console.error('Error reading URL:', error);
+              return null;
+            } finally {
+              visitedURLs.push(url);
+              delete allURLs[url];
             }
           })
-        );
-        diaryContext.push(`
-At step ${step}, you took the **visit** action and deep dive into the following URLs:
+        ).then(results => results.filter(Boolean));
+
+        const success = urlResults.length > 0;
+        diaryContext.push(success
+          ? `At step ${step}, you took the **visit** action and deep dive into the following URLs:
 ${urlResults.map(r => r?.url).join('\n')}
-You found some useful information on the web and add them to your knowledge for future reference.
-`);
+You found some useful information on the web and add them to your knowledge for future reference.`
+          : `At step ${step}, you took the **visit** action and try to visit some URLs but failed to read the content. You need to think out of the box or cut from a completely different angle.`
+        );
+
         updateContext({
           totalStep,
-          question: currentQuestion,
-          ...thisStep,
-          result: urlResults
+          ...(success ? {
+            question: currentQuestion,
+            ...thisStep,
+            result: urlResults
+          } : {
+            ...thisStep,
+            result: 'You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!'
+          })
         });
+
+        allowRead = success;
       } else {
-
         diaryContext.push(`
-At step ${step}, you took the **visit** action and try to visit the following URLs:
-${thisStep.URLTargets.join('\n')}
-But then you realized you have already visited these URLs and you already know very well about their contents.
-
+At step ${step}, you took the **visit** action. But then you realized you have already visited these URLs and you already know very well about their contents.
 You decided to think out of the box or cut from a completely different angle.`);
 
         updateContext({
