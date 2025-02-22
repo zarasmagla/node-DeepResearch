@@ -302,7 +302,7 @@ Question: "fam PLEASE help me calculate the eigenvalues of this 4x4 matrix ASAP!
 Evaluation: {
     "needsFreshness": false,
     "needsPlurality": true,
-    "think": "Multiple eigenvalues needed but no time-sensitive information required",
+    "think": "I see the user needs help with eigenvalues - that's a calculation task. Since it's a 4x4 matrix, there will be multiple eigenvalues to find. The user's language is very informal with 'fam', 'ASAP', and emojis, suggesting panicked student speech with math terms mixed in.",
     "languageStyle": "panicked student English with math jargon"
 }
 
@@ -310,7 +310,7 @@ Question: "Can someone explain how tf did Ferrari mess up their pit stop strateg
 Evaluation: {
     "needsFreshness": true,
     "needsPlurality": true,
-    "think": "Refers to recent race event and requires analysis of multiple strategic decisions",
+    "think": "The user is asking about a specific F1 race incident. The 'AGAIN' and MonacoGP hashtag tell me this is about a recent event. They want analysis of several strategic decisions. Their tone shows clear frustration with informal 'tf' and facepalm emoji - classic angry F1 fan speak.",
     "languageStyle": "frustrated fan English with F1 terminology"
 }
 
@@ -318,7 +318,7 @@ Question: "肖老师您好，请您介绍一下最近量子计算领域的三个
 Evaluation: {
     "needsFreshness": true,
     "needsPlurality": true,
-    "think": "Asks for recent breakthroughs (freshness) and specifically requests three examples (plurality)",
+    "think": "The user wants three recent quantum computing breakthroughs - the '最近' (recent) indicates freshness needed. They use formal address '老师您好' and technical terms, suggesting academic Chinese. The structure asks for multiple examples with cryptography applications.",
     "languageStyle": "formal technical Chinese with academic undertones"
 }
 
@@ -326,7 +326,7 @@ Question: "Bruder krass, kannst du mir erklären warum meine neural network trai
 Evaluation: {
     "needsFreshness": false,
     "needsPlurality": true,
-    "think": "Requires comprehensive debugging analysis of multiple potential issues",
+    "think": "The user has a technical ML problem but explains it very casually. They've 'tried everything' so I'll need to cover multiple debugging angles. Their mix of German slang ('Bruder krass') with English ML terms shows frustrated tech-casual speech.",
     "languageStyle": "frustrated German-English tech slang"
 }
 
@@ -334,8 +334,16 @@ Question: "Does anyone have insights into the sociopolitical implications of GPT
 Evaluation: {
     "needsFreshness": true,
     "needsPlurality": true,
-    "think": "Requires analysis of current impacts (freshness) across multiple dimensions: sociopolitical, cultural, and linguistic (plurality)",
+    "think": "The user asks about current GPT-4 impacts, so freshness matters. They specify multiple aspects (sociopolitical, indigenous knowledge, linguistics) and explicitly request nuanced analysis. Their formal academic vocabulary and structure signals scholarly discourse.",
     "languageStyle": "formal academic English with sociological terminology"
+}
+
+Question: "what's 7 * 9? need to check something real quick"
+Evaluation: {
+    "needsFreshness": false,
+    "needsPlurality": false,
+    "think": "The user wants a single multiplication result - that's all. No need for recent info since math is constant, and no need for multiple examples since it's just one calculation. Their casual phrasing suggests quick mental math check.",
+    "languageStyle": "casual English"
 }
 </examples>
 
