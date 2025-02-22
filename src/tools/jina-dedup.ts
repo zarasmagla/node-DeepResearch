@@ -3,7 +3,7 @@ import {TokenTracker} from "../utils/token-tracker";
 import {JINA_API_KEY} from "../config";
 
 const JINA_API_URL = 'https://api.jina.ai/v1/embeddings';
-const SIMILARITY_THRESHOLD = 0.93; // Adjustable threshold for cosine similarity
+const SIMILARITY_THRESHOLD = 0.88; // Adjustable threshold for cosine similarity
 
 const JINA_API_CONFIG = {
   MODEL: 'jina-embeddings-v3',
