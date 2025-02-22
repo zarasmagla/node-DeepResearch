@@ -799,7 +799,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   console.log(thisStep)
 
   await storeContext(system, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
-  return {result: thisStep, context, visitedURLs};
+  return {result: thisStep, context, visitedURLs: [...visitedURLs, ...Object.keys(allURLs)]};
 
 }
 
