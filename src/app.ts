@@ -559,7 +559,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   }
 
   try {
-    const {result: finalStep} = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
+    const {result: finalStep, visitedURLs: visitedURLs} = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
 
     const usage = context.tokenTracker.getTotalUsageSnakeCase();
     if (body.stream) {
@@ -595,7 +595,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           logprobs: null,
           finish_reason: 'stop'
         }],
-        usage
+        usage,
+        visitedURLs
       };
       res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
       res.end();
@@ -616,7 +617,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           logprobs: null,
           finish_reason: 'stop'
         }],
-        usage
+        usage,
+        visitedURLs
       };
 
       // Log final response (excluding full content for brevity)
@@ -624,7 +626,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         id: response.id,
         status: 200,
         contentLength: response.choices[0].message.content.length,
-        usage: response.usage
+        usage: response.usage,
+        visitedURLs: response.visitedURLs
       });
 
       res.json(response);
@@ -662,7 +665,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           logprobs: null,
           finish_reason: null
         }],
-        usage
+        usage,
       };
       res.write(`data: ${JSON.stringify(closeThinkChunk)}\n\n`);
 
@@ -700,7 +703,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           logprobs: null,
           finish_reason: 'stop'
         }],
-        usage
+        usage,
       };
       res.json(response);
     }

@@ -231,6 +231,7 @@ export interface ChatCompletionResponse {
     completion_tokens: number;
     total_tokens: number;
   };
+  visitedURLs?: string[];
 }
 
 export interface ChatCompletionChunk {
@@ -249,6 +250,7 @@ export interface ChatCompletionChunk {
     finish_reason: null | 'stop';
   }>;
   usage?: any;
+  visitedURLs?: string[];
 }
 
 // Tracker Types

@@ -297,7 +297,7 @@ export async function getResponse(question?: string,
                                   maxBadAttempts: number = 3,
                                   existingContext?: Partial<TrackerContext>,
                                   messages?: Array<CoreAssistantMessage | CoreUserMessage>
-): Promise<{ result: StepAction; context: TrackerContext }> {
+): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[] }> {
   const context: TrackerContext = {
     tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker()
@@ -799,7 +799,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   console.log(thisStep)
 
   await storeContext(system, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
-  return {result: thisStep, context};
+  return {result: thisStep, context, visitedURLs};
 
 }
 
@@ -841,9 +841,11 @@ export async function main() {
   const question = process.argv[2] || "";
   const {
     result: finalStep,
-    context: tracker
-  } = await getResponse(question) as { result: AnswerAction; context: TrackerContext };
+    context: tracker,
+    visitedURLs: visitedURLs
+  } = await getResponse(question) as { result: AnswerAction; context: TrackerContext; visitedURLs: string[] };
   console.log('Final Answer:', finalStep.answer);
+  console.log('Visited URLs:', visitedURLs);
 
   tracker.tokenTracker.printSummary();
 }
