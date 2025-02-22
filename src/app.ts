@@ -441,7 +441,7 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
     } catch (error) {
       console.error('Error in streaming:', error);
     } finally {
-      // Reset state and remove from queue
+      // Clear state before moving to next item
       streamingState.isEmitting = false;
       streamingState.currentlyStreaming = false;
       streamingState.remainingContent = '';
