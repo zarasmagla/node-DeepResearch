@@ -1,10 +1,8 @@
 import {z} from 'zod';
 import {GenerateObjectResult} from 'ai';
-import {TokenTracker} from "../utils/token-tracker";
-import {AnswerAction, EvaluationCriteria, EvaluationResponse, EvaluationType} from '../types';
+import {AnswerAction, EvaluationCriteria, EvaluationResponse, EvaluationType, TrackerContext} from '../types';
 import {readUrl, removeAllLineBreaks} from "./read";
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {ActionTracker} from "../utils/action-tracker";
 
 
 const baseSchema = {
@@ -263,7 +261,7 @@ Answer: ${JSON.stringify(answer)}`;
 const questionEvaluationSchema = z.object({
   needsFreshness: z.boolean().describe('Whether the question requires freshness check'),
   needsPlurality: z.boolean().describe('Whether the question requires plurality check'),
-  think: z.string().describe('Explanation of why these checks are needed').max(500),
+  think: z.string().describe('A very concise explain of why you choose those checks are needed in first person, extremely short.').max(500),
   languageStyle: z.string().describe('The language being used and the overall vibe/mood of the question').max(50),
 });
 
@@ -349,10 +347,10 @@ const TOOL_NAME = 'evaluator';
 
 export async function evaluateQuestion(
   question: string,
-  tracker?: TokenTracker
+  trackers?: TrackerContext
 ): Promise<EvaluationCriteria> {
   try {
-    const generator = new ObjectGeneratorSafe(tracker);
+    const generator = new ObjectGeneratorSafe(trackers?.tokenTracker);
 
     const result = await generator.generateObject({
       model: TOOL_NAME,
@@ -368,6 +366,7 @@ export async function evaluateQuestion(
     if (result.object.needsPlurality) types.push('plurality');
 
     console.log('Question Metrics:', types);
+    trackers?.actionTracker.trackThink(result.object.think);
 
     // Always evaluate definitive first, then freshness (if needed), then plurality (if needed)
     return {types, languageStyle: result.object.languageStyle};
@@ -386,9 +385,9 @@ async function performEvaluation<T>(
     schema: z.ZodType<T>;
     prompt: string;
   },
-  trackers: [TokenTracker, ActionTracker],
+  trackers: TrackerContext,
 ): Promise<GenerateObjectResult<T>> {
-  const generator = new ObjectGeneratorSafe(trackers[0]);
+  const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
 
   const result = await generator.generateObject({
     model: TOOL_NAME,
@@ -396,7 +395,7 @@ async function performEvaluation<T>(
     prompt: params.prompt,
   }) as GenerateObjectResult<any>;
 
-  trackers[1].trackThink(result.object.think)
+  trackers.actionTracker.trackThink(result.object.think)
 
   console.log(`${evaluationType} ${TOOL_NAME}`, result.object);
 
@@ -409,7 +408,7 @@ export async function evaluateAnswer(
   question: string,
   action: AnswerAction,
   evaluationCri: EvaluationCriteria,
-  trackers: [TokenTracker, ActionTracker],
+  trackers: TrackerContext,
   visitedURLs: string[] = []
 ): Promise<{ response: EvaluationResponse }> {
   let result;
@@ -504,14 +503,14 @@ export async function evaluateAnswer(
 }
 
 // Helper function to fetch and combine source content
-async function fetchSourceContent(urls: string[], trackers: [TokenTracker, ActionTracker]): Promise<string> {
+async function fetchSourceContent(urls: string[], trackers: TrackerContext): Promise<string> {
   if (!urls.length) return '';
-  trackers[1].trackThink('Let me fetch the source content to verify the answer.');
+  trackers.actionTracker.trackThink('Let me fetch the source content to verify the answer.');
   try {
     const results = await Promise.all(
       urls.map(async (url) => {
         try {
-          const {response} = await readUrl(url, trackers[0]);
+          const {response} = await readUrl(url, trackers.tokenTracker);
           const content = response?.data?.content || '';
           return removeAllLineBreaks(content);
         } catch (error) {

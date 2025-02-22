@@ -1,13 +1,12 @@
 import {z} from 'zod';
-import {TokenTracker} from "../utils/token-tracker";
-import {ErrorAnalysisResponse} from '../types';
+import {ErrorAnalysisResponse, TrackerContext} from '../types';
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 
 
 const responseSchema = z.object({
-  recap: z.string().describe('Recap of the actions taken and the steps conducted'),
-  blame: z.string().describe('Which action or the step was the root cause of the answer rejection'),
-  improvement: z.string().describe('Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe.'),
+  recap: z.string().describe('Recap of the actions taken and the steps conducted in first person narrative.').max(500),
+  blame: z.string().describe('Which action or the step was the root cause of the answer rejection').max(500),
+  improvement: z.string().describe('Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe.').max(500),
   questionsToAnswer: z.array(
     z.string().describe("each question must be a single line, concise and clear. not composite or compound, less than 20 words.")
   ).max(2)
@@ -111,10 +110,10 @@ ${diaryContext.join('\n')}
 const TOOL_NAME = 'errorAnalyzer';
 export async function analyzeSteps(
   diaryContext: string[],
-  tracker?: TokenTracker
+  trackers?: TrackerContext
 ): Promise<{ response: ErrorAnalysisResponse }> {
   try {
-    const generator = new ObjectGeneratorSafe(tracker);
+    const generator = new ObjectGeneratorSafe(trackers?.tokenTracker);
     const prompt = getPrompt(diaryContext);
 
     const result = await generator.generateObject({
@@ -124,6 +123,8 @@ export async function analyzeSteps(
     });
 
     console.log(TOOL_NAME, result.object);
+    trackers?.actionTracker.trackThink(result.object.blame);
+    trackers?.actionTracker.trackThink(result.object.improvement);
 
     return { response: result.object };
 

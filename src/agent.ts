@@ -342,7 +342,7 @@ export async function getResponse(question?: string,
     allowReflect = allowReflect && (gaps.length <= 1);
     const currentQuestion: string = gaps.length > 0 ? gaps.shift()! : question
     if (!evaluationMetrics[currentQuestion]) {
-      evaluationMetrics[currentQuestion] = await evaluateQuestion(currentQuestion, context.tokenTracker)
+      evaluationMetrics[currentQuestion] = await evaluateQuestion(currentQuestion, context)
     }
 
     // update all urls with buildURLMap
@@ -406,7 +406,7 @@ export async function getResponse(question?: string,
 
       const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep,
         evaluationMetrics[currentQuestion],
-        [context.tokenTracker, context.actionTracker],
+        context,
         visitedURLs
       );
 
@@ -446,7 +446,7 @@ The evaluator thinks your answer is bad because:
 ${evaluation.think}
 `);
             // store the bad context and reset the diary context
-            const {response: errorAnalysis} = await analyzeSteps(diaryContext, context.tokenTracker);
+            const {response: errorAnalysis} = await analyzeSteps(diaryContext, context);
 
             allKnowledge.push({
               question: currentQuestion,
@@ -535,7 +535,7 @@ But then you realized you have asked them before. You decided to to think out of
       }
     } else if (thisStep.action === 'search' && thisStep.searchQuery) {
       // rewrite queries
-      let {queries: keywordsQueries} = await rewriteQuery(thisStep, context.tokenTracker);
+      let {queries: keywordsQueries} = await rewriteQuery(thisStep, context);
 
       // add the original query before rewrite to the keywordsQueries
       keywordsQueries.push(thisStep.searchQuery)
