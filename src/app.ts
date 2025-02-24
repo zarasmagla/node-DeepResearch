@@ -559,7 +559,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   }
 
   try {
-    const {result: finalStep, visitedURLs: visitedURLs} = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
+    const {result: finalStep, visitedURLs: visitedURLs, readURLs: readURLs} = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
 
     const usage = context.tokenTracker.getTotalUsageSnakeCase();
     if (body.stream) {
@@ -596,7 +596,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           finish_reason: 'stop'
         }],
         usage,
-        visitedURLs
+        visitedURLs,
+        readURLs
       };
       res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
       res.end();
@@ -618,7 +619,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           finish_reason: 'stop'
         }],
         usage,
-        visitedURLs
+        visitedURLs,
+        readURLs
       };
 
       // Log final response (excluding full content for brevity)
@@ -627,7 +629,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         status: 200,
         contentLength: response.choices[0].message.content.length,
         usage: response.usage,
-        visitedURLs: response.visitedURLs
+        visitedURLs: response.visitedURLs,
+        readURLs: response.readURLs
       });
 
       res.json(response);

@@ -11,7 +11,7 @@ import {evaluateAnswer, evaluateQuestion} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
-import {StepAction, AnswerAction, KnowledgeItem, EvaluationCriteria} from "./types";
+import {StepAction, AnswerAction, KnowledgeItem, EvaluationCriteria, SearchResult} from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
 // import {grounding} from "./tools/grounding";
@@ -19,12 +19,17 @@ import {zodToJsonSchema} from "zod-to-json-schema";
 import {ObjectGeneratorSafe} from "./utils/safe-generator";
 import {CodeSandbox} from "./tools/code-sandbox";
 import {serperSearch} from './tools/serper-search';
+import {normalizeUrl} from "./utils/url-tools";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
   console.log(`Waiting ${seconds}s...`);
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
+const MAX_URLS_PER_STEP = 2
+const MAX_QUERIES_PER_STEP = 5
+const MAX_REFLECT_PER_STEP = 3
 
 function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean, languageStyle: string = 'same language as the question') {
   const actions: string[] = [];
@@ -61,15 +66,15 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
     actions.push("reflect");
     properties.questionsToAnswer = z.array(
       z.string().describe("each question must be a single line, Questions must be: Original (not variations of existing questions); Focused on single concepts; Under 20 words; Non-compound/non-complex")
-    ).max(2)
-      .describe("Required when action='reflect'. List of most important questions to fill the knowledge gaps of finding the answer to the original question").optional();
+    ).max(MAX_REFLECT_PER_STEP)
+      .describe(`Required when action='reflect'. List of most important questions to fill the knowledge gaps of finding the answer to the original question. Maximum provide ${MAX_REFLECT_PER_STEP} reflect questions.`).optional();
   }
 
   if (allowRead) {
     actions.push("visit");
     properties.URLTargets = z.array(z.string())
-      .max(2)
-      .describe("Required when action='visit'. Must be an array of URLs, choose up the most relevant 2 URLs to visit").optional();
+      .max(MAX_URLS_PER_STEP)
+      .describe(`Required when action='visit'. Must be an array of URLs, choose up the most relevant ${MAX_URLS_PER_STEP} URLs to visit`).optional();
   }
 
   // Update the enum values after collecting all actions
@@ -80,6 +85,11 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
 
 }
 
+function getUnvisitedURLs(allURLs: Record<string, SearchResult>, visitedURLs: string[]): SearchResult[] {
+    return Object.entries(allURLs)
+        .filter(([url]) => !visitedURLs.includes(url))
+        .map(([, result]) => result);
+}
 
 function getPrompt(
   context?: string[],
@@ -92,7 +102,7 @@ function getPrompt(
   allowCoding: boolean = true,
   badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
   knowledge?: KnowledgeItem[],
-  allURLs?: Record<string, string>,
+  allURLs?: SearchResult[],
   beastMode?: boolean,
 ): string {
   const sections: string[] = [];
@@ -181,9 +191,10 @@ ${learnedStrategy}
 
   if (allowRead) {
     let urlList = '';
-    if (allURLs && Object.keys(allURLs).length > 0) {
-      urlList = Object.entries(allURLs)
-        .map(([url, desc]) => `  + "${url}": "${desc}"`)
+    if (allURLs && allURLs.length > 0) {
+      urlList = allURLs
+        .filter(r => 'url' in r)
+        .map(r =>  `  + "${r.url}": "${r.title}"`)
         .join('\n');
     }
 
@@ -232,6 +243,7 @@ ${allKeywords.join('\n')}
     actionSections.push(`
 <action-answer>
 - For greetings, casual conversation, or general knowledge questions, answer directly without references.
+- If the question is clearly within your knowledge cutoff (i.e. Aug. 2024), provide a confident answer directly.
 - For all other questions, provide a verified answer with references. Each reference must include exactQuote and url.
 - If uncertain, use <action-reflect>
 </action-answer>
@@ -257,8 +269,12 @@ FAILURE IS NOT AN OPTION. EXECUTE WITH EXTREME PREJUDICE! ⚡️
   if (allowReflect) {
     actionSections.push(`
 <action-reflect>
-- Analyze through scenarios and systematic breakdowns
-- Identify gaps and ask key clarifying questions that related to the original question and lead to the answer
+- Critically examine <question>, <context>, <knowledge>, <bad-attempts>, and <learned-strategy> to identify gaps and the problems. 
+- Identify gaps and ask key clarifying questions that deeply related to the original question and lead to the answer
+- Ensure each reflection:
+ - Cuts to core emotional truths while staying anchored to original <question>
+ - Transforms surface-level problems into deeper psychological insights
+ - Makes the unconscious conscious
 </action-reflect>
 `);
   }
@@ -286,6 +302,10 @@ function updateContext(step: any) {
   allContext.push(step)
 }
 
+function chooseK(a: string[], k: number) {
+  // randomly sample k from `a` without repitition
+  return a.sort(() => 0.5 - Math.random()).slice(0, k);
+}
 
 function removeHTMLtags(text: string) {
   return text.replace(/<[^>]*>?/gm, '');
@@ -297,12 +317,11 @@ export async function getResponse(question?: string,
                                   maxBadAttempts: number = 3,
                                   existingContext?: Partial<TrackerContext>,
                                   messages?: Array<CoreAssistantMessage | CoreUserMessage>
-): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[] }> {
+): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[] }> {
   const context: TrackerContext = {
     tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker()
   };
-  const maxGapQuestions = 3;
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
@@ -328,12 +347,11 @@ export async function getResponse(question?: string,
   let system = '';
   let thisStep: StepAction = {action: 'answer', answer: '', references: [], think: '', isFinal: false};
 
-  const allURLs: Record<string, string> = {};
+  const allURLs: Record<string, SearchResult> = {};
   const visitedURLs: string[] = [];
   const evaluationMetrics: Record<string, EvaluationCriteria> = {};
   while (context.tokenTracker.getTotalUsage().totalTokens < tokenBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
-    await sleep(STEP_SLEEP);
     step++;
     totalStep++;
     const budgetPercentage = (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget * 100).toFixed(2);
@@ -347,7 +365,7 @@ export async function getResponse(question?: string,
 
     // update all urls with buildURLMap
     // allowRead = allowRead && (Object.keys(allURLs).length > 0);
-    allowSearch = allowSearch && (Object.keys(allURLs).length < 50);  // disable search when too many urls already
+    allowSearch = allowSearch && (getUnvisitedURLs(allURLs, visitedURLs).length < 50);  // disable search when too many urls already
 
     // generate prompt for this step
     system = getPrompt(
@@ -361,7 +379,7 @@ export async function getResponse(question?: string,
       allowCoding,
       badContext,
       allKnowledge,
-      allURLs,
+      getUnvisitedURLs(allURLs, visitedURLs),
       false,
     );
     schema = getSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding,
@@ -400,6 +418,15 @@ export async function getResponse(question?: string,
         totalStep,
         question: currentQuestion,
         ...thisStep,
+      });
+
+      // normalize all references urls, add title to it
+      thisStep.references = thisStep.references?.map(ref => {
+        return {
+          exactQuote: ref.exactQuote,
+          title: allURLs[ref.url]?.title,
+          url: normalizeUrl(ref.url)
+        }
       });
 
       context.actionTracker.trackThink(`But wait, let me evaluate the answer first.`)
@@ -465,8 +492,9 @@ ${evaluation.think}
 
             if (errorAnalysis.questionsToAnswer) {
               // reranker? maybe
-              gaps.push(...errorAnalysis.questionsToAnswer.slice(0, maxGapQuestions));
-              allQuestions.push(...errorAnalysis.questionsToAnswer.slice(0,maxGapQuestions));
+              errorAnalysis.questionsToAnswer = chooseK(errorAnalysis.questionsToAnswer, MAX_REFLECT_PER_STEP);
+              gaps.push(...errorAnalysis.questionsToAnswer);
+              allQuestions.push(...errorAnalysis.questionsToAnswer);
               gaps.push(question);  // always keep the original question in the gaps
             }
 
@@ -500,9 +528,8 @@ Although you solved a sub-question, you still need to find the answer to the ori
         });
       }
     } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
-      let newGapQuestions = thisStep.questionsToAnswer
-      const oldQuestions = newGapQuestions;
-      newGapQuestions = (await dedupQueries(newGapQuestions, allQuestions, context.tokenTracker)).unique_queries;
+      thisStep.questionsToAnswer = chooseK((await dedupQueries(thisStep.questionsToAnswer, allQuestions, context.tokenTracker)).unique_queries, MAX_REFLECT_PER_STEP);
+      const newGapQuestions = thisStep.questionsToAnswer
       if (newGapQuestions.length > 0) {
         // found new gap questions
         diaryContext.push(`
@@ -512,8 +539,8 @@ ${newGapQuestions.map((q: string) => `- ${q}`).join('\n')}
 
 You will now figure out the answers to these sub-questions and see if they can help you find the answer to the original question.
 `);
-        gaps.push(...newGapQuestions.slice(0, maxGapQuestions));
-        allQuestions.push(...newGapQuestions.slice(0, maxGapQuestions));
+        gaps.push(...newGapQuestions);
+        allQuestions.push(...newGapQuestions);
         gaps.push(question);  // always keep the original question in the gaps
         updateContext({
           totalStep,
@@ -522,7 +549,7 @@ You will now figure out the answers to these sub-questions and see if they can h
 
       } else {
         diaryContext.push(`
-At step ${step}, you took **reflect** and think about the knowledge gaps. You tried to break down the question "${currentQuestion}" into gap-questions like this: ${oldQuestions.join(', ')} 
+At step ${step}, you took **reflect** and think about the knowledge gaps. You tried to break down the question "${currentQuestion}" into gap-questions like this: ${newGapQuestions.join(', ')} 
 But then you realized you have asked them before. You decided to to think out of the box or cut from a completely different angle. 
 `);
         updateContext({
@@ -536,90 +563,64 @@ But then you realized you have asked them before. You decided to to think out of
     } else if (thisStep.action === 'search' && thisStep.searchQuery) {
       // rewrite queries
       let {queries: keywordsQueries} = await rewriteQuery(thisStep, context);
-
-      // add the original query before rewrite to the keywordsQueries
-      keywordsQueries.push(thisStep.searchQuery)
-
       const oldKeywords = keywordsQueries;
       // avoid exisitng searched queries
       const {unique_queries: dedupedQueries} = await dedupQueries(keywordsQueries, allKeywords, context.tokenTracker);
-      keywordsQueries = dedupedQueries;
+      keywordsQueries = chooseK(dedupedQueries, MAX_QUERIES_PER_STEP);
+      let anyResult = false;
 
       if (keywordsQueries.length > 0) {
-        // let googleGrounded = '';
-        const searchResults = [];
+
+
         context.actionTracker.trackThink(`Let me search for "${keywordsQueries.join(', ')}" to gather more information.`)
         for (const query of keywordsQueries) {
           console.log(`Search query: ${query}`);
 
-          let results;
+          let results: SearchResult[] = []
 
-          switch (SEARCH_PROVIDER) {
-            case 'jina':
-              // use jinaSearch
-              results = {results: (await search(query, context.tokenTracker)).response?.data || []};
-              // if (LLM_PROVIDER === 'gemini') {
-              //   googleGrounded = await grounding(query, context.tokenTracker);
-              // }
-              break;
-            case 'duck':
-              results = await duckSearch(query, {safeSearch: SafeSearchType.STRICT});
-              break;
-            case 'brave':
-              try {
-                const {response} = await braveSearch(query);
-                results = {
-                  results: response.web?.results?.map(r => ({
-                    title: r.title,
-                    url: r.url,
-                    description: r.description
-                  })) || []
-                };
-              } catch (error) {
-                console.error('Brave search failed:', error);
-                results = {results: []};
-              }
-              await sleep(STEP_SLEEP)
-              break;
-            case 'serper':
-              try {
-                const {response} = await serperSearch(query);
-                results = {
-                  results: response.organic?.map(r => ({
-                    title: r.title,
-                    url: r.link,
-                    description: r.snippet
-                  })) || []
-                };
-              } catch (error) {
-                console.error('Serper search failed:', error);
-                results = {results: []};
-              }
-              await sleep(STEP_SLEEP)
-              break;
-            default:
-              results = {results: []};
+          try {
+            switch (SEARCH_PROVIDER) {
+              case 'jina':
+                results = (await search(query, context.tokenTracker)).response?.data || [];
+                break;
+              case 'duck':
+                results = (await duckSearch(query, {safeSearch: SafeSearchType.STRICT})).results;
+                break;
+              case 'brave':
+                results = (await braveSearch(query)).response.web?.results || [];
+                break;
+              case 'serper':
+                results = (await serperSearch(query)).response.organic || [];
+                break;
+              default:
+                results = [];
+            }
+            if (results.length === 0) {
+              throw new Error('No results found');
+            }
+          } catch (error) {
+            console.error(`${SEARCH_PROVIDER} search failed for query "${query}":`, error);
+            continue
+          } finally {
+            await sleep(STEP_SLEEP)
           }
-          const minResults = results.results.map(r => ({
+
+          const minResults = (results).map(r => ({
             title: r.title,
-            url: r.url,
-            description: r.description
+            url: normalizeUrl('url' in r ? r.url : r.link),
+            description: 'description' in r ? r.description : r.snippet
           }));
 
-          Object.assign(allURLs, Object.fromEntries(
-            minResults.map(r => [r.url, r.title])
-          ));
-          searchResults.push({query, results: minResults});
+          minResults.forEach(r => allURLs[r.url] = r);
           allKeywords.push(query);
-        }
 
-        allKnowledge.push({
-          question: `What do Internet say about ${thisStep.searchQuery}?`,
-          answer: removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
-          // answer: googleGrounded + removeHTMLtags(searchResults.map(r => r.results.map(r => r.description).join('; ')).join('; ')),
-          type: 'side-info',
-          updated: new Date().toISOString()
-        });
+          allKnowledge.push({
+            question: `What do Internet say about "${query}"?`,
+            answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
+            type: 'side-info',
+            updated: new Date().toISOString()
+          });
+        }
 
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
@@ -631,16 +632,17 @@ You found quite some information and add them to your URL list and **visit** the
           totalStep,
           question: currentQuestion,
           ...thisStep,
-          result: searchResults
+          result: result
         });
-      } else {
+        anyResult = true;
+      }
+      if (!anyResult || !keywordsQueries?.length) {
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords: ${oldKeywords.join(', ')}. 
-But then you realized you have already searched for these keywords before.
+But then you realized you have already searched for these keywords before, no new information is returned.
 You decided to think out of the box or cut from a completely different angle.
 `);
-
 
         updateContext({
           totalStep,
@@ -651,9 +653,11 @@ You decided to think out of the box or cut from a completely different angle.
         allowSearch = false;
       }
     } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
-      const uniqueURLs = visitedURLs.length > 0
-        ? thisStep.URLTargets.filter(url => !visitedURLs.includes(url))
-        : thisStep.URLTargets;
+      // normalize URLs
+      thisStep.URLTargets = thisStep.URLTargets.map(url => normalizeUrl(url));
+      thisStep.URLTargets = chooseK(thisStep.URLTargets.filter(url => !visitedURLs.includes(url)), MAX_URLS_PER_STEP)
+
+      const uniqueURLs = thisStep.URLTargets;
 
       if (uniqueURLs.length > 0) {
         context.actionTracker.trackThink(`Let me read ${uniqueURLs.join(', ')} to gather more information.`);
@@ -683,7 +687,6 @@ You decided to think out of the box or cut from a completely different angle.
               return null;
             } finally {
               visitedURLs.push(url);
-              delete allURLs[url];
             }
           })
         ).then(results => results.filter(Boolean));
@@ -723,12 +726,13 @@ You decided to think out of the box or cut from a completely different angle.`);
         allowRead = false;
       }
     } else if (thisStep.action === 'coding' && thisStep.codingIssue) {
-      const sandbox = new CodeSandbox({allContext}, context.tokenTracker);
+      const sandbox = new CodeSandbox({allContext, visitedURLs, allURLs, allKnowledge}, context);
       try {
         const result = await sandbox.solve(thisStep.codingIssue);
         allKnowledge.push({
           question: `What is the solution to the coding issue: ${thisStep.codingIssue}?`,
           answer: result.solution.output,
+          sourceCode: result.solution.code,
           type: 'coding',
           updated: new Date().toISOString()
         });
@@ -752,14 +756,14 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
           ...thisStep,
           result: 'You have tried all possible solutions and found no new information. You must think out of the box or different angle!!!'
         });
-      }
-      finally {
+      } finally {
         allowCoding = false;
       }
     }
 
 
     await storeContext(system, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+    await sleep(STEP_SLEEP);
   }
 
   await storeContext(system, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
@@ -779,7 +783,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       false,
       badContext,
       allKnowledge,
-      allURLs,
+      getUnvisitedURLs(allURLs, visitedURLs),
       true,
     );
 
@@ -802,7 +806,8 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   return {
     result: thisStep,
     context,
-    visitedURLs: [...new Set([...visitedURLs, ...Object.keys(allURLs)])]
+    visitedURLs: [...new Set([...visitedURLs, ...Object.keys(allURLs)])],
+    readURLs: visitedURLs
   };
 
 }

@@ -31,6 +31,7 @@ export type KnowledgeItem = {
   }> | Array<any>;
   type: 'qa' | 'side-info' | 'chat-history' | 'url' | 'coding',
   updated: string,
+  sourceCode?: string,
 }
 
 export type ReflectAction = BaseAction & {
@@ -89,29 +90,29 @@ export interface BraveSearchResponse {
 
 export interface SerperSearchResponse {
   knowledgeGraph?: {
-      title: string;
-      type: string;
-      website: string;
-      imageUrl: string;
-      description: string;
-      descriptionSource: string;
-      descriptionLink: string;
-      attributes: { [k: string]: string; };
+    title: string;
+    type: string;
+    website: string;
+    imageUrl: string;
+    description: string;
+    descriptionSource: string;
+    descriptionLink: string;
+    attributes: { [k: string]: string; };
   },
   organic: {
-      title: string;
-      link: string;
-      snippet: string;
-      date: string;
-      siteLinks?: { title: string; link: string; }[];
-      position: number,
+    title: string;
+    link: string;
+    snippet: string;
+    date: string;
+    siteLinks?: { title: string; link: string; }[];
+    position: number,
   }[];
   topStories?: {
-      title: string;
-      link: string;
-      source: string;
-      data: string;
-      imageUrl: string;
+    title: string;
+    link: string;
+    source: string;
+    data: string;
+    imageUrl: string;
   }[];
   relatedSearches?: string[];
   credits: number;
@@ -159,11 +160,10 @@ export type ErrorAnalysisResponse = {
   questionsToAnswer: string[];
 };
 
-export interface SearchResult {
-  title: string;
-  url: string;
-  description: string;
-}
+export type SearchResult =
+  | { title: string; url: string; description: string }
+  | { title: string; link: string; snippet: string };
+
 
 export interface QueryResult {
   query: string;
@@ -232,6 +232,7 @@ export interface ChatCompletionResponse {
     total_tokens: number;
   };
   visitedURLs?: string[];
+  readURLs?: string[];
 }
 
 export interface ChatCompletionChunk {
@@ -251,6 +252,7 @@ export interface ChatCompletionChunk {
   }>;
   usage?: any;
   visitedURLs?: string[];
+  readURLs?: string[];
 }
 
 // Tracker Types

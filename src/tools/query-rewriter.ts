@@ -3,12 +3,13 @@ import {SearchAction, TrackerContext} from '../types';
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 
 
+const MAX_QUERIES = 5
 const responseSchema = z.object({
   think: z.string().describe('Strategic reasoning about query complexity and search approach').max(500),
   queries: z.array(z.string().describe('keyword-based search query, 2-3 words preferred, total length < 30 characters'))
     .min(1)
-    .max(3)
-    .describe('Array of search keywords queries, orthogonal to each other')
+    .max(MAX_QUERIES)
+    .describe(`'Array of search keywords queries, orthogonal to each other. Maximum ${MAX_QUERIES} queries allowed.'`)
 });
 
 

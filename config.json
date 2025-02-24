@@ -12,7 +12,7 @@
   "defaults": {
     "search_provider": "jina",
     "llm_provider": "gemini",
-    "step_sleep": 0
+    "step_sleep": 100
   },
   "providers": {
     "gemini": {
@@ -30,13 +30,13 @@
       "default": {
         "model": "gemini-2.0-flash",
         "temperature": 0,
-        "maxTokens": 1000
+        "maxTokens": 2000
       },
       "tools": {
         "coder": { "temperature": 0.7 },
         "searchGrounding": { "temperature": 0 },
         "dedup": { "temperature": 0.1 },
-        "evaluator": {},
+        "evaluator": {"temperature":  0.6, "maxTokens": 200},
         "errorAnalyzer": {},
         "queryRewriter": { "temperature": 0.1 },
         "agent": { "temperature": 0.7 },

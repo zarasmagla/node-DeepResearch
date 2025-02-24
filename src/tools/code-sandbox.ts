@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { TokenTracker } from "../utils/token-tracker";
 import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import {TrackerContext} from "../types";
 
 // Define the response schema for code generation
 const codeGenerationSchema = z.object({
-  code: z.string().describe('The JavaScript code that solves the problem and always use \'return\' statement to return the result. Focus on solving the core problem; No need for error handling or try-catch blocks.'),
+  think: z.string().describe('Short explain or comments on the thought process behind the code, in first person.').max(200),
+  code: z.string().describe('The JavaScript code that solves the problem and always use \'return\' statement to return the result. Focus on solving the core problem; No need for error handling or try-catch blocks or code comments. No need to declare variables that are already available, especially big long strings or arrays.'),
 });
 
 // Define the types
@@ -18,35 +19,27 @@ interface SandboxResult {
   error?: string;
 }
 
-interface AvailableVariable {
-  name: string;
-  type: string;
-  sample?: string;
-}
 
 function getPrompt(
   problem: string,
-  availableVars: AvailableVariable[],
+  availableVars: string,
   previousAttempts: Array<{ code: string; error?: string }> = []
 ): string {
   const previousAttemptsContext = previousAttempts.map((attempt, index) => `
-Attempt ${index + 1}:
+<bad-attempt-${index + 1}>
 ${attempt.code}
-${attempt.error ? `Error: ${attempt.error}` : ''}
+${attempt.error ? `Error: ${attempt.error}
+</bad-attempt-${index + 1}>
+` : ''}
 `).join('\n');
 
-  const varsContext = availableVars.map(v =>
-    `${v.name} (${v.type})${v.sample ? ` e.g. ${v.sample}` : ''}`
-  ).join('\n');
-
-  return `You are an expert JavaScript programmer. Your task is to generate JavaScript code to solve the given problem.
+  const prompt = `You are an expert JavaScript programmer. Your task is to generate JavaScript code to solve the given problem.
 
 <rules>
 1. Generate plain JavaScript code that returns the result directly
-2. You can use any of these available variables directly:
-${varsContext}
-3. No need to declare variables that are already available, especially big long strings or arrays; try to always start with using "allContext" object
-4. Focus on solving the core problem; No need for error handling or try-catch blocks; Always use 'return' statement to return the result
+2. You can access any of these available variables directly:
+${availableVars}
+3. You don't have access to any third party libraries that need to be installed, so you must write complete, self-contained code.
 </rules>
 
 ${previousAttempts.length > 0 ? `Previous attempts and their errors:
@@ -68,84 +61,42 @@ Response:
 
 Problem to solve:
 ${problem}`;
+
+  console.log('Coding prompt', prompt)
+
+  return prompt;
 }
 
 export class CodeSandbox {
-  private tracker?: TokenTracker;
+  private trackers?: TrackerContext;
   private generator: ObjectGeneratorSafe;
   private maxAttempts: number;
-  private availableVars: AvailableVariable[];
   private context: Record<string, any>;
 
   constructor(
-    context: Record<string, any> = {},
-    tracker?: TokenTracker,
+    context: any = {},
+    trackers?: TrackerContext,
     maxAttempts: number = 3
   ) {
-    this.tracker = tracker;
-    this.generator = new ObjectGeneratorSafe(tracker);
+    this.trackers = trackers;
+    this.generator = new ObjectGeneratorSafe(trackers?.tokenTracker);
     this.maxAttempts = maxAttempts;
     this.context = context;
-    this.availableVars = this.collectVariables(context);
-  }
-
-  private collectVariables(context: Record<string, any>): AvailableVariable[] {
-    const vars: AvailableVariable[] = [];
-
-    // Collect from provided context
-    for (const [name, value] of Object.entries(context)) {
-      vars.push(this.createVariableInfo(name, value));
-    }
-
-    // Collect from global scope (window in browser, global in Node)
-    const globalObj = typeof window !== 'undefined' ? window : global;
-    for (const key of Object.keys(globalObj)) {
-      if (key === 'window' || key === 'global' || key === 'globalThis') continue;
-      const value = (globalObj as any)[key];
-      if (typeof value === 'function') continue; // Skip functions
-      if (!vars.some(v => v.name === key)) { // Avoid duplicates
-        vars.push(this.createVariableInfo(key, value));
-      }
-    }
-
-    return vars;
-  }
-
-  private createVariableInfo(name: string, value: any): AvailableVariable {
-    const type = Array.isArray(value)
-      ? `Array<${typeof value[0]}>`
-      : typeof value;
-
-    let sample: string | undefined;
-    try {
-      if (Array.isArray(value)) {
-        sample = JSON.stringify(value.slice(0, 3));
-        if (value.length > 3) sample = sample.replace(']', ', ...]');
-      } else if (typeof value === 'object' && value !== null) {
-        const entries = Object.entries(value).slice(0, 2);
-        sample = JSON.stringify(Object.fromEntries(entries));
-        if (Object.keys(value).length > 2) sample = sample.replace('}', ', ...}');
-      } else if (value !== undefined && value !== null) {
-        sample = JSON.stringify(value);
-      }
-    } catch (e) {
-      // If we can't stringify the value, skip the sample
-    }
-
-    return { name, type, sample };
   }
 
   private async generateCode(
     problem: string,
     previousAttempts: Array<{ code: string; error?: string }> = []
   ): Promise<CodeGenerationResponse> {
-    const prompt = getPrompt(problem, this.availableVars, previousAttempts);
+    const prompt = getPrompt(problem, analyzeStructure(this.context), previousAttempts);
 
     const result = await this.generator.generateObject({
       model: 'coder',
       schema: codeGenerationSchema,
       prompt,
     });
+
+    this.trackers?.actionTracker.trackThink(result.object.think);
 
     return result.object;
   }
@@ -167,7 +118,7 @@ export class CodeSandbox {
       if (output === undefined) {
         return {
           success: false,
-          error: 'No value was returned'
+          error: 'No value was returned, make sure to use "return" statement to return the result'
         };
       }
 
@@ -197,6 +148,7 @@ export class CodeSandbox {
       console.log(`Coding attempt ${i + 1}:`, code);
       // Evaluate the code
       const result = this.evaluateCode(code);
+      console.log(`Coding attempt ${i + 1} success:`, result);
 
       if (result.success) {
         return {
@@ -225,4 +177,64 @@ export class CodeSandbox {
     // This should never be reached due to the throw above
     throw new Error('Unexpected end of execution');
   }
+}
+
+function formatValue(value: any): string {
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+
+    const type = typeof value;
+
+    if (type === 'string') {
+        // Clean and truncate string value
+        const cleaned = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+        return cleaned.length > 50 ?
+            `"${cleaned.slice(0, 47)}..."` :
+            `"${cleaned}"`;
+    }
+
+    if (type === 'number' || type === 'boolean') {
+        return String(value);
+    }
+
+    if (value instanceof Date) {
+        return `"${value.toISOString()}"`;
+    }
+
+    return '';
+}
+
+export function analyzeStructure(value: any, indent = ''): string {
+    if (value === null) return 'null';
+    if (value === undefined) return 'undefined';
+
+    const type = typeof value;
+
+    if (type === 'function') {
+        return 'Function';
+    }
+
+    // Handle atomic types with example values
+    if (type !== 'object' || value instanceof Date) {
+        const formattedValue = formatValue(value);
+        return `${type}${formattedValue ? ` (example: ${formattedValue})` : ''}`;
+    }
+
+    if (Array.isArray(value)) {
+        if (value.length === 0) return 'Array<unknown>';
+        const sampleItem = value[0];
+        return `Array<${analyzeStructure(sampleItem, indent + '  ')}>`;
+    }
+
+    const entries = Object.entries(value);
+    if (entries.length === 0) return '{}';
+
+    const properties = entries
+        .map(([key, val]) => {
+            const analyzed = analyzeStructure(val, indent + '  ');
+            return `${indent}  "${key}": ${analyzed}`;
+        })
+        .join(',\n');
+
+    return `{\n${properties}\n${indent}}`;
 }

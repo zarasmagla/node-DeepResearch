@@ -446,6 +446,7 @@ export async function evaluateAnswer(
         }
 
         const allKnowledge = await fetchSourceContent(uniqueURLs, trackers);
+        visitedURLs.push(...uniqueURLs);
 
         if (!allKnowledge.trim()) {
           return {
