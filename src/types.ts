@@ -52,7 +52,7 @@ export type CodingAction = BaseAction & {
 
 export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitAction | CodingAction;
 
-export type EvaluationType = 'definitive' | 'freshness' | 'plurality' | 'attribution';
+export type EvaluationType = 'definitive' | 'freshness' | 'plurality' | 'attribution' | 'completeness';
 export type EvaluationCriteria = {
   types: EvaluationType[];
   languageStyle: string;
@@ -143,7 +143,7 @@ export interface ReadResponse {
 export type EvaluationResponse = {
   pass: boolean;
   think: string;
-  type?: 'definitive' | 'freshness' | 'plurality' | 'attribution';
+  type?: EvaluationType;
   freshness_analysis?: {
     days_ago: number;
     max_age_days?: number;
@@ -152,6 +152,15 @@ export type EvaluationResponse = {
     count_expected?: number;
     count_provided: number;
   };
+  attribution_analysis?: {
+    sources_provided: boolean,
+    sources_verified: boolean,
+    quotes_accurate: boolean,
+  };
+  completeness_analysis?: {
+    aspects_expected: string,
+    aspects_provided: string,
+  }
 };
 
 export type ErrorAnalysisResponse = {

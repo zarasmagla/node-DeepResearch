@@ -33,6 +33,15 @@ const pluralitySchema = z.object({
   })
 });
 
+const completenessSchema = z.object({
+  ...baseSchema,
+  type: z.literal('completeness'),
+  completeness_analysis: z.object({
+    aspects_expected: z.string().describe('Comma-separated list of all aspects or dimensions that the question explicitly asks for.'),
+    aspects_provided: z.string().describe('Comma-separated list of all aspects or dimensions that were actually addressed in the answer'),
+  })
+});
+
 const attributionSchema = z.object({
   ...baseSchema,
   type: z.literal('attribution'),
@@ -95,9 +104,9 @@ Evaluation: {
 </examples>
 
 Now evaluate this pair:
-Question: ${JSON.stringify(question)}
-Answer: ${JSON.stringify(answer)}
-Source Content: ${JSON.stringify(sourceContent)}`;
+Question: ${question}
+Answer: ${answer}
+Source Content: ${sourceContent}`;
 }
 
 function getDefinitivePrompt(question: string, answer: string): string {
@@ -151,8 +160,8 @@ Evaluation: {
 </examples>
 
 Now evaluate this pair:
-Question: ${JSON.stringify(question)}
-Answer: ${JSON.stringify(answer)}`;
+Question: ${question}
+Answer: ${answer}`;
 }
 
 function getFreshnessPrompt(question: string, answer: string, currentTime: string): string {
@@ -212,8 +221,74 @@ Question-Answer Freshness Checker Guidelines
 </rules>
 
 Now evaluate this pair:
-Question: ${JSON.stringify(question)}
-Answer: ${JSON.stringify(answer)}`;
+Question: ${question}
+Answer: ${answer}`;
+}
+
+function getCompletenessPrompt(question: string, answer: string): string {
+  return `You are an evaluator that determines if an answer addresses all explicitly mentioned aspects of a multi-aspect question.
+
+<rules>
+For questions with **explicitly** multiple aspects:
+
+1. Explicit Aspect Identification:
+   - Only identify aspects that are explicitly mentioned in the question
+   - Look for specific topics, dimensions, or categories mentioned by name
+   - Aspects may be separated by commas, "and", "or", bullets, or mentioned in phrases like "such as X, Y, and Z"
+   - DO NOT include implicit aspects that might be relevant but aren't specifically mentioned
+
+2. Coverage Assessment:
+   - Each explicitly mentioned aspect should be addressed in the answer
+   - Recognize that answers may use different terminology, synonyms, or paraphrases for the same aspects
+   - Look for conceptual coverage rather than exact wording matches
+   - Calculate a coverage score (aspects addressed / aspects explicitly mentioned)
+
+3. Pass/Fail Determination:
+   - Pass: Addresses all explicitly mentioned aspects, even if using different terminology or written in different language styles
+   - Fail: Misses one or more explicitly mentioned aspects
+</rules>
+
+<examples>
+Question: "How does climate change impact agricultural practices, water resources, and biodiversity in Mediterranean regions?"
+Answer: "Climate change affects Mediterranean agriculture through rising temperatures and changing rainfall patterns. Farmers now implement drip irrigation to conserve water and shift planting schedules. Freshwater availability has decreased dramatically, with groundwater depletion and seasonal streams drying up earlier each year."
+Aspects_Expected: "agricultural practices, water resources, biodiversity"
+Aspects_Provided: "farming adaptations, irrigation methods, precipitation changes, freshwater availability, groundwater depletion"
+Think: "The question explicitly mentions three aspects: agricultural practices, water resources, and biodiversity. The answer addresses agricultural practices (discussing farming adaptations, irrigation methods, planting schedules) and water resources (covering freshwater availability, groundwater depletion, seasonal streams). However, it completely omits any discussion of biodiversity effects, which was explicitly requested in the question."
+Pass: false
+
+Question: "What are the key considerations when designing a microservice architecture, including scalability, fault tolerance, and data consistency patterns?"
+Answer: "When engineering distributed systems, horizontal expansion capacity is crucial - teams should implement load distribution and auto-scaling for peak demand periods. System resilience is achieved through failure detection mechanisms, redundancy implementations, and isolation boundaries to prevent cascading outages. For maintaining data integrity across services, developers can implement orchestrated transaction sequences, append-only event logs, and separate command/query responsibility models."
+Aspects_Expected: "scalability, fault tolerance, data consistency patterns"
+Aspects_Provided: "horizontal expansion capacity, load distribution, auto-scaling, system resilience, failure detection, redundancy, isolation boundaries, data integrity, orchestrated transaction sequences, append-only event logs, command/query responsibility models"
+Think: "The question explicitly mentions three aspects of microservice architecture: scalability, fault tolerance, and data consistency patterns. Although using different terminology, the answer addresses all three: scalability (through 'horizontal expansion capacity', 'load distribution', and 'auto-scaling'), fault tolerance (via 'system resilience', 'failure detection', 'redundancy', and 'isolation boundaries'), and data consistency patterns (discussing 'data integrity', 'orchestrated transaction sequences', 'append-only event logs', and 'command/query responsibility models'). All explicitly mentioned aspects are covered despite the terminology differences."
+Pass: true
+
+Question: "Compare iOS and Android in terms of user interface, app ecosystem, and security."
+Answer: "Apple's mobile platform presents users with a curated visual experience emphasizing minimalist design and consistency, while Google's offering focuses on flexibility and customization options. The App Store's review process creates a walled garden with higher quality control but fewer options, whereas Play Store offers greater developer freedom and variety. Apple employs strict sandboxing techniques and maintains tight hardware-software integration."
+Aspects_Expected: "user interface, app ecosystem, security"
+Aspects_Provided: "visual experience, minimalist design, flexibility, customization, App Store review process, walled garden, quality control, Play Store, developer freedom, sandboxing, hardware-software integration"
+Think: "The question explicitly asks for a comparison of iOS and Android across three specific aspects: user interface, app ecosystem, and security. The answer addresses user interface (discussing 'visual experience', 'minimalist design', 'flexibility', and 'customization') and app ecosystem (mentioning 'App Store review process', 'walled garden', 'quality control', 'Play Store', and 'developer freedom'). For security, it mentions 'sandboxing' and 'hardware-software integration', which are security features of iOS, but doesn't provide a comparative analysis of Android's security approach. Since security is only partially addressed for one platform, the comparison of this aspect is incomplete."
+Pass: false
+
+Question: "Explain how social media affects teenagers' mental health, academic performance, and social relationships."
+Answer: "Platforms like Instagram and TikTok have been linked to psychological distress among adolescents, with documented increases in comparative thinking patterns and anxiety about social exclusion. Scholastic achievement often suffers as screen time increases, with homework completion rates declining and attention spans fragmenting during study sessions. Peer connections show a complex duality - digital platforms facilitate constant contact with friend networks while sometimes diminishing in-person social skill development and enabling new forms of peer harassment."
+Aspects_Expected: "mental health, academic performance, social relationships"
+Aspects_Provided: "psychological distress, comparative thinking, anxiety about social exclusion, scholastic achievement, screen time, homework completion, attention spans, peer connections, constant contact with friend networks, in-person social skill development, peer harassment"
+Think: "The question explicitly asks about three aspects of social media's effects on teenagers: mental health, academic performance, and social relationships. The answer addresses all three using different terminology: mental health (discussing 'psychological distress', 'comparative thinking', 'anxiety about social exclusion'), academic performance (mentioning 'scholastic achievement', 'screen time', 'homework completion', 'attention spans'), and social relationships (covering 'peer connections', 'constant contact with friend networks', 'in-person social skill development', and 'peer harassment'). All explicitly mentioned aspects are covered despite using different language."
+Pass: true
+
+Question: "What economic and political factors contributed to the 2008 financial crisis?"
+Answer: "The real estate market collapse after years of high-risk lending practices devastated mortgage-backed securities' value. Wall Street had created intricate derivative products that disguised underlying risk levels, while credit assessment organizations failed in their oversight role. Legislative changes in the financial industry during the 1990s eliminated regulatory guardrails that previously limited excessive leverage and speculation among investment banks."
+Aspects_Expected: "economic factors, political factors"
+Aspects_Provided: "real estate market collapse, high-risk lending, mortgage-backed securities, derivative products, risk disguising, credit assessment failures, legislative changes, regulatory guardrail elimination, leverage, speculation"
+Think: "The question explicitly asks about two categories of factors: economic and political. The answer addresses economic factors ('real estate market collapse', 'high-risk lending', 'mortgage-backed securities', 'derivative products', 'risk disguising', 'credit assessment failures') and political factors ('legislative changes', 'regulatory guardrail elimination'). While using different terminology, the answer covers both explicitly requested aspects."
+Pass: true
+</examples>
+
+Now evaluate this pair:
+Question: ${question}
+Answer: ${answer}
+`;
 }
 
 function getPluralityPrompt(question: string, answer: string): string {
@@ -253,25 +328,27 @@ Question Type Reference Table
 </rules>
 
 Now evaluate this pair:
-Question: ${JSON.stringify(question)}
-Answer: ${JSON.stringify(answer)}`;
+Question: ${question}
+Answer: ${answer}`;
 }
 
 
 const questionEvaluationSchema = z.object({
   needsFreshness: z.boolean().describe('Whether the question requires freshness check'),
   needsPlurality: z.boolean().describe('Whether the question requires plurality check'),
+  needsCompleteness: z.boolean().describe('Whether the question requires completeness check'),
   think: z.string().describe('A very concise explain of why you choose those checks are needed in first person, extremely short.').max(500),
   languageStyle: z.string().describe('The language being used and the overall vibe/mood of the question').max(50),
 });
 
 function getQuestionEvaluationPrompt(question: string): string {
-  return `You are an evaluator that determines if a question requires freshness and/or plurality checks in addition to the required definitiveness check.
+  return `You are an evaluator that determines if a question requires freshness, plurality, and/or completeness checks in addition to the required definitiveness check.
 
 <evaluation_types>
 1. freshness - Checks if the question is time-sensitive or requires very recent information
-2. plurality - Checks if the question asks for multiple items or a specific count or enumeration
-3. language style - Identifies both the language used and the overall vibe of the question
+2. plurality - Checks if the question asks for multiple items, examples, or a specific count or enumeration
+3. completeness - Checks if the question explicitly mentions multiple named elements that all need to be addressed
+4. language style - Identifies both the language used and the overall vibe of the question
 </evaluation_types>
 
 <rules>
@@ -284,12 +361,26 @@ If question is a simple greeting, chit-chat, or general knowledge, provide the a
    - Consider company positions, product versions, market data time-sensitive
 
 2. Plurality Evaluation:
-   - Required when question asks for multiple items or specific counts
-   - Check for: numbers ("5 examples"), plural nouns, list requests
-   - Look for: "all", "list", "enumerate", "examples", plural forms
-   - Required when question implies completeness ("all the reasons", "every factor")
+   - ONLY apply when completeness check is NOT triggered
+   - Required when question asks for multiple examples, items, or specific counts
+   - Check for: numbers ("5 examples"), list requests ("list the ways"), enumeration requests
+   - Look for: "examples", "list", "enumerate", "ways to", "methods for", "several"
+   - Focus on requests for QUANTITY of items or examples
 
-3. Language Style Analysis:
+3. Completeness Evaluation:
+   - Takes precedence over plurality check - if completeness applies, set plurality to false
+   - Required when question EXPLICITLY mentions multiple named elements that all need to be addressed
+   - This includes:
+     * Named aspects or dimensions: "economic, social, and environmental factors"
+     * Named entities: "Apple, Microsoft, and Google", "Biden and Trump"
+     * Named products: "iPhone 15 and Samsung Galaxy S24"
+     * Named locations: "New York, Paris, and Tokyo"
+     * Named time periods: "Renaissance and Industrial Revolution"
+   - Look for explicitly named elements separated by commas, "and", "or", bullets
+   - Example patterns: "comparing X and Y", "differences between A, B, and C", "both P and Q"
+   - DO NOT trigger for elements that aren't specifically named
+
+4. Language Style Analysis:
   Combine both language and emotional vibe in a descriptive phrase, considering:
   - Language: The primary language or mix of languages used
   - Emotional tone: panic, excitement, frustration, curiosity, etc.
@@ -302,23 +393,26 @@ Question: "fam PLEASE help me calculate the eigenvalues of this 4x4 matrix ASAP!
 Evaluation: {
     "needsFreshness": false,
     "needsPlurality": true,
-    "think": "I see the user needs help with eigenvalues - that's a calculation task. Since it's a 4x4 matrix, there will be multiple eigenvalues to find. The user's language is very informal with 'fam', 'ASAP', and emojis, suggesting panicked student speech with math terms mixed in.",
+    "needsCompleteness": false,
+    "think": "I see the user needs help with eigenvalues - that's a calculation task. Since it's a 4x4 matrix, there will be multiple eigenvalues to find, so plurality is needed. There are no explicitly named entities, aspects, or elements that need to be addressed, so completeness check doesn't apply.",
     "languageStyle": "panicked student English with math jargon"
 }
 
 Question: "Can someone explain how tf did Ferrari mess up their pit stop strategy AGAIN?! 🤦‍♂️ #MonacoGP"
 Evaluation: {
     "needsFreshness": true,
-    "needsPlurality": true,
-    "think": "The user is asking about a specific F1 race incident. The 'AGAIN' and MonacoGP hashtag tell me this is about a recent event. They want analysis of several strategic decisions. Their tone shows clear frustration with informal 'tf' and facepalm emoji - classic angry F1 fan speak.",
+    "needsPlurality": false,
+    "needsCompleteness": true,
+    "think": "The user is asking about a specific F1 race incident. The 'AGAIN' and MonacoGP hashtag tell me this is about a recent event (freshness). The question explicitly mentions Ferrari and MonacoGP as named entities that need to be addressed, so completeness check applies. Since completeness takes precedence, I set plurality to false.",
     "languageStyle": "frustrated fan English with F1 terminology"
 }
 
 Question: "肖老师您好，请您介绍一下最近量子计算领域的三个重大突破，特别是它们在密码学领域的应用价值吗？🤔"
 Evaluation: {
     "needsFreshness": true,
-    "needsPlurality": true,
-    "think": "The user wants three recent quantum computing breakthroughs - the '最近' (recent) indicates freshness needed. They use formal address '老师您好' and technical terms, suggesting academic Chinese. The structure asks for multiple examples with cryptography applications.",
+    "needsPlurality": false,
+    "needsCompleteness": true,
+    "think": "The user wants three recent quantum computing breakthroughs and the '最近' (recent) indicates freshness needed. They explicitly request analysis of two named domains: quantum computing ('量子计算') and cryptography ('密码学'), so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
     "languageStyle": "formal technical Chinese with academic undertones"
 }
 
@@ -326,15 +420,17 @@ Question: "Bruder krass, kannst du mir erklären warum meine neural network trai
 Evaluation: {
     "needsFreshness": false,
     "needsPlurality": true,
-    "think": "The user has a technical ML problem but explains it very casually. They've 'tried everything' so I'll need to cover multiple debugging angles. Their mix of German slang ('Bruder krass') with English ML terms shows frustrated tech-casual speech.",
+    "needsCompleteness": false,
+    "think": "The user has a technical ML problem but explains it very casually. They've 'tried everything' so I'll need to cover multiple debugging options (plurality). They don't explicitly mention multiple named elements that must be addressed, so completeness check doesn't apply.",
     "languageStyle": "frustrated German-English tech slang"
 }
 
 Question: "Does anyone have insights into the sociopolitical implications of GPT-4's emergence in the Global South, particularly regarding indigenous knowledge systems and linguistic diversity? Looking for a nuanced analysis."
 Evaluation: {
     "needsFreshness": true,
-    "needsPlurality": true,
-    "think": "The user asks about current GPT-4 impacts, so freshness matters. They specify multiple aspects (sociopolitical, indigenous knowledge, linguistics) and explicitly request nuanced analysis. Their formal academic vocabulary and structure signals scholarly discourse.",
+    "needsPlurality": false,
+    "needsCompleteness": true,
+    "think": "The user asks about current GPT-4 impacts, so freshness matters. They explicitly name multiple elements to analyze: 'GPT-4', 'Global South', 'indigenous knowledge systems' and 'linguistic diversity', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
     "languageStyle": "formal academic English with sociological terminology"
 }
 
@@ -342,13 +438,77 @@ Question: "what's 7 * 9? need to check something real quick"
 Evaluation: {
     "needsFreshness": false,
     "needsPlurality": false,
-    "think": "The user wants a single multiplication result - that's all. No need for recent info since math is constant, and no need for multiple examples since it's just one calculation. Their casual phrasing suggests quick mental math check.",
+    "needsCompleteness": false,
+    "think": "The user wants a single multiplication result - that's all. No need for recent info since math is constant, no need for multiple examples, and no explicitly named elements to cover.",
     "languageStyle": "casual English"
+}
+
+Question: "Can you provide a thorough analysis of how climate change affects agricultural practices, water resources, and biodiversity in Mediterranean regions?"
+Evaluation: {
+    "needsFreshness": true,
+    "needsPlurality": false,
+    "needsCompleteness": true,
+    "think": "This question requires recent climate data (freshness). It explicitly names four elements that must all be addressed: 'climate change', 'agricultural practices', 'water resources', and 'biodiversity' in 'Mediterranean regions', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
+    "languageStyle": "formal academic English with environmental science terminology"
+}
+
+Question: "What are the key considerations when designing a microservice architecture, including scalability, fault tolerance, and data consistency patterns?"
+Evaluation: {
+    "needsFreshness": false,
+    "needsPlurality": false,
+    "needsCompleteness": true,
+    "think": "The question explicitly names three aspects that must be addressed: 'scalability', 'fault tolerance', and 'data consistency patterns', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
+    "languageStyle": "professional technical English with software architecture terminology"
+}
+
+Question: "Give me 5 effective strategies for improving time management skills."
+Evaluation: {
+    "needsFreshness": false,
+    "needsPlurality": true,
+    "needsCompleteness": false,
+    "think": "The user requests exactly 5 strategies (plurality). They don't specify multiple named elements that must be covered, so completeness check doesn't apply.",
+    "languageStyle": "direct practical English"
+}
+
+Question: "How do macroeconomic policies affect both inflation rates and employment levels?"
+Evaluation: {
+    "needsFreshness": true,
+    "needsPlurality": false,
+    "needsCompleteness": true,
+    "think": "This requires current economic knowledge (freshness). It explicitly mentions two named economic indicators that must be addressed: 'inflation rates' and 'employment levels', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
+    "languageStyle": "formal academic English with economics terminology"
+}
+
+Question: "Compare and contrast Tesla and Ford's approaches to electric vehicle manufacturing."
+Evaluation: {
+    "needsFreshness": true,
+    "needsPlurality": false,
+    "needsCompleteness": true,
+    "think": "This needs current automotive industry knowledge (freshness). It explicitly mentions two named companies that must both be addressed: 'Tesla' and 'Ford', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
+    "languageStyle": "formal analytical English with automotive industry terminology"
+}
+
+Question: "How have the recent policies of President Biden and former President Trump affected international relations?"
+Evaluation: {
+    "needsFreshness": true,
+    "needsPlurality": false, 
+    "needsCompleteness": true,
+    "think": "This requires current political knowledge (freshness). It explicitly mentions two named political figures that must both be addressed: 'President Biden' and 'former President Trump', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
+    "languageStyle": "formal political analysis English"
+}
+
+Question: "What are the differences between iPhone 15 Pro and Samsung Galaxy S24 Ultra cameras?"
+Evaluation: {
+    "needsFreshness": true,
+    "needsPlurality": false,
+    "needsCompleteness": true,
+    "think": "This requires current tech product knowledge (freshness). It explicitly mentions two named products that must both be addressed: 'iPhone 15 Pro' and 'Samsung Galaxy S24 Ultra', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
+    "languageStyle": "consumer tech comparison English"
 }
 </examples>
 
 Now evaluate this question:
-Question: ${JSON.stringify(question)}`;
+Question: ${question}`;
 }
 
 const TOOL_NAME = 'evaluator';
@@ -372,6 +532,7 @@ export async function evaluateQuestion(
     const types: EvaluationType[] = ['definitive'];
     if (result.object.needsFreshness) types.push('freshness');
     if (result.object.needsPlurality) types.push('plurality');
+    if (result.object.needsCompleteness) types.push('completeness');
 
     console.log('Question Metrics:', types);
     trackers?.actionTracker.trackThink(result.object.think);
@@ -381,8 +542,8 @@ export async function evaluateQuestion(
 
   } catch (error) {
     console.error('Error in question evaluation:', error);
-    // Default to all evaluation types in case of error
-    return {types: ['definitive', 'freshness', 'plurality'], languageStyle: 'plain English'};
+    // Default to no check
+    return {types: [], languageStyle: 'plain English'};
   }
 }
 
@@ -497,6 +658,16 @@ export async function evaluateAnswer(
           {
             schema: pluralitySchema,
             prompt: getPluralityPrompt(question, action.answer),
+          },
+          trackers
+        );
+        break;
+      case 'completeness':
+        result = await performEvaluation(
+          'completeness',
+          {
+            schema: completenessSchema,
+            prompt: getCompletenessPrompt(question, action.answer),
           },
           trackers
         );
