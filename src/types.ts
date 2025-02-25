@@ -53,10 +53,7 @@ export type CodingAction = BaseAction & {
 export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitAction | CodingAction;
 
 export type EvaluationType = 'definitive' | 'freshness' | 'plurality' | 'attribution' | 'completeness';
-export type EvaluationCriteria = {
-  types: EvaluationType[];
-  languageStyle: string;
-};
+
 
 // Following Vercel AI SDK's token counting interface
 export interface TokenUsage {
@@ -119,10 +116,6 @@ export interface SerperSearchResponse {
   credits: number;
 }
 
-export type DedupResponse = {
-  think: string;
-  unique_queries: string[];
-};
 
 export interface ReadResponse {
   code: number;
@@ -163,6 +156,11 @@ export type EvaluationResponse = {
   }
 };
 
+export type CodeGenResponse = {
+  think: string;
+  code: string;
+}
+
 export type ErrorAnalysisResponse = {
   recap: string;
   blame: string;
@@ -174,36 +172,6 @@ export type SearchResult =
   | { title: string; url: string; description: string }
   | { title: string; link: string; snippet: string };
 
-
-export interface QueryResult {
-  query: string;
-  results: SearchResult[];
-}
-
-export interface StepData {
-  step: number;
-  question: string;
-  action: string;
-  reasoning: string;
-  searchQuery?: string;
-  result?: QueryResult[];
-}
-
-export type KeywordsResponse = {
-  think: string;
-  queries: string[];
-};
-
-export interface StreamMessage {
-  type: 'progress' | 'answer' | 'error';
-  data: string | StepAction;
-  step?: number;
-  budget?: {
-    used: number;
-    total: number;
-    percentage: string;
-  };
-}
 
 // OpenAI API Types
 export interface Model {
@@ -273,3 +241,4 @@ export interface TrackerContext {
   tokenTracker: TokenTracker;
   actionTracker: ActionTracker;
 }
+

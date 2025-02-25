@@ -1,17 +1,7 @@
-import { z } from 'zod';
-import { ObjectGeneratorSafe } from "../utils/safe-generator";
-import {TrackerContext} from "../types";
+import {ObjectGeneratorSafe} from "../utils/safe-generator";
+import {CodeGenResponse, TrackerContext} from "../types";
+import {Schemas} from "../utils/schemas";
 
-// Define the response schema for code generation
-const codeGenerationSchema = z.object({
-  think: z.string().describe('Short explain or comments on the thought process behind the code, in first person.').max(200),
-  code: z.string().describe('The JavaScript code that solves the problem and always use \'return\' statement to return the result. Focus on solving the core problem; No need for error handling or try-catch blocks or code comments. No need to declare variables that are already available, especially big long strings or arrays.'),
-});
-
-// Define the types
-interface CodeGenerationResponse {
-  code: string;
-}
 
 interface SandboxResult {
   success: boolean;
@@ -72,33 +62,36 @@ export class CodeSandbox {
   private generator: ObjectGeneratorSafe;
   private maxAttempts: number;
   private context: Record<string, any>;
+  private schemaGen: Schemas;
 
   constructor(
     context: any = {},
-    trackers?: TrackerContext,
-    maxAttempts: number = 3
+    trackers: TrackerContext,
+    schemaGen: Schemas,
+    maxAttempts: number = 3,
   ) {
     this.trackers = trackers;
     this.generator = new ObjectGeneratorSafe(trackers?.tokenTracker);
     this.maxAttempts = maxAttempts;
     this.context = context;
+    this.schemaGen = schemaGen;
   }
 
   private async generateCode(
     problem: string,
     previousAttempts: Array<{ code: string; error?: string }> = []
-  ): Promise<CodeGenerationResponse> {
+  ): Promise<CodeGenResponse> {
     const prompt = getPrompt(problem, analyzeStructure(this.context), previousAttempts);
 
     const result = await this.generator.generateObject({
       model: 'coder',
-      schema: codeGenerationSchema,
+      schema: this.schemaGen.getCodeGeneratorSchema(),
       prompt,
     });
 
     this.trackers?.actionTracker.trackThink(result.object.think);
 
-    return result.object;
+    return result.object as CodeGenResponse;
   }
 
   private evaluateCode(code: string): SandboxResult {
@@ -143,7 +136,7 @@ export class CodeSandbox {
     for (let i = 0; i < this.maxAttempts; i++) {
       // Generate code
       const generation = await this.generateCode(problem, attempts);
-      const { code } = generation;
+      const {code} = generation;
 
       console.log(`Coding attempt ${i + 1}:`, code);
       // Evaluate the code
@@ -180,61 +173,61 @@ export class CodeSandbox {
 }
 
 function formatValue(value: any): string {
-    if (value === null) return 'null';
-    if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
 
-    const type = typeof value;
+  const type = typeof value;
 
-    if (type === 'string') {
-        // Clean and truncate string value
-        const cleaned = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
-        return cleaned.length > 50 ?
-            `"${cleaned.slice(0, 47)}..."` :
-            `"${cleaned}"`;
-    }
+  if (type === 'string') {
+    // Clean and truncate string value
+    const cleaned = value.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    return cleaned.length > 50 ?
+      `"${cleaned.slice(0, 47)}..."` :
+      `"${cleaned}"`;
+  }
 
-    if (type === 'number' || type === 'boolean') {
-        return String(value);
-    }
+  if (type === 'number' || type === 'boolean') {
+    return String(value);
+  }
 
-    if (value instanceof Date) {
-        return `"${value.toISOString()}"`;
-    }
+  if (value instanceof Date) {
+    return `"${value.toISOString()}"`;
+  }
 
-    return '';
+  return '';
 }
 
 export function analyzeStructure(value: any, indent = ''): string {
-    if (value === null) return 'null';
-    if (value === undefined) return 'undefined';
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
 
-    const type = typeof value;
+  const type = typeof value;
 
-    if (type === 'function') {
-        return 'Function';
-    }
+  if (type === 'function') {
+    return 'Function';
+  }
 
-    // Handle atomic types with example values
-    if (type !== 'object' || value instanceof Date) {
-        const formattedValue = formatValue(value);
-        return `${type}${formattedValue ? ` (example: ${formattedValue})` : ''}`;
-    }
+  // Handle atomic types with example values
+  if (type !== 'object' || value instanceof Date) {
+    const formattedValue = formatValue(value);
+    return `${type}${formattedValue ? ` (example: ${formattedValue})` : ''}`;
+  }
 
-    if (Array.isArray(value)) {
-        if (value.length === 0) return 'Array<unknown>';
-        const sampleItem = value[0];
-        return `Array<${analyzeStructure(sampleItem, indent + '  ')}>`;
-    }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return 'Array<unknown>';
+    const sampleItem = value[0];
+    return `Array<${analyzeStructure(sampleItem, indent + '  ')}>`;
+  }
 
-    const entries = Object.entries(value);
-    if (entries.length === 0) return '{}';
+  const entries = Object.entries(value);
+  if (entries.length === 0) return '{}';
 
-    const properties = entries
-        .map(([key, val]) => {
-            const analyzed = analyzeStructure(val, indent + '  ');
-            return `${indent}  "${key}": ${analyzed}`;
-        })
-        .join(',\n');
+  const properties = entries
+    .map(([key, val]) => {
+      const analyzed = analyzeStructure(val, indent + '  ');
+      return `${indent}  "${key}": ${analyzed}`;
+    })
+    .join(',\n');
 
-    return `{\n${properties}\n${indent}}`;
+  return `{\n${properties}\n${indent}}`;
 }

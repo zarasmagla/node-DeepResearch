@@ -1,56 +1,9 @@
-import {z} from 'zod';
 import {GenerateObjectResult} from 'ai';
-import {AnswerAction, EvaluationCriteria, EvaluationResponse, EvaluationType, TrackerContext} from '../types';
+import {AnswerAction, EvaluationResponse, EvaluationType, TrackerContext} from '../types';
 import {readUrl, removeAllLineBreaks} from "./read";
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
+import {Schemas} from "../utils/schemas";
 
-
-const baseSchema = {
-  pass: z.boolean().describe('Whether the answer passes the evaluation criteria defined by the evaluator'),
-  think: z.string().describe('Explanation the thought process why the answer does not pass the evaluation criteria').max(500)
-};
-
-const definitiveSchema = z.object({
-  ...baseSchema,
-  type: z.literal('definitive')
-});
-
-const freshnessSchema = z.object({
-  ...baseSchema,
-  type: z.literal('freshness'),
-  freshness_analysis: z.object({
-    days_ago: z.number().describe('Inferred dates or timeframes mentioned in the answer and relative to the current time'),
-    max_age_days: z.number().optional().describe('Maximum allowed age in days before content is considered outdated')
-  })
-});
-
-const pluralitySchema = z.object({
-  ...baseSchema,
-  type: z.literal('plurality'),
-  plurality_analysis: z.object({
-    count_expected: z.number().optional().describe('Number of items expected if specified in question'),
-    count_provided: z.number().describe('Number of items provided in answer')
-  })
-});
-
-const completenessSchema = z.object({
-  ...baseSchema,
-  type: z.literal('completeness'),
-  completeness_analysis: z.object({
-    aspects_expected: z.string().describe('Comma-separated list of all aspects or dimensions that the question explicitly asks for.'),
-    aspects_provided: z.string().describe('Comma-separated list of all aspects or dimensions that were actually addressed in the answer'),
-  })
-});
-
-const attributionSchema = z.object({
-  ...baseSchema,
-  type: z.literal('attribution'),
-  attribution_analysis: z.object({
-    sources_provided: z.boolean().describe('Whether the answer provides source references'),
-    sources_verified: z.boolean().describe('Whether the provided sources contain the claimed information'),
-    quotes_accurate: z.boolean().describe('Whether the quotes accurately represent the source content')
-  })
-});
 
 function getAttributionPrompt(question: string, answer: string, sourceContent: string): string {
   return `You are an evaluator that verifies if answer content is properly attributed to and supported by the provided sources.
@@ -80,26 +33,52 @@ Question: "What are Jina AI's main products?"
 Answer: "According to Jina AI's website, their main products are DocArray and Jina Framework."
 Source Content: "Jina AI's flagship products include DocArray, Jina Framework, and JCloud, offering a complete ecosystem for neural search applications."
 Evaluation: {
-  "pass": false,
   "think": "The answer omits JCloud which is mentioned as a main product in the source. The information provided is incomplete and potentially misleading as it fails to mention a significant product from the company's ecosystem.",
   "attribution_analysis": {
     "sources_provided": true,
     "sources_verified": false,
     "quotes_accurate": false
   }
+  "pass": false,
 }
 
 Question: "When was Python first released?"
 Answer: "Python was first released in 1991 by Guido van Rossum."
 Source Content: "Python was first released in 1991 by Guido van Rossum while working at CWI."
 Evaluation: {
-  "pass": true,
   "think": "The answer accurately reflects the core information from the source about Python's release date and creator, though it omits the additional context about CWI which isn't essential to the question.",
   "attribution_analysis": {
     "sources_provided": true,
     "sources_verified": true,
     "quotes_accurate": true
   }
+  "pass": true,
+}
+
+Question: "长城是什么时候建造的？"
+Answer: "长城始建于公元前7世纪，但现存的大部分长城是明朝时期修建的。"
+Source Content: "中国长城始建于公元前7世纪的春秋战国时期，历经多个朝代修建和扩展，但现存的大部分长城是明朝（1368-1644年）时期修建的。"
+Evaluation: {
+  "think": "这个回答准确地反映了原文中关于长城建造时间的核心信息，包括最初的建造时期和现存长城的主要来源。虽然省略了具体的年份范围（1368-1644年），但这对回答问题的核心内容不是必要的。",
+  "attribution_analysis": {
+    "sources_provided": true,
+    "sources_verified": true,
+    "quotes_accurate": true
+  }
+  "pass": true,
+}
+
+Question: "Wann wurde die Berliner Mauer gebaut?"
+Answer: "Die Berliner Mauer wurde am 13. August 1961 errichtet."
+Source Content:  "Die Berliner Mauer wurde am 13. August 1961 von der DDR-Regierung errichtet und fiel am 9. November 1989."
+Evaluation: {
+  "think": "Die Antwort gibt das korrekte Datum des Mauerbaus wieder, wie in der Quelle angegeben. Der zusätzliche Kontext über den Fall der Mauer wurde weggelassen, da er für die spezifische Frage nach dem Bauzeitpunkt nicht wesentlich ist.",
+  "attribution_analysis": {
+    "sources_provided": true,
+    "sources_verified": true,
+    "quotes_accurate": true
+  }
+  "pass": true,
 }
 </examples>
 
@@ -126,36 +105,57 @@ Definitiveness is the king! The following types of responses are NOT definitive 
 Question: "What are the system requirements for running Python 3.9?"
 Answer: "I'm not entirely sure, but I think you need a computer with some RAM."
 Evaluation: {
-  "pass": false,
   "think": "The answer contains uncertainty markers like 'not entirely sure' and 'I think', making it non-definitive."
+  "pass": false,
 }
 
 Question: "What are the system requirements for running Python 3.9?"
 Answer: "Python 3.9 requires Windows 7 or later, macOS 10.11 or later, or Linux."
 Evaluation: {
-  "pass": true,
   "think": "The answer makes clear, definitive statements without uncertainty markers or ambiguity."
+  "pass": true,
 }
 
 Question: "Who will be the president of the United States in 2032?"
 Answer: "I cannot predict the future, it depends on the election results."
 Evaluation: {
-  "pass": false,
   "think": "The answer contains a statement of inability to predict the future, making it non-definitive."
+  "pass": false,
 }
 
 Question: "Who is the sales director at Company X?"
 Answer: "I cannot provide the name of the sales director, but you can contact their sales team at sales@companyx.com"
 Evaluation: {
-  "pass": false,
   "think": "The answer starts with 'I cannot provide' and redirects to an alternative contact method instead of answering the original question."
+  "pass": false,
 }
 
 Question: "what is the twitter account of jina ai's founder?"
 Answer: "The provided text does not contain the Twitter account of Jina AI's founder."
 Evaluation: {
-  "pass": false,
   "think": "The answer indicates a lack of information rather than providing a definitive response."
+  "pass": false,
+}
+
+Question: "量子コンピュータの計算能力を具体的に測定する方法は何ですか？"
+Answer: "量子コンピュータの計算能力は量子ビット（キュービット）の数、ゲート忠実度、コヒーレンス時間で測定されます。"
+Evaluation: {
+  "think": "The answer provides specific, definitive metrics for measuring quantum computing power without uncertainty markers or qualifications."
+  "pass": true,
+}
+
+Question: "如何证明哥德巴赫猜想是正确的？"
+Answer: "目前尚无完整证明，但2013年张益唐证明了存在无穷多对相差不超过7000万的素数，后来这个界被缩小到246。"
+Evaluation: {
+  "think": "The answer begins by stating no complete proof exists, which is a non-definitive response, and then shifts to discussing a related but different theorem about bounded gaps between primes."
+  "pass": false,
+}
+
+Question: "Wie kann man mathematisch beweisen, dass P ≠ NP ist?"
+Answer: "Ein Beweis für P ≠ NP erfordert, dass man zeigt, dass mindestens ein NP-vollständiges Problem nicht in polynomieller Zeit lösbar ist. Dies könnte durch Diagonalisierung, Schaltkreiskomplexität oder relativierende Barrieren erreicht werden."
+Evaluation: {
+  "think": "The answer provides concrete mathematical approaches to proving P ≠ NP without uncertainty markers, presenting definitive methods that could be used."
+  "pass": true,
 }
 </examples>
 
@@ -283,6 +283,27 @@ Aspects_Expected: "economic factors, political factors"
 Aspects_Provided: "real estate market collapse, high-risk lending, mortgage-backed securities, derivative products, risk disguising, credit assessment failures, legislative changes, regulatory guardrail elimination, leverage, speculation"
 Think: "The question explicitly asks about two categories of factors: economic and political. The answer addresses economic factors ('real estate market collapse', 'high-risk lending', 'mortgage-backed securities', 'derivative products', 'risk disguising', 'credit assessment failures') and political factors ('legislative changes', 'regulatory guardrail elimination'). While using different terminology, the answer covers both explicitly requested aspects."
 Pass: true
+
+Question: "コロナウイルスの感染拡大が経済、教育システム、および医療インフラにどのような影響を与えましたか？"
+Answer: "コロナウイルスは世界経済に甚大な打撃を与え、多くの企業が倒産し、失業率が急増しました。教育については、遠隔学習への移行が進み、デジタル格差が浮き彫りになりましたが、新しい教育テクノロジーの採用も加速しました。"
+Aspects_Expected: "経済、教育システム、医療インフラ"
+Aspects_Provided: "世界経済、企業倒産、失業率、遠隔学習、デジタル格差、教育テクノロジー"
+Think: "質問では明示的にコロナウイルスの影響の三つの側面について尋ねています：経済、教育システム、医療インフラです。回答は経済（「世界経済」「企業倒産」「失業率」について）と教育システム（「遠隔学習」「デジタル格差」「教育テクノロジー」について）に対応していますが、質問で明示的に求められていた医療インフラへの影響についての議論が完全に省略されています。"
+Pass: false
+
+Question: "请解释人工智能在医疗诊断、自动驾驶和客户服务方面的应用。"
+Answer: "在医疗领域，AI算法可以分析医学影像以检测癌症和其他疾病，准确率有时甚至超过人类专家。自动驾驶技术利用机器学习处理来自雷达、激光雷达和摄像头的数据，实时做出驾驶决策。在客户服务方面，聊天机器人和智能助手能够处理常见问题，分类客户查询，并在必要时将复杂问题转给人工代表。"
+Aspects_Expected: "医疗诊断、自动驾驶、客户服务"
+Aspects_Provided: "医学影像分析、癌症检测、雷达数据处理、激光雷达数据处理、摄像头数据处理、实时驾驶决策、聊天机器人、智能助手、客户查询分类"
+Think: "问题明确要求解释人工智能在三个领域的应用：医疗诊断、自动驾驶和客户服务。回答虽然使用了不同的术语，但涵盖了所有三个方面：医疗诊断（讨论了'医学影像分析'和'癌症检测'），自动驾驶（包括'雷达数据处理'、'激光雷达数据处理'、'摄像头数据处理'和'实时驾驶决策'），以及客户服务（提到了'聊天机器人'、'智能助手'和'客户查询分类'）。尽管使用了不同的表述，但所有明确提及的方面都得到了全面覆盖。"
+Pass: true
+
+Question: "Comment les changements climatiques affectent-ils la production agricole, les écosystèmes marins et la santé publique dans les régions côtières?"
+Answer: "Les variations de température et de précipitations modifient les cycles de croissance des cultures et la distribution des ravageurs agricoles, nécessitant des adaptations dans les pratiques de culture. Dans les océans, l'acidification et le réchauffement des eaux entraînent le blanchissement des coraux et la migration des espèces marines vers des latitudes plus froides, perturbant les chaînes alimentaires existantes."
+Aspects_Expected: "production agricole, écosystèmes marins, santé publique"
+Aspects_Provided: "cycles de croissance, distribution des ravageurs, adaptations des pratiques de culture, acidification des océans, réchauffement des eaux, blanchissement des coraux, migration des espèces marines, perturbation des chaînes alimentaires"
+Think: "La question demande explicitement les effets du changement climatique sur trois aspects: la production agricole, les écosystèmes marins et la santé publique dans les régions côtières. La réponse aborde la production agricole (en discutant des 'cycles de croissance', de la 'distribution des ravageurs' et des 'adaptations des pratiques de culture') et les écosystèmes marins (en couvrant 'l'acidification des océans', le 'réchauffement des eaux', le 'blanchissement des coraux', la 'migration des espèces marines' et la 'perturbation des chaînes alimentaires'). Cependant, elle omet complètement toute discussion sur les effets sur la santé publique dans les régions côtières, qui était explicitement demandée dans la question."
+Pass: false
 </examples>
 
 Now evaluate this pair:
@@ -333,14 +354,6 @@ Answer: ${answer}`;
 }
 
 
-const questionEvaluationSchema = z.object({
-  needsFreshness: z.boolean().describe('Whether the question requires freshness check'),
-  needsPlurality: z.boolean().describe('Whether the question requires plurality check'),
-  needsCompleteness: z.boolean().describe('Whether the question requires completeness check'),
-  think: z.string().describe('A very concise explain of why you choose those checks are needed in first person, extremely short.').max(500),
-  languageStyle: z.string().describe('The language being used and the overall vibe/mood of the question').max(50),
-});
-
 function getQuestionEvaluationPrompt(question: string): string {
   return `You are an evaluator that determines if a question requires freshness, plurality, and/or completeness checks in addition to the required definitiveness check.
 
@@ -348,12 +361,9 @@ function getQuestionEvaluationPrompt(question: string): string {
 1. freshness - Checks if the question is time-sensitive or requires very recent information
 2. plurality - Checks if the question asks for multiple items, examples, or a specific count or enumeration
 3. completeness - Checks if the question explicitly mentions multiple named elements that all need to be addressed
-4. language style - Identifies both the language used and the overall vibe of the question
 </evaluation_types>
 
 <rules>
-If question is a simple greeting, chit-chat, or general knowledge, provide the answer directly.
-
 1. Freshness Evaluation:
    - Required for questions about current state, recent events, or time-sensitive information
    - Required for: prices, versions, leadership positions, status updates
@@ -379,132 +389,88 @@ If question is a simple greeting, chit-chat, or general knowledge, provide the a
    - Look for explicitly named elements separated by commas, "and", "or", bullets
    - Example patterns: "comparing X and Y", "differences between A, B, and C", "both P and Q"
    - DO NOT trigger for elements that aren't specifically named
-
-4. Language Style Analysis:
-  Combine both language and emotional vibe in a descriptive phrase, considering:
-  - Language: The primary language or mix of languages used
-  - Emotional tone: panic, excitement, frustration, curiosity, etc.
-  - Formality level: academic, casual, professional, etc.
-  - Domain context: technical, academic, social, etc.
 </rules>
 
 <examples>
+<example-1>
+Question: "谁发明了微积分？牛顿和莱布尼兹各自的贡献是什么？"
+<output>
+"think": "这是关于微积分历史的问题，不需要最新信息。问题特别提到了牛顿和莱布尼兹两个人，要求分析他们各自的贡献，所以我需要全面回答这两部分内容。完整性比较重要，而不是提供多个不同答案。",
+"needsFreshness": false,
+"needsPlurality": false,
+"needsCompleteness": true,
+</output>
+</example-1>
+
+<example-2>
 Question: "fam PLEASE help me calculate the eigenvalues of this 4x4 matrix ASAP!! [matrix details] got an exam tmrw 😭"
-Evaluation: {
-    "needsFreshness": false,
-    "needsPlurality": true,
-    "needsCompleteness": false,
-    "think": "I see the user needs help with eigenvalues - that's a calculation task. Since it's a 4x4 matrix, there will be multiple eigenvalues to find, so plurality is needed. There are no explicitly named entities, aspects, or elements that need to be addressed, so completeness check doesn't apply.",
-    "languageStyle": "panicked student English with math jargon"
-}
+<output>
+"think": "This is a math question about eigenvalues which doesn't change over time, so I don't need fresh info. A 4x4 matrix has multiple eigenvalues, so I'll need to provide several results. The student just wants the eigenvalues calculated, not asking me to address multiple specific topics.",
+"needsFreshness": false,
+"needsPlurality": true,
+"needsCompleteness": false,
+</output>
+</example-2>
 
-Question: "Can someone explain how tf did Ferrari mess up their pit stop strategy AGAIN?! 🤦‍♂️ #MonacoGP"
-Evaluation: {
-    "needsFreshness": true,
-    "needsPlurality": false,
-    "needsCompleteness": true,
-    "think": "The user is asking about a specific F1 race incident. The 'AGAIN' and MonacoGP hashtag tell me this is about a recent event (freshness). The question explicitly mentions Ferrari and MonacoGP as named entities that need to be addressed, so completeness check applies. Since completeness takes precedence, I set plurality to false.",
-    "languageStyle": "frustrated fan English with F1 terminology"
-}
+<example-3>
+Question: "Quelles sont les principales différences entre le romantisme et le réalisme dans la littérature du 19ème siècle?"
+<output>
+"think": "C'est une question sur l'histoire littéraire, donc je n'ai pas besoin d'informations récentes. Je dois comparer deux mouvements spécifiques: le romantisme et le réalisme. Ma réponse doit couvrir ces deux éléments, donc l'exhaustivité est importante ici. La pluralité n'est pas la priorité dans ce cas.",
+"needsFreshness": false,
+"needsPlurality": false,
+"needsCompleteness": true,
+</output>
+</example-3>
 
-Question: "肖老师您好，请您介绍一下最近量子计算领域的三个重大突破，特别是它们在密码学领域的应用价值吗？🤔"
-Evaluation: {
-    "needsFreshness": true,
-    "needsPlurality": false,
-    "needsCompleteness": true,
-    "think": "The user wants three recent quantum computing breakthroughs and the '最近' (recent) indicates freshness needed. They explicitly request analysis of two named domains: quantum computing ('量子计算') and cryptography ('密码学'), so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
-    "languageStyle": "formal technical Chinese with academic undertones"
-}
+<example-4>
+Question: "Shakespeare の最も有名な悲劇を5つ挙げ、簡単にあらすじを説明してください。"
+<output>
+"think": "シェイクスピアの悲劇についての質問だから、最新情報は必要ないな。「5つ挙げ」とはっきり書いてあるから、複数の回答が必要だ。どの悲劇を選ぶかは私次第で、特定の作品について比較するよう求められているわけじゃないから、完全性よりも複数性が重要だな。",
+"needsFreshness": false,
+"needsPlurality": true,
+"needsCompleteness": false,
+</output>
+</example-4>
 
-Question: "Bruder krass, kannst du mir erklären warum meine neural network training loss komplett durchdreht? Hab schon alles probiert 😤"
-Evaluation: {
-    "needsFreshness": false,
-    "needsPlurality": true,
-    "needsCompleteness": false,
-    "think": "The user has a technical ML problem but explains it very casually. They've 'tried everything' so I'll need to cover multiple debugging options (plurality). They don't explicitly mention multiple named elements that must be addressed, so completeness check doesn't apply.",
-    "languageStyle": "frustrated German-English tech slang"
-}
+<example-5>
+Question: "What are the current interest rates for mortgage loans from Bank of America, Wells Fargo, and Chase Bank in the US?"
+<output>
+"think": "This is asking about 'current' interest rates, so I definitely need up-to-date info. The person wants rates from three specific banks: Bank of America, Wells Fargo, and Chase. I need to cover all three to properly answer, so addressing these specific elements is more important than providing multiple different answers.",
+"needsFreshness": true,
+"needsPlurality": false,
+"needsCompleteness": true,
+</output>
+</example-5>
 
-Question: "Does anyone have insights into the sociopolitical implications of GPT-4's emergence in the Global South, particularly regarding indigenous knowledge systems and linguistic diversity? Looking for a nuanced analysis."
-Evaluation: {
-    "needsFreshness": true,
-    "needsPlurality": false,
-    "needsCompleteness": true,
-    "think": "The user asks about current GPT-4 impacts, so freshness matters. They explicitly name multiple elements to analyze: 'GPT-4', 'Global South', 'indigenous knowledge systems' and 'linguistic diversity', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
-    "languageStyle": "formal academic English with sociological terminology"
-}
+<example-6>
+Question: "2025年に注目すべき人工知能の3つのトレンドは何ですか？"
+<output>
+"think": "これは将来のAIトレンドについての質問だから、最新の情報が必要だね。「3つの」と明確に数を指定しているから、複数の回答が求められている。特定のトレンドについて詳しく説明するというより、重要なトレンドを3つ挙げることが大事そうだから、複数性の方が完全性より重要だな。",
+"needsFreshness": true,
+"needsPlurality": true,
+"needsCompleteness": false,
+</output>
+</example-6>
 
-Question: "what's 7 * 9? need to check something real quick"
-Evaluation: {
-    "needsFreshness": false,
-    "needsPlurality": false,
-    "needsCompleteness": false,
-    "think": "The user wants a single multiplication result - that's all. No need for recent info since math is constant, no need for multiple examples, and no explicitly named elements to cover.",
-    "languageStyle": "casual English"
-}
+<example-7>
+Question: "Was sind die besten Strategien für nachhaltiges Investieren in der heutigen Wirtschaft?"
+<output>
+"think": "Hier geht's um Investieren in der 'heutigen Wirtschaft', also brauche ich aktuelle Informationen. Die Frage ist nach 'Strategien' im Plural gestellt, daher sollte ich mehrere Beispiele nennen. Es werden keine bestimmten Aspekte genannt, die ich alle behandeln muss - ich soll einfach verschiedene gute Strategien vorschlagen. Aktualität und mehrere Antworten sind hier wichtig.",
+"needsFreshness": true,
+"needsPlurality": true,
+"needsCompleteness": false,
+</output>
+</example-7>
 
-Question: "Can you provide a thorough analysis of how climate change affects agricultural practices, water resources, and biodiversity in Mediterranean regions?"
-Evaluation: {
-    "needsFreshness": true,
-    "needsPlurality": false,
-    "needsCompleteness": true,
-    "think": "This question requires recent climate data (freshness). It explicitly names four elements that must all be addressed: 'climate change', 'agricultural practices', 'water resources', and 'biodiversity' in 'Mediterranean regions', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
-    "languageStyle": "formal academic English with environmental science terminology"
-}
-
-Question: "What are the key considerations when designing a microservice architecture, including scalability, fault tolerance, and data consistency patterns?"
-Evaluation: {
-    "needsFreshness": false,
-    "needsPlurality": false,
-    "needsCompleteness": true,
-    "think": "The question explicitly names three aspects that must be addressed: 'scalability', 'fault tolerance', and 'data consistency patterns', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
-    "languageStyle": "professional technical English with software architecture terminology"
-}
-
-Question: "Give me 5 effective strategies for improving time management skills."
-Evaluation: {
-    "needsFreshness": false,
-    "needsPlurality": true,
-    "needsCompleteness": false,
-    "think": "The user requests exactly 5 strategies (plurality). They don't specify multiple named elements that must be covered, so completeness check doesn't apply.",
-    "languageStyle": "direct practical English"
-}
-
-Question: "How do macroeconomic policies affect both inflation rates and employment levels?"
-Evaluation: {
-    "needsFreshness": true,
-    "needsPlurality": false,
-    "needsCompleteness": true,
-    "think": "This requires current economic knowledge (freshness). It explicitly mentions two named economic indicators that must be addressed: 'inflation rates' and 'employment levels', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
-    "languageStyle": "formal academic English with economics terminology"
-}
-
-Question: "Compare and contrast Tesla and Ford's approaches to electric vehicle manufacturing."
-Evaluation: {
-    "needsFreshness": true,
-    "needsPlurality": false,
-    "needsCompleteness": true,
-    "think": "This needs current automotive industry knowledge (freshness). It explicitly mentions two named companies that must both be addressed: 'Tesla' and 'Ford', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
-    "languageStyle": "formal analytical English with automotive industry terminology"
-}
-
-Question: "How have the recent policies of President Biden and former President Trump affected international relations?"
-Evaluation: {
-    "needsFreshness": true,
-    "needsPlurality": false, 
-    "needsCompleteness": true,
-    "think": "This requires current political knowledge (freshness). It explicitly mentions two named political figures that must both be addressed: 'President Biden' and 'former President Trump', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
-    "languageStyle": "formal political analysis English"
-}
-
-Question: "What are the differences between iPhone 15 Pro and Samsung Galaxy S24 Ultra cameras?"
-Evaluation: {
-    "needsFreshness": true,
-    "needsPlurality": false,
-    "needsCompleteness": true,
-    "think": "This requires current tech product knowledge (freshness). It explicitly mentions two named products that must both be addressed: 'iPhone 15 Pro' and 'Samsung Galaxy S24 Ultra', so completeness check applies. Since completeness takes precedence over plurality, I set plurality to false.",
-    "languageStyle": "consumer tech comparison English"
-}
+<example-8>
+Question: "请解释赤壁之战的历史背景、主要参与者以及战略意义，这对中国历史产生了什么影响？"
+<output>
+"think": "这是关于历史事件的问题，不需要最新信息。问题清楚地列出了几个需要我回答的方面：历史背景、主要参与者、战略意义和历史影响。我需要涵盖所有这些特定方面，而不是提供多个不同的答案。这里完整性比复数性更重要。",
+"needsFreshness": false,
+"needsPlurality": false,
+"needsCompleteness": true,
+</output>
+</example-8>
 </examples>
 
 Now evaluate this question:
@@ -515,14 +481,15 @@ const TOOL_NAME = 'evaluator';
 
 export async function evaluateQuestion(
   question: string,
-  trackers?: TrackerContext
-): Promise<EvaluationCriteria> {
+  trackers: TrackerContext,
+  schemaGen: Schemas
+): Promise<EvaluationType[]> {
   try {
-    const generator = new ObjectGeneratorSafe(trackers?.tokenTracker);
+    const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
 
     const result = await generator.generateObject({
       model: TOOL_NAME,
-      schema: questionEvaluationSchema,
+      schema: schemaGen.getQuestionEvaluateSchema(),
       prompt: getQuestionEvaluationPrompt(question),
     });
 
@@ -538,30 +505,27 @@ export async function evaluateQuestion(
     trackers?.actionTracker.trackThink(result.object.think);
 
     // Always evaluate definitive first, then freshness (if needed), then plurality (if needed)
-    return {types, languageStyle: result.object.languageStyle};
+    return types;
 
   } catch (error) {
     console.error('Error in question evaluation:', error);
     // Default to no check
-    return {types: [], languageStyle: 'plain English'};
+    return [];
   }
 }
 
 
 async function performEvaluation<T>(
   evaluationType: EvaluationType,
-  params: {
-    schema: z.ZodType<T>;
-    prompt: string;
-  },
+  prompt: string,
   trackers: TrackerContext,
+  schemaGen: Schemas
 ): Promise<GenerateObjectResult<T>> {
   const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
-
   const result = await generator.generateObject({
     model: TOOL_NAME,
-    schema: params.schema,
-    prompt: params.prompt,
+    schema: schemaGen.getEvaluatorSchema(evaluationType),
+    prompt: prompt,
   }) as GenerateObjectResult<any>;
 
   trackers.actionTracker.trackThink(result.object.think)
@@ -576,110 +540,73 @@ async function performEvaluation<T>(
 export async function evaluateAnswer(
   question: string,
   action: AnswerAction,
-  evaluationCri: EvaluationCriteria,
+  evaluationTypes: EvaluationType[],
   trackers: TrackerContext,
-  visitedURLs: string[] = []
-): Promise<{ response: EvaluationResponse }> {
+  visitedURLs: string[] = [],
+  schemaGen: Schemas
+): Promise<EvaluationResponse> {
   let result;
 
   // Only add attribution if we have valid references
-  if (action.references && action.references.length > 0 && action.references.some(ref => ref.url.startsWith('http'))) {
-    evaluationCri.types = ['attribution', ...evaluationCri.types];
+  const urls = action.references?.filter(ref => ref.url.startsWith('http') && !visitedURLs.includes(ref.url)).map(ref => ref.url) || [];
+  const uniqueNewURLs = [...new Set(urls)];
+  if (uniqueNewURLs.length > 0) {
+    evaluationTypes = ['attribution', ...evaluationTypes];
   }
 
-  for (const evaluationType of evaluationCri.types) {
+  for (const evaluationType of evaluationTypes) {
+    let prompt: string = '';
     switch (evaluationType) {
       case 'attribution': {
         // Safely handle references and ensure we have content
-        const urls = action.references?.filter(ref => ref.url.startsWith('http') && !visitedURLs.includes(ref.url)).map(ref => ref.url) || [];
-        const uniqueURLs = [...new Set(urls)];
 
-        if (uniqueURLs.length === 0) {
-          // all URLs have been read, or there is no valid urls. no point to read them.
-          result = {
-            object: {
-              pass: true,
-              think: "All provided references have been visited and no new URLs were found to read. The answer is considered valid without further verification.",
-              type: 'attribution',
-            } as EvaluationResponse
-          }
-          break;
-        }
+        const allKnowledge = await fetchSourceContent(uniqueNewURLs, trackers);
+        visitedURLs.push(...uniqueNewURLs);
 
-        const allKnowledge = await fetchSourceContent(uniqueURLs, trackers);
-        visitedURLs.push(...uniqueURLs);
-
-        if (!allKnowledge.trim()) {
+        if (allKnowledge.trim().length === 0) {
           return {
-            response: {
-              pass: false,
-              think: `The answer does provide URL references ${JSON.stringify(uniqueURLs)}, but the content could not be fetched or is empty. Need to found some other references and URLs`,
-              type: 'attribution',
-            }
+            pass: false,
+            think: `The answer does provide URL references ${JSON.stringify(uniqueNewURLs)}, but the content could not be fetched or is empty. Need to found some other references and URLs`,
+            type: 'attribution',
           };
         }
-
-        result = await performEvaluation(
-          'attribution',
-          {
-            schema: attributionSchema,
-            prompt: getAttributionPrompt(question, action.answer, allKnowledge),
-          },
-          trackers
-        );
+        prompt = getAttributionPrompt(question, action.answer, allKnowledge);
         break;
       }
 
       case 'definitive':
-        result = await performEvaluation(
-          'definitive',
-          {
-            schema: definitiveSchema,
-            prompt: getDefinitivePrompt(question, action.answer),
-          },
-          trackers
-        );
+        prompt = getDefinitivePrompt(question, action.answer);
         break;
 
       case 'freshness':
-        result = await performEvaluation(
-          'freshness',
-          {
-            schema: freshnessSchema,
-            prompt: getFreshnessPrompt(question, action.answer, new Date().toISOString()),
-          },
-          trackers
-        );
+        prompt = getFreshnessPrompt(question, action.answer, new Date().toISOString());
         break;
 
       case 'plurality':
-        result = await performEvaluation(
-          'plurality',
-          {
-            schema: pluralitySchema,
-            prompt: getPluralityPrompt(question, action.answer),
-          },
-          trackers
-        );
+        prompt = getPluralityPrompt(question, action.answer);
         break;
       case 'completeness':
-        result = await performEvaluation(
-          'completeness',
-          {
-            schema: completenessSchema,
-            prompt: getCompletenessPrompt(question, action.answer),
-          },
-          trackers
-        );
+        prompt = getCompletenessPrompt(question, action.answer);
         break;
+      default:
+        console.error(`Unknown evaluation type: ${evaluationType}`);
     }
+    if (prompt) {
+      result = await performEvaluation(
+        evaluationType,
+        prompt,
+        trackers,
+        schemaGen
+      );
 
-    if (!result?.object.pass) {
-      return {response: result.object};
+      // fail one, return immediately
+      if (!(result?.object as EvaluationResponse).pass) {
+        return (result.object as EvaluationResponse);
+      }
     }
   }
 
-  return {response: result!.object};
+  return (result!.object as EvaluationResponse);
 }
 
 // Helper function to fetch and combine source content

@@ -11,7 +11,7 @@ import {evaluateAnswer, evaluateQuestion} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
-import {StepAction, AnswerAction, KnowledgeItem, EvaluationCriteria, SearchResult} from "./types";
+import {StepAction, AnswerAction, KnowledgeItem, SearchResult, EvaluationType} from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
 // import {grounding} from "./tools/grounding";
@@ -21,72 +21,13 @@ import {CodeSandbox} from "./tools/code-sandbox";
 import {serperSearch} from './tools/serper-search';
 import {getUnvisitedURLs, normalizeUrl} from "./utils/url-tools";
 import {buildMdFromAnswer, chooseK, removeExtraLineBreaks, removeHTMLtags} from "./utils/text-tools";
+import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
   console.log(`Waiting ${seconds}s...`);
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-const MAX_URLS_PER_STEP = 2
-const MAX_QUERIES_PER_STEP = 5
-const MAX_REFLECT_PER_STEP = 3
-
-function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean, languageStyle: string = 'same language as the question') {
-  const actions: string[] = [];
-  const properties: Record<string, z.ZodTypeAny> = {
-    action: z.enum(['placeholder']), // Will update later with actual actions
-    think: z.string().describe(`Explain why choose this action, what's the chain-of-thought behind choosing this action, use the first-person narrative.`).max(500)
-  };
-
-  if (allowSearch) {
-    actions.push("search");
-    properties.searchRequests =  z.array(
-      z.string().max(30)
-      .describe(`A natual language search request in ${languageStyle}. Based on the deep intention behind the original question and the expected answer format.`)).describe(`Required when action='search'. Always prefer a single request, only add another request if the original question covers multiple aspects or elements and one search request is definitely not enough, each request focus on one specific aspect of the original question. Minimize mutual information between each request. Maximum ${MAX_QUERIES_PER_STEP} search requests.`).max(MAX_QUERIES_PER_STEP);
-  }
-
-  if (allowCoding) {
-    actions.push("coding");
-    properties.codingIssue = z.string().max(500)
-      .describe("Required when action='coding'. Describe what issue to solve with coding, format like a github issue ticket. Specify the input value when it is short.").optional();
-  }
-
-  if (allowAnswer) {
-    actions.push("answer");
-    properties.references = z.array(
-      z.object({
-        exactQuote: z.string().describe("Exact relevant quote from the document, must be a soundbite, short and to the point, no fluff").max(30),
-        url: z.string().describe("source URL; must be directly from the context")
-      }).required()
-    ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document").optional();
-    properties.answer = z.string()
-      .describe(`Required when action='answer'. Must be definitive, no ambiguity, uncertainty, or disclaimers. Must in ${languageStyle} and confident. Use markdown footnote syntax like [^1], [^2] to refer the corresponding reference item`).optional();
-  }
-
-  if (allowReflect) {
-    actions.push("reflect");
-    properties.questionsToAnswer = z.array(
-      z.string().describe("each question must be a single line, Questions must be: Original (not variations of existing questions); Focused on single concepts; Under 20 words; Non-compound/non-complex")
-    ).max(MAX_REFLECT_PER_STEP)
-      .describe(`Required when action='reflect'. List of most important questions to fill the knowledge gaps of finding the answer to the original question. Maximum provide ${MAX_REFLECT_PER_STEP} reflect questions.`).optional();
-  }
-
-  if (allowRead) {
-    actions.push("visit");
-    properties.URLTargets = z.array(z.string())
-      .max(MAX_URLS_PER_STEP)
-      .describe(`Required when action='visit'. Must be an array of URLs, choose up the most relevant ${MAX_URLS_PER_STEP} URLs to visit`).optional();
-  }
-
-  // Update the enum values after collecting all actions
-  properties.action = z.enum(actions as [string, ...string[]])
-    .describe("Must match exactly one action type");
-
-  return z.object(properties);
-
-}
-
 
 
 function getPrompt(
@@ -192,7 +133,7 @@ ${learnedStrategy}
     if (allURLs && allURLs.length > 0) {
       urlList = allURLs
         .filter(r => 'url' in r)
-        .map(r =>  `  + "${r.url}": "${r.title}"`)
+        .map(r => `  + "${r.url}": "${r.title}"`)
         .join('\n');
     }
 
@@ -290,15 +231,11 @@ ${actionSections.join('\n\n')}
 }
 
 
-
 const allContext: StepAction[] = [];  // all steps in the current session, including those leads to wrong results
 
 function updateContext(step: any) {
   allContext.push(step)
 }
-
-
-
 
 
 export async function getResponse(question?: string,
@@ -307,20 +244,25 @@ export async function getResponse(question?: string,
                                   existingContext?: Partial<TrackerContext>,
                                   messages?: Array<CoreAssistantMessage | CoreUserMessage>
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[] }> {
-  const context: TrackerContext = {
-    tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
-    actionTracker: existingContext?.actionTracker || new ActionTracker()
-  };
+
   let step = 0;
   let totalStep = 0;
   let badAttempts = 0;
-  let schema: ZodObject<any> = getSchema(true, true, true, true, true)
+
   question = question?.trim() as string;
   if (messages && messages.length > 0) {
     question = (messages[messages.length - 1]?.content as string).trim();
   } else {
     messages = [{role: 'user', content: question.trim()}]
   }
+
+  const SchemaGen = new Schemas(question);
+  const context: TrackerContext = {
+    tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
+    actionTracker: existingContext?.actionTracker || new ActionTracker()
+  };
+
+  let schema: ZodObject<any> = SchemaGen.getAgentSchema(true, true, true, true, true)
   const gaps: string[] = [question];  // All questions to be answered including the orginal question
   const allQuestions = [question];
   const allKeywords = [];
@@ -338,7 +280,7 @@ export async function getResponse(question?: string,
 
   const allURLs: Record<string, SearchResult> = {};
   const visitedURLs: string[] = [];
-  const evaluationMetrics: Record<string, EvaluationCriteria> = {};
+  const evaluationMetrics: Record<string, EvaluationType[]> = {};
   while (context.tokenTracker.getTotalUsage().totalTokens < tokenBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
     step++;
@@ -349,7 +291,8 @@ export async function getResponse(question?: string,
     allowReflect = allowReflect && (gaps.length <= 1);
     const currentQuestion: string = gaps.length > 0 ? gaps.shift()! : question
     if (!evaluationMetrics[currentQuestion]) {
-      evaluationMetrics[currentQuestion] = await evaluateQuestion(currentQuestion, context)
+      evaluationMetrics[currentQuestion] =
+        await evaluateQuestion(currentQuestion, context, SchemaGen)
     }
 
     // update all urls with buildURLMap
@@ -371,8 +314,7 @@ export async function getResponse(question?: string,
       getUnvisitedURLs(allURLs, visitedURLs),
       false,
     );
-    schema = getSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding,
-      evaluationMetrics[currentQuestion].languageStyle)
+    schema = SchemaGen.getAgentSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding)
     const generator = new ObjectGeneratorSafe(context.tokenTracker);
     const result = await generator.generateObject({
       model: 'agent',
@@ -420,10 +362,11 @@ export async function getResponse(question?: string,
 
       context.actionTracker.trackThink(`But wait, let me evaluate the answer first.`)
 
-      const {response: evaluation} = await evaluateAnswer(currentQuestion, thisStep,
+      const evaluation = await evaluateAnswer(currentQuestion, thisStep,
         evaluationMetrics[currentQuestion],
         context,
-        visitedURLs
+        visitedURLs,
+        SchemaGen
       );
 
       if (currentQuestion.trim() === question) {
@@ -462,7 +405,7 @@ The evaluator thinks your answer is bad because:
 ${evaluation.think}
 `);
             // store the bad context and reset the diary context
-            const {response: errorAnalysis} = await analyzeSteps(diaryContext, context);
+            const errorAnalysis = await analyzeSteps(diaryContext, context, SchemaGen);
 
             allKnowledge.push({
               question: currentQuestion,
@@ -554,7 +497,7 @@ But then you realized you have asked them before. You decided to to think out of
       thisStep.searchRequests = chooseK((await dedupQueries(thisStep.searchRequests, [], context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
 
       // rewrite queries
-      let {queries: keywordsQueries} = await rewriteQuery(thisStep, context);
+      let {queries: keywordsQueries} = await rewriteQuery(thisStep, context, SchemaGen);
       // avoid exisitng searched queries
       keywordsQueries = chooseK((await dedupQueries(keywordsQueries, allKeywords, context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
 
@@ -717,7 +660,7 @@ You decided to think out of the box or cut from a completely different angle.`);
         allowRead = false;
       }
     } else if (thisStep.action === 'coding' && thisStep.codingIssue) {
-      const sandbox = new CodeSandbox({allContext, visitedURLs, allURLs, allKnowledge}, context);
+      const sandbox = new CodeSandbox({allContext, visitedURLs, allURLs, allKnowledge}, context, SchemaGen);
       try {
         const result = await sandbox.solve(thisStep.codingIssue);
         allKnowledge.push({
@@ -778,8 +721,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       true,
     );
 
-    schema = getSchema(false, false, true, false, false,
-      evaluationMetrics[question]?.languageStyle || 'same language as the question');
+    schema = SchemaGen.getAgentSchema(false, false, true, false, false);
     const generator = new ObjectGeneratorSafe(context.tokenTracker);
     const result = await generator.generateObject({
       model: 'agentBeastMode',
