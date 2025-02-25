@@ -1,4 +1,5 @@
 import {AnswerAction} from "../types";
+import i18nJSON from './i18n.json';
 
 export function buildMdFromAnswer(answer: AnswerAction) {
   // Standard footnote regex
@@ -129,8 +130,7 @@ export function removeHTMLtags(text: string) {
 
 export function getI18nText(key: string, lang = 'en', params: Record<string, string> = {}) {
   // 获取i18n数据
-  const i18nData = require('./i18n.json');
-
+  const i18nData = i18nJSON as Record<string, any>;
   // 确保语言代码存在，如果不存在则使用英语作为后备
   if (!i18nData[lang]) {
     console.error(`Language '${lang}' not found, falling back to English.`);

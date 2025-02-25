@@ -1,4 +1,4 @@
-import {z, ZodObject} from 'zod';
+import {ZodObject} from 'zod';
 import {CoreAssistantMessage, CoreUserMessage} from 'ai';
 import {SEARCH_PROVIDER, STEP_SLEEP} from "./config";
 import {readUrl, removeAllLineBreaks} from "./tools/read";
