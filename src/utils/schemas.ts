@@ -61,7 +61,7 @@ ${question}`;
 
 export class Schemas {
   private languageStyle: string = 'formal English';
-  private languageCode: string = 'en';
+  public languageCode: string = 'en';
 
 
   constructor(query: string) {

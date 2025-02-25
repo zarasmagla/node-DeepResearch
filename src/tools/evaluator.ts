@@ -474,7 +474,9 @@ Question: "请解释赤壁之战的历史背景、主要参与者以及战略意
 </examples>
 
 Now evaluate this question:
-Question: ${question}`;
+Question: ${question}
+
+NOTE: "think" field should be in the same language as the question`;
 }
 
 const TOOL_NAME = 'evaluator';
@@ -560,7 +562,7 @@ export async function evaluateAnswer(
       case 'attribution': {
         // Safely handle references and ensure we have content
 
-        const allKnowledge = await fetchSourceContent(uniqueNewURLs, trackers);
+        const allKnowledge = await fetchSourceContent(uniqueNewURLs, trackers, schemaGen);
         visitedURLs.push(...uniqueNewURLs);
 
         if (allKnowledge.trim().length === 0) {
@@ -610,9 +612,9 @@ export async function evaluateAnswer(
 }
 
 // Helper function to fetch and combine source content
-async function fetchSourceContent(urls: string[], trackers: TrackerContext): Promise<string> {
+async function fetchSourceContent(urls: string[], trackers: TrackerContext, schemaGen: Schemas): Promise<string> {
   if (!urls.length) return '';
-  trackers.actionTracker.trackThink('Let me fetch the source content to verify the answer.');
+  trackers.actionTracker.trackThink('read_for_verify', schemaGen.languageCode);
   try {
     const results = await Promise.all(
       urls.map(async (url) => {

@@ -132,7 +132,7 @@ function calculateDelay(chunk: string, burstMode: boolean): number {
 
   // Special handling for CJK characters
   if (/^[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]$/.test(chunk)) {
-    return Math.random() * 50 + 10; // Longer delay for individual CJK characters
+    return Math.random() * 25 + 10; // Longer delay for individual CJK characters
   }
 
   // Base delay calculation

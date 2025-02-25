@@ -125,3 +125,39 @@ export function chooseK(a: string[], k: number) {
 export function removeHTMLtags(text: string) {
   return text.replace(/<[^>]*>?/gm, '');
 }
+
+
+export function getI18nText(key: string, lang = 'en', params: Record<string, string> = {}) {
+  // 获取i18n数据
+  const i18nData = require('./i18n.json');
+
+  // 确保语言代码存在，如果不存在则使用英语作为后备
+  if (!i18nData[lang]) {
+    console.error(`Language '${lang}' not found, falling back to English.`);
+    lang = 'en';
+  }
+
+  // 获取对应语言的文本
+  let text = i18nData[lang][key];
+
+  // 如果文本不存在，则使用英语作为后备
+  if (!text) {
+    console.error(`Key '${key}' not found for language '${lang}', falling back to English.`);
+    text = i18nData['en'][key];
+
+    // 如果英语版本也不存在，则返回键名
+    if (!text) {
+      console.error(`Key '${key}' not found for English either.`);
+      return key;
+    }
+  }
+
+  // 替换模板中的变量
+  if (params) {
+    Object.keys(params).forEach(paramKey => {
+      text = text.replace(`\${${paramKey}}`, params[paramKey]);
+    });
+  }
+
+  return text;
+}

@@ -181,7 +181,6 @@ ${allKeywords.join('\n')}
     actionSections.push(`
 <action-answer>
 - For greetings, casual conversation, or general knowledge questions, answer directly without references.
-- If the question is clearly within your knowledge cutoff (i.e. Aug. 2024) and requires no up-to-date knowledge to get better answer, then provide a confident answer directly.
 - For all other questions, provide a verified answer with references. Each reference must include exactQuote and url.
 - If uncertain, use <action-reflect>
 </action-answer>
@@ -356,11 +355,11 @@ export async function getResponse(question?: string,
         return {
           exactQuote: ref.exactQuote,
           title: allURLs[ref.url]?.title,
-          url: normalizeUrl(ref.url)
+          url: ref.url ? normalizeUrl(ref.url) : ''
         }
       });
 
-      context.actionTracker.trackThink(`But wait, let me evaluate the answer first.`)
+      context.actionTracker.trackThink('eval_first', SchemaGen.languageCode)
 
       const evaluation = await evaluateAnswer(currentQuestion, thisStep,
         evaluationMetrics[currentQuestion],
@@ -506,7 +505,7 @@ But then you realized you have asked them before. You decided to to think out of
       if (keywordsQueries.length > 0) {
 
 
-        context.actionTracker.trackThink(`Let me search for "${keywordsQueries.join(', ')}" to gather more information.`)
+        context.actionTracker.trackThink('search_for', SchemaGen.languageCode, {keywords: keywordsQueries.join(', ')});
         for (const query of keywordsQueries) {
           console.log(`Search query: ${query}`);
 
@@ -594,7 +593,7 @@ You decided to think out of the box or cut from a completely different angle.
       const uniqueURLs = thisStep.URLTargets;
 
       if (uniqueURLs.length > 0) {
-        context.actionTracker.trackThink(`Let me read ${uniqueURLs.join(', ')} to gather more information.`);
+        context.actionTracker.trackThink('read_for', SchemaGen.languageCode, {urls: uniqueURLs.join(', ')});
 
         const urlResults = await Promise.all(
           uniqueURLs.map(async url => {
