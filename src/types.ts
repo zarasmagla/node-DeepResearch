@@ -8,7 +8,7 @@ type BaseAction = {
 
 export type SearchAction = BaseAction & {
   action: "search";
-  searchQuery: string;
+  searchRequests: string[];
 };
 
 export type AnswerAction = BaseAction & {
@@ -19,6 +19,7 @@ export type AnswerAction = BaseAction & {
     url: string;
   }>;
   isFinal?: boolean;
+  mdAnswer?: string;
 };
 
 

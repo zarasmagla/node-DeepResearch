@@ -28,102 +28,6 @@ app.get('/health', (req, res) => {
   res.json({status: 'ok'});
 });
 
-function buildMdFromAnswer(answer: AnswerAction) {
-  const footnoteRegex = /\[\^(\d+)]/g;
-
-  // Helper function to format references
-  const formatReferences = (refs: typeof answer.references) => {
-    return refs.map((ref, i) => {
-      const cleanQuote = ref.exactQuote
-        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-        .replace(/\s+/g, ' ');
-
-      const citation = `[^${i + 1}]: ${cleanQuote}`;
-
-      if (!ref.url?.startsWith('http')) return citation;
-
-      const domainName = new URL(ref.url).hostname.replace('www.', '');
-      return `${citation} [${domainName}](${ref.url})`;
-    }).join('\n\n');
-  };
-
-  // First case: no references - remove any footnote citations
-  if (!answer.references?.length) {
-    return answer.answer.replace(footnoteRegex, '');
-  }
-
-  // Extract all footnotes from answer
-  const footnotes: string[] = [];
-  let match;
-  while ((match = footnoteRegex.exec(answer.answer)) !== null) {
-    footnotes.push(match[1]);
-  }
-
-  // No footnotes in answer but we have references - append them at the end
-  if (footnotes.length === 0) {
-    const appendedCitations = Array.from(
-      {length: answer.references.length},
-      (_, i) => `[^${i + 1}]`
-    ).join('');
-
-    const references = formatReferences(answer.references);
-
-    return `
-${answer.answer}
-
-⁜${appendedCitations}
-
-${references}
-`.trim();
-  }
-
-  // Check if correction is needed
-  const needsCorrection =
-    (footnotes.length === answer.references.length && footnotes.every(n => n === footnotes[0])) ||
-    (footnotes.every(n => n === footnotes[0]) && parseInt(footnotes[0]) > answer.references.length) ||
-    (footnotes.length > 0 && footnotes.every(n => parseInt(n) > answer.references.length));
-
-  // New case: we have more references than footnotes
-  if (answer.references.length > footnotes.length && !needsCorrection) {
-    // Get the used indices
-    const usedIndices = new Set(footnotes.map(n => parseInt(n)));
-
-    // Create citations for unused references
-    const unusedReferences = Array.from(
-      {length: answer.references.length},
-      (_, i) => !usedIndices.has(i + 1) ? `[^${i + 1}]` : ''
-    ).join('');
-
-    return `
-${answer.answer} 
-
-⁜${unusedReferences}
-
-${formatReferences(answer.references)}
-`.trim();
-  }
-
-  if (!needsCorrection) {
-    return `
-${answer.answer}
-
-${formatReferences(answer.references)}
-`.trim();
-  }
-
-  // Apply correction: sequentially number the footnotes
-  let currentIndex = 0;
-  const correctedAnswer = answer.answer.replace(footnoteRegex, () =>
-    `[^${++currentIndex}]`
-  );
-
-  return `
-${correctedAnswer}
-
-${formatReferences(answer.references)}
-`.trim();
-}
-
 async function* streamTextNaturally(text: string, streamingState: StreamingState) {
   // Split text into chunks that preserve CJK characters, URLs, and regular words
   const chunks = splitTextIntoChunks(text);
@@ -452,6 +356,7 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
 
   streamingState.processingQueue = false;
 }
+
 app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   // Check authentication only if secret is set
   if (secret) {
@@ -559,13 +464,17 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   }
 
   try {
-    const {result: finalStep, visitedURLs: visitedURLs, readURLs: readURLs} = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
+    const {
+      result: finalStep,
+      visitedURLs: visitedURLs,
+      readURLs: readURLs
+    } = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
 
     const usage = context.tokenTracker.getTotalUsageSnakeCase();
     if (body.stream) {
       // Complete any ongoing streaming before sending final answer
       await completeCurrentStreaming(streamingState, res, requestId, created, body.model);
-      const finalAnswer = buildMdFromAnswer(finalStep as AnswerAction);
+      const finalAnswer = (finalStep as AnswerAction).mdAnswer;
       // Send closing think tag
       const closeThinkChunk: ChatCompletionChunk = {
         id: requestId,
@@ -613,7 +522,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           index: 0,
           message: {
             role: 'assistant',
-            content: finalStep.action === 'answer' ? buildMdFromAnswer(finalStep) : finalStep.think
+            content: finalStep.action === 'answer' ? (finalStep.mdAnswer || '') : finalStep.think
           },
           logprobs: null,
           finish_reason: 'stop'

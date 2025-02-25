@@ -1,3 +1,5 @@
+import {SearchResult} from "../types";
+
 export function normalizeUrl(urlString: string, debug = false): string {
     if (!urlString?.trim()) {
         throw new Error('Empty URL');
@@ -92,4 +94,11 @@ export function normalizeUrl(urlString: string, debug = false): string {
         // Main URL parsing error - this one we should throw
         throw new Error(`Invalid URL "${urlString}": ${error}`);
     }
+}
+
+
+export function getUnvisitedURLs(allURLs: Record<string, SearchResult>, visitedURLs: string[]): SearchResult[] {
+    return Object.entries(allURLs)
+        .filter(([url]) => !visitedURLs.includes(url))
+        .map(([, result]) => result);
 }

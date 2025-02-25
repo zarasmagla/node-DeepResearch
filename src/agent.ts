@@ -19,7 +19,8 @@ import {zodToJsonSchema} from "zod-to-json-schema";
 import {ObjectGeneratorSafe} from "./utils/safe-generator";
 import {CodeSandbox} from "./tools/code-sandbox";
 import {serperSearch} from './tools/serper-search';
-import {normalizeUrl} from "./utils/url-tools";
+import {getUnvisitedURLs, normalizeUrl} from "./utils/url-tools";
+import {buildMdFromAnswer, chooseK, removeExtraLineBreaks, removeHTMLtags} from "./utils/text-tools";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -40,8 +41,9 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
 
   if (allowSearch) {
     actions.push("search");
-    properties.searchQuery = z.string().max(30)
-      .describe(`Required when action='search'. Must be a short, keyword-based query that BM25, tf-idf based search engines can understand. Write the query in the language that potential answers might be written in, then in ${languageStyle}.`).optional();
+    properties.searchRequests =  z.array(
+      z.string().max(30)
+      .describe(`A natual language search request in ${languageStyle}. Based on the deep intention behind the original question and the expected answer format.`)).describe(`Required when action='search'. Always prefer a single request, only add another request if the original question covers multiple aspects or elements and one search request is definitely not enough, each request focus on one specific aspect of the original question. Minimize mutual information between each request. Maximum ${MAX_QUERIES_PER_STEP} search requests.`).max(MAX_QUERIES_PER_STEP);
   }
 
   if (allowCoding) {
@@ -85,11 +87,7 @@ function getSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boole
 
 }
 
-function getUnvisitedURLs(allURLs: Record<string, SearchResult>, visitedURLs: string[]): SearchResult[] {
-    return Object.entries(allURLs)
-        .filter(([url]) => !visitedURLs.includes(url))
-        .map(([, result]) => result);
-}
+
 
 function getPrompt(
   context?: string[],
@@ -226,14 +224,13 @@ ${urlList}
     actionSections.push(`
 <action-search>
 - Use web search to find relevant information
-- Choose optimal search queries and language based on the expected answer format
-- Focus on one specific aspect of the original question
-- Suggest unique keywords and alternative search angles
+- Build a search request based on the deep intention behind the original question and the expected answer format
+- Always prefer a single search request, only add another request if the original question covers multiple aspects or elements and one query is not enough, each request focus on one specific aspect of the original question 
 ${allKeywords?.length ? `
-- Previous unsuccessful queries to avoid:
-<bad-queries>
+- Avoid those unsuccessful search requests and queries:
+<bad-requests>
 ${allKeywords.join('\n')}
-</bad-queries>
+</bad-requests>
 `.trim() : ''}
 </action-search>
 `);
@@ -243,7 +240,7 @@ ${allKeywords.join('\n')}
     actionSections.push(`
 <action-answer>
 - For greetings, casual conversation, or general knowledge questions, answer directly without references.
-- If the question is clearly within your knowledge cutoff (i.e. Aug. 2024), provide a confident answer directly.
+- If the question is clearly within your knowledge cutoff (i.e. Aug. 2024) and requires no up-to-date knowledge to get better answer, then provide a confident answer directly.
 - For all other questions, provide a verified answer with references. Each reference must include exactQuote and url.
 - If uncertain, use <action-reflect>
 </action-answer>
@@ -292,9 +289,7 @@ ${actionSections.join('\n\n')}
   return removeExtraLineBreaks(sections.join('\n\n'));
 }
 
-const removeExtraLineBreaks = (text: string) => {
-  return text.replace(/\n{2,}/gm, '\n\n');
-}
+
 
 const allContext: StepAction[] = [];  // all steps in the current session, including those leads to wrong results
 
@@ -302,14 +297,8 @@ function updateContext(step: any) {
   allContext.push(step)
 }
 
-function chooseK(a: string[], k: number) {
-  // randomly sample k from `a` without repitition
-  return a.sort(() => 0.5 - Math.random()).slice(0, k);
-}
 
-function removeHTMLtags(text: string) {
-  return text.replace(/<[^>]*>?/gm, '');
-}
+
 
 
 export async function getResponse(question?: string,
@@ -560,13 +549,15 @@ But then you realized you have asked them before. You decided to to think out of
 
         allowReflect = false;
       }
-    } else if (thisStep.action === 'search' && thisStep.searchQuery) {
+    } else if (thisStep.action === 'search' && thisStep.searchRequests) {
+      // dedup search requests
+      thisStep.searchRequests = chooseK((await dedupQueries(thisStep.searchRequests, [], context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
+
       // rewrite queries
       let {queries: keywordsQueries} = await rewriteQuery(thisStep, context);
-      const oldKeywords = keywordsQueries;
       // avoid exisitng searched queries
-      const {unique_queries: dedupedQueries} = await dedupQueries(keywordsQueries, allKeywords, context.tokenTracker);
-      keywordsQueries = chooseK(dedupedQueries, MAX_QUERIES_PER_STEP);
+      keywordsQueries = chooseK((await dedupQueries(keywordsQueries, allKeywords, context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
+
       let anyResult = false;
 
       if (keywordsQueries.length > 0) {
@@ -639,7 +630,7 @@ You found quite some information and add them to your URL list and **visit** the
       if (!anyResult || !keywordsQueries?.length) {
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
-In particular, you tried to search for the following keywords: ${oldKeywords.join(', ')}. 
+In particular, you tried to search for the following keywords: ${keywordsQueries.join(', ')}. 
 But then you realized you have already searched for these keywords before, no new information is returned.
 You decided to think out of the box or cut from a completely different angle.
 `);
@@ -800,6 +791,8 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     (thisStep as AnswerAction).isFinal = true;
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
   }
+
+  (thisStep as AnswerAction).mdAnswer = buildMdFromAnswer((thisStep as AnswerAction))
   console.log(thisStep)
 
   await storeContext(system, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
@@ -807,7 +800,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     result: thisStep,
     context,
     visitedURLs: [...new Set([...visitedURLs, ...Object.keys(allURLs)])],
-    readURLs: visitedURLs
+    readURLs: visitedURLs,
   };
 
 }

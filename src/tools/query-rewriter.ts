@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import {z} from 'zod';
 import {SearchAction, TrackerContext} from '../types';
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 
@@ -13,8 +13,7 @@ const responseSchema = z.object({
 });
 
 
-
-function getPrompt(action: SearchAction): string {
+function getPrompt(query: string, think: string): string {
   return `You are an expert search query generator with deep psychological understanding. You optimize user queries by extensively analyzing potential user intents and generating comprehensive search variations.
 
 <rules>
@@ -185,8 +184,8 @@ queries: [
 ]
 
 Now, process this query:
-Input Query: ${action.searchQuery}
-Intention: ${action.think}
+Input Query: ${query}
+Intention: ${think}
 `;
 }
 
@@ -195,17 +194,23 @@ const TOOL_NAME = 'queryRewriter';
 export async function rewriteQuery(action: SearchAction, trackers?: TrackerContext): Promise<{ queries: string[] }> {
   try {
     const generator = new ObjectGeneratorSafe(trackers?.tokenTracker);
-    const prompt = getPrompt(action);
+    const allQueries = [...action.searchRequests];
 
-    const result = await generator.generateObject({
-      model: TOOL_NAME,
-      schema: responseSchema,
-      prompt,
+    const queryPromises = action.searchRequests.map(async (req) => {
+      const prompt = getPrompt(req, action.think);
+      const result = await generator.generateObject({
+        model: TOOL_NAME,
+        schema: responseSchema,
+        prompt,
+      });
+      trackers?.actionTracker.trackThink(result.object.think);
+      return result.object.queries;
     });
 
-    console.log(TOOL_NAME, result.object.queries);
-    trackers?.actionTracker.trackThink(result.object.think);
-    return { queries: result.object.queries };
+    const queryResults = await Promise.all(queryPromises);
+    queryResults.forEach(queries => allQueries.push(...queries));
+    console.log(TOOL_NAME, allQueries);
+    return { queries: allQueries };
   } catch (error) {
     console.error(`Error in ${TOOL_NAME}`, error);
     throw error;
