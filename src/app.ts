@@ -392,10 +392,17 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   });
   console.log('messages', body.messages);
 
-  const {tokenBudget, maxBadAttempts} = getTokenBudgetAndMaxAttempts(
+  let {tokenBudget, maxBadAttempts} = getTokenBudgetAndMaxAttempts(
     body.reasoning_effort,
     body.max_completion_tokens
   );
+
+  if (body.budget_tokens) {
+    tokenBudget = body.budget_tokens;
+  }
+  if (body.max_attempts) {
+    maxBadAttempts = body.max_attempts;
+  }
 
   const requestId = Date.now().toString();
   const created = Math.floor(Date.now() / 1000);

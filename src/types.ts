@@ -187,6 +187,9 @@ export interface ChatCompletionRequest {
   stream?: boolean;
   reasoning_effort?: 'low' | 'medium' | 'high' | null;
   max_completion_tokens?: number | null;
+
+  budget_tokens?: number | null;
+  max_attempts?: number | null;
 }
 
 export interface ChatCompletionResponse {

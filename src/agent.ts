@@ -261,6 +261,8 @@ export async function getResponse(question?: string,
     actionTracker: existingContext?.actionTracker || new ActionTracker()
   };
 
+  const generator = new ObjectGeneratorSafe(context.tokenTracker);
+
   let schema: ZodObject<any> = SchemaGen.getAgentSchema(true, true, true, true, true)
   const gaps: string[] = [question];  // All questions to be answered including the orginal question
   const allQuestions = [question];
@@ -280,7 +282,9 @@ export async function getResponse(question?: string,
   const allURLs: Record<string, SearchResult> = {};
   const visitedURLs: string[] = [];
   const evaluationMetrics: Record<string, EvaluationType[]> = {};
-  while (context.tokenTracker.getTotalUsage().totalTokens < tokenBudget && badAttempts <= maxBadAttempts) {
+  // reserve the 10% final budget for the beast mode
+  const regularBudget = tokenBudget * 0.9;
+  while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
     step++;
     totalStep++;
@@ -314,7 +318,6 @@ export async function getResponse(question?: string,
       false,
     );
     schema = SchemaGen.getAgentSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding)
-    const generator = new ObjectGeneratorSafe(context.tokenTracker);
     const result = await generator.generateObject({
       model: 'agent',
       schema,
@@ -721,7 +724,6 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     );
 
     schema = SchemaGen.getAgentSchema(false, false, true, false, false);
-    const generator = new ObjectGeneratorSafe(context.tokenTracker);
     const result = await generator.generateObject({
       model: 'agentBeastMode',
       schema,
