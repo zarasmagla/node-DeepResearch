@@ -1,12 +1,14 @@
 import {GenerateObjectResult} from 'ai';
-import {AnswerAction, EvaluationResponse, EvaluationType, TrackerContext} from '../types';
+import {AnswerAction, EvaluationResponse, EvaluationType, PromptPair, TrackerContext} from '../types';
 import {readUrl, removeAllLineBreaks} from "./read";
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
 
 
-function getAttributionPrompt(question: string, answer: string, sourceContent: string): string {
-  return `You are an evaluator that verifies if answer content is properly attributed to and supported by the provided sources.
+
+function getAttributionPrompt(question: string, answer: string, sourceContent: string): PromptPair {
+  return {
+    system: `You are an evaluator that verifies if answer content is properly attributed to and supported by the provided sources.
 
 <rules>
 1. Source Verification:
@@ -80,16 +82,17 @@ Evaluation: {
   }
   "pass": true,
 }
-</examples>
-
-Now evaluate this pair:
+</examples>`,
+    user: `
 Question: ${question}
 Answer: ${answer}
-Source Content: ${sourceContent}`;
+Source Content: ${sourceContent}`
+  }
 }
 
-function getDefinitivePrompt(question: string, answer: string): string {
-  return `You are an evaluator of answer definitiveness. Analyze if the given answer provides a definitive response or not.
+function getDefinitivePrompt(question: string, answer: string): PromptPair {
+  return {
+    system: `You are an evaluator of answer definitiveness. Analyze if the given answer provides a definitive response or not.
 
 <rules>
 First, if the answer is not a direct response to the question, it must return false. 
@@ -157,15 +160,16 @@ Evaluation: {
   "think": "The answer provides concrete mathematical approaches to proving P ≠ NP without uncertainty markers, presenting definitive methods that could be used."
   "pass": true,
 }
-</examples>
-
-Now evaluate this pair:
+</examples>`,
+    user: `
 Question: ${question}
-Answer: ${answer}`;
+Answer: ${answer}`
+  };
 }
 
-function getFreshnessPrompt(question: string, answer: string, currentTime: string): string {
-  return `You are an evaluator that analyzes if answer content is likely outdated based on mentioned dates (or implied datetime) and current system time: ${currentTime}
+function getFreshnessPrompt(question: string, answer: string, currentTime: string): PromptPair {
+  return {
+    system: `You are an evaluator that analyzes if answer content is likely outdated based on mentioned dates (or implied datetime) and current system time: ${currentTime}
 
 <rules>
 Question-Answer Freshness Checker Guidelines
@@ -218,15 +222,17 @@ Question-Answer Freshness Checker Guidelines
 4. **Source Reliability**: Pair freshness metrics with source credibility scores for better quality assessment.
 5. **Domain Specificity**: Some specialized fields (medical research during pandemics, financial data during market volatility) may require dynamically adjusted thresholds.
 6. **Geographic Relevance**: Regional considerations may alter freshness requirements for local regulations or events.
-</rules>
+</rules>`,
 
-Now evaluate this pair:
+    user: `
 Question: ${question}
-Answer: ${answer}`;
+Answer: ${answer}`
+  }
 }
 
-function getCompletenessPrompt(question: string, answer: string): string {
-  return `You are an evaluator that determines if an answer addresses all explicitly mentioned aspects of a multi-aspect question.
+function getCompletenessPrompt(question: string, answer: string): PromptPair {
+  return {
+    system: `You are an evaluator that determines if an answer addresses all explicitly mentioned aspects of a multi-aspect question.
 
 <rules>
 For questions with **explicitly** multiple aspects:
@@ -305,15 +311,17 @@ Aspects_Provided: "cycles de croissance, distribution des ravageurs, adaptations
 Think: "La question demande explicitement les effets du changement climatique sur trois aspects: la production agricole, les écosystèmes marins et la santé publique dans les régions côtières. La réponse aborde la production agricole (en discutant des 'cycles de croissance', de la 'distribution des ravageurs' et des 'adaptations des pratiques de culture') et les écosystèmes marins (en couvrant 'l'acidification des océans', le 'réchauffement des eaux', le 'blanchissement des coraux', la 'migration des espèces marines' et la 'perturbation des chaînes alimentaires'). Cependant, elle omet complètement toute discussion sur les effets sur la santé publique dans les régions côtières, qui était explicitement demandée dans la question."
 Pass: false
 </examples>
-
-Now evaluate this pair:
+`,
+    user: `
 Question: ${question}
 Answer: ${answer}
-`;
+`
+  }
 }
 
-function getPluralityPrompt(question: string, answer: string): string {
-  return `You are an evaluator that analyzes if answers provide the appropriate number of items requested in the question.
+function getPluralityPrompt(question: string, answer: string): PromptPair {
+  return {
+    system: `You are an evaluator that analyzes if answers provide the appropriate number of items requested in the question.
 
 <rules>
 Question Type Reference Table
@@ -347,15 +355,17 @@ Question Type Reference Table
 | "Secondary" | 3-7 supporting items | Present important but not critical items that complement primary factors and provide additional context. |
 | Unspecified Analysis | 3-5 key points | Default to 3-5 main points covering primary aspects with balanced breadth and depth. |
 </rules>
-
-Now evaluate this pair:
-Question: ${question}
-Answer: ${answer}`;
+`,
+    user:
+`Question: ${question}
+Answer: ${answer}`
+  }
 }
 
 
-function getQuestionEvaluationPrompt(question: string): string {
-  return `You are an evaluator that determines if a question requires freshness, plurality, and/or completeness checks in addition to the required definitiveness check.
+function getQuestionEvaluationPrompt(question: string): PromptPair {
+  return {
+    system: `You are an evaluator that determines if a question requires freshness, plurality, and/or completeness checks in addition to the required definitiveness check.
 
 <evaluation_types>
 1. freshness - Checks if the question is time-sensitive or requires very recent information
@@ -393,9 +403,11 @@ function getQuestionEvaluationPrompt(question: string): string {
 
 <examples>
 <example-1>
-Question: "谁发明了微积分？牛顿和莱布尼兹各自的贡献是什么？"
+谁发明了微积分？牛顿和莱布尼兹各自的贡献是什么？
+<think>
+这是关于微积分历史的问题，不需要最新信息。问题特别提到了牛顿和莱布尼兹两个人，要求分析他们各自的贡献，所以我需要全面回答这两部分内容。完整性比较重要，而不是提供多个不同答案。
+</think>
 <output>
-"think": "这是关于微积分历史的问题，不需要最新信息。问题特别提到了牛顿和莱布尼兹两个人，要求分析他们各自的贡献，所以我需要全面回答这两部分内容。完整性比较重要，而不是提供多个不同答案。",
 "needsFreshness": false,
 "needsPlurality": false,
 "needsCompleteness": true,
@@ -403,9 +415,11 @@ Question: "谁发明了微积分？牛顿和莱布尼兹各自的贡献是什么
 </example-1>
 
 <example-2>
-Question: "fam PLEASE help me calculate the eigenvalues of this 4x4 matrix ASAP!! [matrix details] got an exam tmrw 😭"
+fam PLEASE help me calculate the eigenvalues of this 4x4 matrix ASAP!! [matrix details] got an exam tmrw 😭
+<think>
+This is a math question about eigenvalues which doesn't change over time, so I don't need fresh info. A 4x4 matrix has multiple eigenvalues, so I'll need to provide several results. The student just wants the eigenvalues calculated, not asking me to address multiple specific topics.
+</think>
 <output>
-"think": "This is a math question about eigenvalues which doesn't change over time, so I don't need fresh info. A 4x4 matrix has multiple eigenvalues, so I'll need to provide several results. The student just wants the eigenvalues calculated, not asking me to address multiple specific topics.",
 "needsFreshness": false,
 "needsPlurality": true,
 "needsCompleteness": false,
@@ -413,9 +427,11 @@ Question: "fam PLEASE help me calculate the eigenvalues of this 4x4 matrix ASAP!
 </example-2>
 
 <example-3>
-Question: "Quelles sont les principales différences entre le romantisme et le réalisme dans la littérature du 19ème siècle?"
+Quelles sont les principales différences entre le romantisme et le réalisme dans la littérature du 19ème siècle?
 <output>
-"think": "C'est une question sur l'histoire littéraire, donc je n'ai pas besoin d'informations récentes. Je dois comparer deux mouvements spécifiques: le romantisme et le réalisme. Ma réponse doit couvrir ces deux éléments, donc l'exhaustivité est importante ici. La pluralité n'est pas la priorité dans ce cas.",
+<think>
+C'est une question sur l'histoire littéraire, donc je n'ai pas besoin d'informations récentes. Je dois comparer deux mouvements spécifiques: le romantisme et le réalisme. Ma réponse doit couvrir ces deux éléments, donc l'exhaustivité est importante ici. La pluralité n'est pas la priorité dans ce cas.
+</think>
 "needsFreshness": false,
 "needsPlurality": false,
 "needsCompleteness": true,
@@ -423,9 +439,11 @@ Question: "Quelles sont les principales différences entre le romantisme et le r
 </example-3>
 
 <example-4>
-Question: "Shakespeare の最も有名な悲劇を5つ挙げ、簡単にあらすじを説明してください。"
+Shakespeare の最も有名な悲劇を5つ挙げ、簡単にあらすじを説明してください。
+<think>
+シェイクスピアの悲劇についての質問だから、最新情報は必要ないな。「5つ挙げ」とはっきり書いてあるから、複数の回答が必要だ。どの悲劇を選ぶかは私次第で、特定の作品について比較するよう求められているわけじゃないから、完全性よりも複数性が重要だな。
+</think>
 <output>
-"think": "シェイクスピアの悲劇についての質問だから、最新情報は必要ないな。「5つ挙げ」とはっきり書いてあるから、複数の回答が必要だ。どの悲劇を選ぶかは私次第で、特定の作品について比較するよう求められているわけじゃないから、完全性よりも複数性が重要だな。",
 "needsFreshness": false,
 "needsPlurality": true,
 "needsCompleteness": false,
@@ -433,9 +451,11 @@ Question: "Shakespeare の最も有名な悲劇を5つ挙げ、簡単にあら�
 </example-4>
 
 <example-5>
-Question: "What are the current interest rates for mortgage loans from Bank of America, Wells Fargo, and Chase Bank in the US?"
+What are the current interest rates for mortgage loans from Bank of America, Wells Fargo, and Chase Bank in the US?
+<think>
+This is asking about 'current' interest rates, so I definitely need up-to-date info. The person wants rates from three specific banks: Bank of America, Wells Fargo, and Chase. I need to cover all three to properly answer, so addressing these specific elements is more important than providing multiple different answers.
+</think>
 <output>
-"think": "This is asking about 'current' interest rates, so I definitely need up-to-date info. The person wants rates from three specific banks: Bank of America, Wells Fargo, and Chase. I need to cover all three to properly answer, so addressing these specific elements is more important than providing multiple different answers.",
 "needsFreshness": true,
 "needsPlurality": false,
 "needsCompleteness": true,
@@ -443,9 +463,10 @@ Question: "What are the current interest rates for mortgage loans from Bank of A
 </example-5>
 
 <example-6>
-Question: "2025年に注目すべき人工知能の3つのトレンドは何ですか？"
-<output>
-"think": "これは将来のAIトレンドについての質問だから、最新の情報が必要だね。「3つの」と明確に数を指定しているから、複数の回答が求められている。特定のトレンドについて詳しく説明するというより、重要なトレンドを3つ挙げることが大事そうだから、複数性の方が完全性より重要だな。",
+2025年に注目すべき人工知能の3つのトレンドは何ですか？
+<think>
+これは将来のAIトレンドについての質問だから、最新の情報が必要だね。「3つの」と明確に数を指定しているから、複数の回答が求められている。特定のトレンドについて詳しく説明するというより、重要なトレンドを3つ挙げることが大事そうだから、複数性の方が完全性より重要だな。
+</think>
 "needsFreshness": true,
 "needsPlurality": true,
 "needsCompleteness": false,
@@ -453,9 +474,11 @@ Question: "2025年に注目すべき人工知能の3つのトレンドは何で�
 </example-6>
 
 <example-7>
-Question: "Was sind die besten Strategien für nachhaltiges Investieren in der heutigen Wirtschaft?"
+Was sind die besten Strategien für nachhaltiges Investieren in der heutigen Wirtschaft?
+<think>
+Hier geht's um Investieren in der 'heutigen Wirtschaft', also brauche ich aktuelle Informationen. Die Frage ist nach 'Strategien' im Plural gestellt, daher sollte ich mehrere Beispiele nennen. Es werden keine bestimmten Aspekte genannt, die ich alle behandeln muss - ich soll einfach verschiedene gute Strategien vorschlagen. Aktualität und mehrere Antworten sind hier wichtig.
+</think>
 <output>
-"think": "Hier geht's um Investieren in der 'heutigen Wirtschaft', also brauche ich aktuelle Informationen. Die Frage ist nach 'Strategien' im Plural gestellt, daher sollte ich mehrere Beispiele nennen. Es werden keine bestimmten Aspekte genannt, die ich alle behandeln muss - ich soll einfach verschiedene gute Strategien vorschlagen. Aktualität und mehrere Antworten sind hier wichtig.",
 "needsFreshness": true,
 "needsPlurality": true,
 "needsCompleteness": false,
@@ -463,20 +486,22 @@ Question: "Was sind die besten Strategien für nachhaltiges Investieren in der h
 </example-7>
 
 <example-8>
-Question: "请解释赤壁之战的历史背景、主要参与者以及战略意义，这对中国历史产生了什么影响？"
+请解释赤壁之战的历史背景、主要参与者以及战略意义，这对中国历史产生了什么影响？
+<think>
+这是关于历史事件的问题，不需要最新信息。问题清楚地列出了几个需要我回答的方面：历史背景、主要参与者、战略意义和历史影响。我需要涵盖所有这些特定方面，而不是提供多个不同的答案。这里完整性比复数性更重要。
+</think>
 <output>
-"think": "这是关于历史事件的问题，不需要最新信息。问题清楚地列出了几个需要我回答的方面：历史背景、主要参与者、战略意义和历史影响。我需要涵盖所有这些特定方面，而不是提供多个不同的答案。这里完整性比复数性更重要。",
 "needsFreshness": false,
 "needsPlurality": false,
 "needsCompleteness": true,
 </output>
 </example-8>
 </examples>
-
-Now evaluate this question:
-Question: ${question}
-
-NOTE: "think" field should be in the same language as the question`;
+`,
+    user:
+`${question}
+<think>`
+  };
 }
 
 const TOOL_NAME = 'evaluator';
@@ -488,11 +513,13 @@ export async function evaluateQuestion(
 ): Promise<EvaluationType[]> {
   try {
     const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
+    const prompt = getQuestionEvaluationPrompt(question);
 
     const result = await generator.generateObject({
       model: TOOL_NAME,
       schema: schemaGen.getQuestionEvaluateSchema(),
-      prompt: getQuestionEvaluationPrompt(question),
+      system: prompt.system,
+      prompt: prompt.user
     });
 
     console.log('Question Evaluation:', result.object);
@@ -519,7 +546,7 @@ export async function evaluateQuestion(
 
 async function performEvaluation<T>(
   evaluationType: EvaluationType,
-  prompt: string,
+  prompt: PromptPair,
   trackers: TrackerContext,
   schemaGen: Schemas
 ): Promise<GenerateObjectResult<T>> {
@@ -527,7 +554,8 @@ async function performEvaluation<T>(
   const result = await generator.generateObject({
     model: TOOL_NAME,
     schema: schemaGen.getEvaluatorSchema(evaluationType),
-    prompt: prompt,
+    system: prompt.system,
+    prompt: prompt.user
   }) as GenerateObjectResult<any>;
 
   trackers.actionTracker.trackThink(result.object.think)
@@ -557,7 +585,7 @@ export async function evaluateAnswer(
   }
 
   for (const evaluationType of evaluationTypes) {
-    let prompt: string = '';
+    let prompt: { system: string; user: string } | undefined
     switch (evaluationType) {
       case 'attribution': {
         // Safely handle references and ensure we have content

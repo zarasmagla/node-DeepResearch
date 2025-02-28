@@ -1,5 +1,5 @@
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {CodeGenResponse, TrackerContext} from "../types";
+import {CodeGenResponse, PromptPair, TrackerContext} from "../types";
 import {Schemas} from "../utils/schemas";
 
 
@@ -14,7 +14,7 @@ function getPrompt(
   problem: string,
   availableVars: string,
   previousAttempts: Array<{ code: string; error?: string }> = []
-): string {
+): PromptPair {
   const previousAttemptsContext = previousAttempts.map((attempt, index) => `
 <bad-attempt-${index + 1}>
 ${attempt.code}
@@ -47,14 +47,11 @@ Response:
 {
   "code": "return numbers.filter(n => n > threshold).reduce((a, b) => a + b, 0);"
 }
-</example>
-
-Problem to solve:
-${problem}`;
+</example>`;
 
   console.log('Coding prompt', prompt)
 
-  return prompt;
+  return {system: prompt, user: problem };
 }
 
 export class CodeSandbox {
@@ -86,7 +83,8 @@ export class CodeSandbox {
     const result = await this.generator.generateObject({
       model: 'coder',
       schema: this.schemaGen.getCodeGeneratorSchema(),
-      prompt,
+      system: prompt.system,
+      prompt: prompt.user
     });
 
     this.trackers?.actionTracker.trackThink(result.object.think);

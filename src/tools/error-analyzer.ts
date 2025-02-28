@@ -1,11 +1,11 @@
-import {ErrorAnalysisResponse, TrackerContext} from '../types';
+import {ErrorAnalysisResponse, PromptPair, TrackerContext} from '../types';
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
 
 
-
-function getPrompt(diaryContext: string[]): string {
-  return `You are an expert at analyzing search and reasoning processes. Your task is to analyze the given sequence of steps and identify what went wrong in the search process.
+function getPrompt(diaryContext: string[]): PromptPair {
+  return {
+    system: `You are an expert at analyzing search and reasoning processes. Your task is to analyze the given sequence of steps and identify what went wrong in the search process.
 
 <rules>
 1. The sequence of actions taken
@@ -90,14 +90,13 @@ The answer is not definitive and fails to provide the requested information.  La
   ]
 }
 </output>
-</example>
-Review the steps below carefully and generate your analysis following this format.
-
-${diaryContext.join('\n')}
-`;
+</example>`,
+    user: `${diaryContext.join('\n')}`
+  }
 }
 
 const TOOL_NAME = 'errorAnalyzer';
+
 export async function analyzeSteps(
   diaryContext: string[],
   trackers: TrackerContext,
@@ -110,7 +109,8 @@ export async function analyzeSteps(
     const result = await generator.generateObject({
       model: TOOL_NAME,
       schema: schemaGen.getErrorAnalysisSchema(),
-      prompt,
+      system: prompt.system,
+      prompt: prompt.user
     });
 
     console.log(TOOL_NAME, result.object);

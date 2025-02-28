@@ -94,7 +94,7 @@ export class Schemas {
       needsFreshness: z.boolean().describe('If the question requires freshness check'),
       needsPlurality: z.boolean().describe('If the question requires plurality check'),
       needsCompleteness: z.boolean().describe('If the question requires completeness check'),
-      think: z.string().describe(`A very concise explain of why you choose those checks are needed. ${this.getLanguagePrompt()}`).max(500),
+      think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()}`).max(500),
     });
   }
 

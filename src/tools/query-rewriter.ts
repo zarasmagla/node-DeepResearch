@@ -1,10 +1,10 @@
-import {SearchAction, TrackerContext} from '../types';
+import {PromptPair, SearchAction, TrackerContext} from '../types';
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
 
 
-function getPrompt(query: string, think: string): string {
-  return `You are an expert search query generator with deep psychological understanding. You optimize user queries by extensively analyzing potential user intents and generating comprehensive search variations.
+function getPrompt(query: string, think: string): PromptPair {
+  return {system:`You are an expert search query generator with deep psychological understanding. You optimize user queries by extensively analyzing potential user intents and generating comprehensive search variations.
 
 <rules>
 1. Start with deep intent analysis:
@@ -207,13 +207,12 @@ queries: [
   "AI literacy career development practical guide"
 ]
 </example-3>
-</examples>
+</examples>`,
+    user:`
+${query}
 
-Now, process this query:
-Input Query: ${query}
-
-Let me think as a user: ${think}
-`;
+<think>${think}
+`};
 }
 
 const TOOL_NAME = 'queryRewriter';
@@ -228,7 +227,8 @@ export async function rewriteQuery(action: SearchAction, trackers: TrackerContex
       const result = await generator.generateObject({
         model: TOOL_NAME,
         schema: schemaGen.getQueryRewriterSchema(),
-        prompt,
+        system: prompt.system,
+        prompt: prompt.user,
       });
       trackers?.actionTracker.trackThink(result.object.think);
       return result.object.queries;

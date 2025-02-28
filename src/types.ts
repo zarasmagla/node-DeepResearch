@@ -181,6 +181,8 @@ export interface Model {
   owned_by: string;
 }
 
+export type PromptPair = { system: string, user: string };
+
 export interface ChatCompletionRequest {
   model: string;
   messages: Array<CoreUserMessage | CoreAssistantMessage>;
