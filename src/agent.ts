@@ -258,7 +258,8 @@ export async function getResponse(question?: string,
     messages = [{role: 'user', content: question.trim()}]
   }
 
-  const SchemaGen = new Schemas(question);
+  const SchemaGen = new Schemas();
+  await SchemaGen.setLanguage(question)
   const context: TrackerContext = {
     tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker()

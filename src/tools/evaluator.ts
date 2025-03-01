@@ -366,7 +366,7 @@ Answer: ${answer}`
 
 function getQuestionEvaluationPrompt(question: string): PromptPair {
   return {
-    system: `You are an evaluator that determines if a question requires freshness, plurality, and/or completeness checks in addition to the required definitiveness check.
+    system: `You are an evaluator that determines if a question requires freshness, plurality, and/or completeness checks.
 
 <evaluation_types>
 1. freshness - Checks if the question is time-sensitive or requires very recent information
@@ -399,7 +399,7 @@ function getQuestionEvaluationPrompt(question: string): PromptPair {
      * Named time periods: "Renaissance and Industrial Revolution"
    - Look for explicitly named elements separated by commas, "and", "or", bullets
    - Example patterns: "comparing X and Y", "differences between A, B, and C", "both P and Q"
-   - DO NOT trigger for elements that aren't specifically named
+   - DO NOT trigger for elements that aren't specifically named   
 </rules>
 
 <examples>
@@ -498,6 +498,7 @@ Hier geht's um Investieren in der 'heutigen Wirtschaft', also brauche ich aktuel
 </output>
 </example-8>
 </examples>
+
 `,
     user:
 `${question}

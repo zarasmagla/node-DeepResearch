@@ -64,18 +64,18 @@ export class Schemas {
   public languageCode: string = 'en';
 
 
-  constructor(query: string) {
+  async setLanguage(query: string) {
     const generator = new ObjectGeneratorSafe();
 
-    generator.generateObject({
+    const result = await generator.generateObject({
       model: 'evaluator',
       schema: this.getLanguageSchema(),
       prompt: getLanguagePrompt(query.slice(0, 100)),
-    }).then((result) => {
-      this.languageCode = result.object.langCode;
-      this.languageStyle = result.object.langStyle;
-      console.log(`langauge`, result.object);
     });
+
+    this.languageCode = result.object.langCode;
+    this.languageStyle = result.object.langStyle;
+    console.log(`langauge`, result.object);
   }
 
   getLanguagePrompt() {
@@ -91,10 +91,10 @@ export class Schemas {
 
   getQuestionEvaluateSchema(): z.ZodObject<any> {
     return z.object({
-      needsFreshness: z.boolean().describe('If the question requires freshness check'),
-      needsPlurality: z.boolean().describe('If the question requires plurality check'),
-      needsCompleteness: z.boolean().describe('If the question requires completeness check'),
       think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()}`).max(500),
+      needsFreshness: z.boolean(),
+      needsPlurality: z.boolean(),
+      needsCompleteness: z.boolean(),
     });
   }
 
