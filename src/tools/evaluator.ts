@@ -167,7 +167,7 @@ Answer: ${answer}`
   };
 }
 
-function getFreshnessPrompt(question: string, answer: string, currentTime: string): PromptPair {
+function getFreshnessPrompt(question: string, answer: AnswerAction, currentTime: string): PromptPair {
   return {
     system: `You are an evaluator that analyzes if answer content is likely outdated based on mentioned dates (or implied datetime) and current system time: ${currentTime}
 
@@ -226,7 +226,8 @@ Question-Answer Freshness Checker Guidelines
 
     user: `
 Question: ${question}
-Answer: ${answer}`
+Answer: 
+${JSON.stringify(answer)}`
   }
 }
 
@@ -609,7 +610,7 @@ export async function evaluateAnswer(
         break;
 
       case 'freshness':
-        prompt = getFreshnessPrompt(question, action.answer, new Date().toISOString());
+        prompt = getFreshnessPrompt(question, action, new Date().toISOString());
         break;
 
       case 'plurality':

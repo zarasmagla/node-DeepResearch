@@ -50,7 +50,8 @@ function getPrompt(
   // Add header section
   sections.push(`Current date: ${new Date().toUTCString()}
 
-You are an advanced AI research agent from Jina AI. You are specialized in multistep reasoning. Using your training data and prior lessons learned, answer the user question with absolute certainty.
+You are an advanced AI research agent from Jina AI. You are specialized in multistep reasoning. 
+Using your training data and prior lessons learned, answer the user question with absolute certainty.
 `);
 
   // Add knowledge section if exists
@@ -182,6 +183,8 @@ ${allKeywords.join('\n')}
 <action-answer>
 - For greetings, casual conversation, or general knowledge questions, answer directly without references.
 - For all other questions, provide a verified answer with references. Each reference must include exactQuote and url.
+- You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
+- You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
 - If uncertain, use <action-reflect>
 </action-answer>
 `);
@@ -224,7 +227,7 @@ ${actionSections.join('\n\n')}
 `);
 
   // Add footer
-  sections.push(`Respond in valid JSON format matching exact JSON schema.`);
+  sections.push(`Think step by step, choose the action, and respond in valid JSON format matching exact JSON schema of that action.`);
 
   return removeExtraLineBreaks(sections.join('\n\n'));
 }
@@ -297,6 +300,11 @@ export async function getResponse(question?: string,
       evaluationMetrics[currentQuestion] =
         await evaluateQuestion(currentQuestion, context, SchemaGen)
     }
+    if (step===1 && evaluationMetrics[currentQuestion].includes('freshness')) {
+      // if it detects freshness, avoid direct answer at step 1
+      allowAnswer = false;
+      allowReflect = false;
+    }
 
     // update all urls with buildURLMap
     // allowRead = allowRead && (Object.keys(allURLs).length > 0);
@@ -324,7 +332,11 @@ export async function getResponse(question?: string,
       system,
       messages,
     });
-    thisStep = result.object as StepAction;
+    thisStep = {
+      action: result.object.action,
+      think: result.object.think,
+      ...result.object[result.object.action]
+    } as StepAction;
     // print allowed and chose action
     const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect, allowCoding].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
     console.log(`${thisStep.action} <- [${actionsStr}]`);
@@ -354,7 +366,7 @@ export async function getResponse(question?: string,
       });
 
       // normalize all references urls, add title to it
-      thisStep.references = thisStep.references?.map(ref => {
+      thisStep.references = thisStep.references?.filter(ref => ref.url.startsWith('http')).map(ref => {
         return {
           exactQuote: ref.exactQuote,
           title: allURLs[ref.url]?.title,
@@ -730,7 +742,11 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       system,
       messages
     });
-    thisStep = result.object as AnswerAction;
+    thisStep = {
+        action: result.object.action,
+        think: result.object.think,
+        ...result.object[result.object.action]
+    } as AnswerAction;
     (thisStep as AnswerAction).isFinal = true;
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
   }

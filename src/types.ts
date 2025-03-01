@@ -17,6 +17,7 @@ export type AnswerAction = BaseAction & {
   references: Array<{
     exactQuote: string;
     url: string;
+    dateTime?: string;
   }>;
   isFinal?: boolean;
   mdAnswer?: string;
@@ -29,6 +30,7 @@ export type KnowledgeItem = {
   references?: Array<{
     exactQuote: string;
     url: string;
+    dateTime?: string;
   }> | Array<any>;
   type: 'qa' | 'side-info' | 'chat-history' | 'url' | 'coding',
   updated: string,
