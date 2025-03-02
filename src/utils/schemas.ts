@@ -1,13 +1,13 @@
 import {z} from "zod";
 import {ObjectGeneratorSafe} from "./safe-generator";
-import {EvaluationType} from "../types";
+import {EvaluationType, PromptPair} from "../types";
 
 export const MAX_URLS_PER_STEP = 2
 export const MAX_QUERIES_PER_STEP = 5
 export const MAX_REFLECT_PER_STEP = 3
 
-function getLanguagePrompt(question: string) {
-  return `Identifies both the language used and the overall vibe of the question
+function getLanguagePrompt(question: string): PromptPair {
+  return {system:`Identifies both the language used and the overall vibe of the question
 
 <rules>
 Combine both language and emotional vibe in a descriptive phrase, considering:
@@ -53,10 +53,8 @@ Evaluation: {
     "langCode": "en",
     "languageStyle": "casual English"
 }
-</examples>
-
-Now evaluate this question:
-${question}`;
+</examples>`,
+  user: question};
 }
 
 export class Schemas {
@@ -66,11 +64,13 @@ export class Schemas {
 
   async setLanguage(query: string) {
     const generator = new ObjectGeneratorSafe();
+    const prompt = getLanguagePrompt(query.slice(0, 100))
 
     const result = await generator.generateObject({
       model: 'evaluator',
       schema: this.getLanguageSchema(),
-      prompt: getLanguagePrompt(query.slice(0, 100)),
+      system: prompt.system,
+      prompt: prompt.user
     });
 
     this.languageCode = result.object.langCode;
