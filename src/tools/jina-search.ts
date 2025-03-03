@@ -18,7 +18,7 @@ export function search(query: string, tracker?: TokenTracker): Promise<{ respons
       headers: {
         'Accept': 'application/json',
         'Authorization': `Bearer ${JINA_API_KEY}`,
-        'X-Respond-With': 'favicon',
+        'X-Respond-With': 'no-content',
         'X-Retain-Images': 'none'
       }
     };

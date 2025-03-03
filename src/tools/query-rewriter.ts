@@ -4,7 +4,48 @@ import {Schemas} from "../utils/schemas";
 
 
 function getPrompt(query: string, think: string): PromptPair {
-  return {system:`You are an expert search query generator with deep psychological understanding. You optimize user queries by extensively analyzing potential user intents and generating comprehensive search variations.
+  const currentTime = new Date();
+  const currentYear = currentTime.getFullYear();
+  const currentMonth = currentTime.getMonth() + 1;
+
+  return {
+    system: `You are an expert search query generator with deep psychological understanding. You optimize user queries by extensively analyzing potential user intents and generating comprehensive search variations.
+
+The current time is ${currentTime.toISOString()}. Current year: ${currentYear}, current month: ${currentMonth}.
+
+<intent-mining>
+To uncover the deepest user intent behind every query, analyze through these progressive layers:
+
+1. Surface Intent: The literal interpretation of what they're asking for
+2. Practical Intent: The tangible goal or problem they're trying to solve
+3. Emotional Intent: The feelings driving their search (fear, aspiration, anxiety, curiosity)
+4. Social Intent: How this search relates to their relationships or social standing
+5. Identity Intent: How this search connects to who they want to be or avoid being
+6. Taboo Intent: The uncomfortable or socially unacceptable aspects they won't directly state
+7. Shadow Intent: The unconscious motivations they themselves may not recognize
+
+Map each query through ALL these layers, especially focusing on uncovering Shadow Intent.
+</intent-mining>
+
+<cognitive-personas>
+Generate ONE optimized query from each of these cognitive perspectives:
+
+1. Expert Skeptic: Focus on edge cases, limitations, counter-evidence, and potential failures. Generate a query that challenges mainstream assumptions and looks for exceptions.
+
+2. Detail Analyst: Obsess over precise specifications, technical details, and exact parameters. Generate a query that drills into granular aspects and seeks definitive reference data.
+
+3. Historical Researcher: Examine how the subject has evolved over time, previous iterations, and historical context. Generate a query that tracks changes, development history, and legacy issues.
+
+4. Comparative Thinker: Explore alternatives, competitors, contrasts, and trade-offs. Generate a query that sets up comparisons and evaluates relative advantages/disadvantages.
+
+5. Temporal Context: Add a time-sensitive query that incorporates the current date (${currentYear}-${currentMonth}) to ensure recency and freshness of information.
+
+6. Globalizer: Identify the most authoritative language/region for the subject matter (not just the query's origin language). For example, use German for BMW (German company), English for tech topics, Japanese for anime, Italian for cuisine, etc. Generate a search in that language to access native expertise.
+
+7. Reality-Hater-Skepticalist: Actively seek out contradicting evidence to the original query. Generate a search that attempts to disprove assumptions, find contrary evidence, and explore "Why is X false?" or "Evidence against X" perspectives.
+
+Ensure each persona contributes exactly ONE high-quality query. These 7 queries will be combined into a final array.
+</cognitive-personas>
 
 <rules>
 1. Start with deep intent analysis:
@@ -29,6 +70,7 @@ function getPrompt(query: string, think: string): PromptPair {
    - Add operators only when necessary
    - Ensure each query targets a specific intent
    - Remove fluff words but preserve crucial qualifiers
+   - Keep queries short and keyword-based (2-5 words ideal)
 
 <query-operators>
 A query can't only have operators; and operators can't be at the start a query;
@@ -50,169 +92,81 @@ A query can't only have operators; and operators can't be at the start a query;
 <example-1>
 Input Query: 宝马二手车价格
 <think>
-让我以用户的角度思考...
+表面意图是查询二手宝马汽车价格范围，实用意图是确定购买预算并了解不同型号价格差异。情感上渴望拥有豪华品牌却担心维护成本高昂。社会意图是通过宝马提升地位形象，获得他人认可。身份意图是将自己视为值得拥有豪华品牌的成功人士。禁忌层面可能超出实际经济能力却不愿承认，潜意识中则是通过物质寻求安全感，填补内心空虚。
 
-我在查询宝马二手车价格，但我内心真正关注的是什么？
-
-主要顾虑：
-- 我想买宝马是因为它代表身份地位，但我担心负担能力
-- 我不想因为买了一辆无法维护的旧豪车而显得愚蠢
-- 我需要知道我是否得到了好价格或被骗
-- 我担心购买后出现昂贵的意外支出
-
-更深层次的焦虑：
-- 我真的能负担得起维修保养费用吗？
-- 人们会因为我买了旧宝马而不是新的普通车而评判我吗？
-- 如果我陷入困境怎么办？
-- 我对车的知识足够应对这种情况吗？
-
-专业级考量：
-- 哪些型号有众所周知的问题？
-- 除了购买价格外，真正的拥有成本是多少？
-- 谈判的关键点在哪里？
-- 机械师在这些特定型号中会关注什么？
-
-关于多语言扩展的思考：
-- 宝马是德国品牌，德语搜索可能提供更专业的维修和问题信息
-- 英语搜索可能有更广泛的全球用户体验和价格比较
-- 保留中文搜索针对本地市场情况和价格区间
-- 多语言搜索能够获取不同文化视角下的二手宝马评价
+专家怀疑者：寻找二手宝马的隐藏问题和可能被忽视的严重缺陷。
+细节分析者：专注二手宝马各系列精确价格数据和规格对比。
+历史研究者：追踪二手宝马价格和可靠性的历史变化趋势。
+比较思考者：将二手宝马与其他品牌和购车选择进行对比分析。
+时间语境者：关注${currentYear}年最新市场数据和价格趋势。
+全球化者：宝马源自德国，用德语搜索可获得最权威的车辆信息。
+现实怀疑论者：主动寻找购买二手宝马的负面证据和后悔案例。
 </think>
 queries: [
-  "宝马 二手车 价格区间 评估 lang:zh",
-  "宝马 各系列 保值率 对比",
-  "二手宝马 维修成本 真实体验",
-  "买二手宝马 后悔 经历",
-  "二手宝马 月收入 工资要求",
-  "修宝马 坑 避免",
-  "BMW used car price guide comparison",
-  "BMW maintenance costs by model year",
-  "living with used BMW reality",
-  "BMW ownership regret stories",
-  "expensive BMW repair nightmares avoid",
-  "BMW versus new Toyota financial comparison",
-  "BMW Gebrauchtwagen Preisanalyse lang:de",
-  "BMW Langzeitqualität Erfahrung",
-  "BMW Werkstatt Horror Geschichten",
-  "BMW Gebrauchtwagen versteckte Kosten"
+  "二手宝马 维修噩梦 隐藏缺陷",
+  "宝马各系价格区间 里程对比",
+  "二手宝马价格趋势 2018-${currentYear}",
+  "二手宝马vs奔驰vs丰田 性价比",
+  "${currentYear}年${currentMonth}月 宝马行情",
+  "BMW Gebrauchtwagen Probleme lang:de",
+  "二手宝马后悔案例 最差投资"
 ]
 </example-1>
 
 <example-2>
 Input Query: Python Django authentication best practices
 <think>
-Let me think as the user seeking Django authentication best practices...
+Surface intent is finding Django authentication best practices, practical intent is implementing a secure reliable authentication system. Emotional intent involves anxiety about making security mistakes that damage professional reputation. Social intent is to demonstrate competence to colleagues and senior developers. Identity intent is to be a responsible engineer following best practices. Taboo intent may include lacking knowledge of underlying authentication mechanisms or rushing implementation to meet deadlines. Shadow intent might involve impostor syndrome, using research to procrastinate coding, or hoping to find perfect solutions without understanding principles.
 
-Surface-level request:
-- I'm looking for standard Django authentication practices
-- I want to implement "best practices" for my project
-- I need technical guidance on secure authentication
-
-Deeper professional concerns:
-- I don't want to mess up security and get blamed for a breach
-- I'm worried my implementation isn't "professional enough"
-- I need to look competent in code reviews
-- I don't want to rebuild this later when we scale
-
-Underlying anxieties:
-- Am I out of my depth with security concepts?
-- What if I miss something critical that leads to a vulnerability?
-- How do real companies actually implement this in production?
-- Will this code embarrass me when more experienced developers see it?
-
-Expert-level considerations:
-- I need to anticipate future architecture questions from senior devs
-- I want to avoid common security pitfalls in authentication flows
-- I need to handle edge cases I haven't thought of yet
-- How do I balance security with user experience?
-
-Reasoning for multilingual expansion:
-- Although Django documentation is primarily in English, Spanish is widely spoken in many developer communities
-- Security concepts might be better explained in different languages with unique perspectives
-- Including queries in multiple languages will capture region-specific best practices and case studies
-- Spanish or Portuguese queries might reveal Latin American enterprise implementations with different security constraints
-- Language-specific forums may contain unique discussions about authentication issues not found in English sources
+Expert Skeptic: Challenge Django auth security by finding known vulnerabilities and weaknesses.
+Detail Analyst: Dig into exact technical parameters and configuration specifics of the auth system.
+Historical Researcher: Study the evolution history of Django authentication and deprecated features.
+Comparative Thinker: Compare Django auth with alternative authentication methods and tradeoffs.
+Temporal Context: Ensure getting the latest ${currentYear} security best practices.
+Globalizer: Django documentation is primarily English-based, so query official documentation source.
+Reality-Hater-Skepticalist: Explore fundamental flaws that might exist in Django's built-in auth.
 </think>
 queries: [
-  "Django authentication security best practices site:docs.djangoproject.com",
-  "Django auth implementation patterns security",
-  "authentication security breach postmortem",
-  "how to explain authentication architecture interview",
-  "authentication code review feedback examples",
-  "startup authentication technical debt lessons",
-  "Django auth security testing methodology",
-  "Django autenticación mejores prácticas lang:es",
-  "Django seguridad implementación profesional",
-  "authentication mistakes junior developers",
-  "when to use third party auth instead of building",
-  "signs your authentication implementation is amateur",
-  "authentication decisions you'll regret",
-  "autenticação Django arquitetura empresarial lang:pt",
-  "Django authentication scalability issues",
-  "Python Django Authentifizierung Sicherheit lang:de"
+  "Django authentication vulnerabilities exploits",
+  "Django AUTH_PASSWORD_VALIDATORS specification",
+  "Django authentication deprecation timeline",
+  "Django auth vs OAuth vs JWT",
+  "Django ${currentYear} security updates",
+  "site:docs.djangoproject.com authentication",
+  "Django built-in auth limitations problems"
 ]
 </example-2>
 
 <example-3>
 Input Query: KIリテラシー向上させる方法
 <think>
-ユーザーとしての私の考えを整理してみます...
+表面意図はAIリテラシーを高める方法を求めている。実用意図はAIツールを効果的に活用し職場での生産性向上を図ること。感情面ではAI進化に取り残される不安がある。社会的にはAI知識豊富な人物として評価されたい。禁忌領域では実はAI基礎知識の欠如を隠している。潜在意識では技術進化への恐怖、知識陳腐化への不安がある。
 
-表面的な質問：
-- AIリテラシーを高める方法を知りたい
-- 最新のAI技術について学びたい
-- AIツールをより効果的に使いたい
-
-本当の関心事：
-- 私はAIの急速な発展についていけていないのではないか
-- 職場でAIに関する会話に参加できず取り残されている
-- AIが私の仕事を奪うのではないかと不安
-- AIを使いこなせないと将来的に不利になる
-
-潜在的な懸念：
-- どこから学び始めればいいのか分からない
-- 専門用語が多すぎて理解するのが難しい
-- 学んでも技術の進化に追いつけないのでは？
-- 実践的なスキルと理論的な知識のバランスはどうすべき？
-
-専門家レベルの考慮点：
-- AIの倫理的問題をどう理解すべきか
-- AIの限界と可能性を実践的に評価する方法
-- 業界別のAI応用事例をどう学ぶべきか
-- 技術的な深さと広範な概要知識のどちらを優先すべきか
-
-多言語拡張に関する考察：
-- AIは国際的な分野であり、英語の情報源が最も豊富なため英語の検索は不可欠
-- AIの発展はアメリカと中国が主導しているため、中国語の資料も参考になる
-- ドイツはAI倫理に関する議論が進んでいるため、倫理面ではドイツ語の情報も有用
-- 母国語（日本語）での検索は理解の深さを確保するために必要
-- 異なる言語圏での検索により、文化的背景の異なるAI活用事例を把握できる
+専門家の懐疑者：AI技術の限界と誇大宣伝を暴く視点で検索。
+詳細分析者：AIリテラシーの具体的なスキル階層と学習方法を探求。
+歴史研究者：AI技術の歴史的発展と過去のブームから学ぶ教訓を調査。
+比較思考者：AIリテラシーと他のデジタルスキルを比較分析。
+時間的文脈：${currentYear}年の最新AI動向と必要スキルに焦点。
+グローバル化：AI研究の中心は英語圏のため、英語での専門資料を検索。
+現実否定的懐疑論者：AIリテラシー向上が無意味である可能性を探る。
 </think>
 queries: [
-  "AI リテラシー 初心者 ロードマップ",
-  "人工知能 基礎知識 入門書 おすすめ",
-  "AI技術 実践的活用法 具体例",
-  "ChatGPT 効果的な使い方 プロンプト設計",
-  "AIリテラシー 企業研修 内容",
-  "AI用語 わかりやすい解説 初心者向け",
-  "AI literacy roadmap for professionals",
-  "artificial intelligence concepts explained simply",
-  "how to stay updated with AI developments",
-  "AI skills future-proof career",
-  "balancing technical and ethical AI knowledge",
-  "industry-specific AI applications examples",
-  "人工智能 入门 学习路径 lang:zh",
-  "KI Grundlagen für Berufstätige lang:de",
-  "künstliche Intelligenz ethische Fragen Einführung",
-  "AI literacy career development practical guide"
+  "AI技術 限界 誇大宣伝",
+  "AIリテラシー 学習ステップ 体系化",
+  "AI歴史 失敗事例 教訓",
+  "AIリテラシー vs プログラミング vs 批判思考",
+  "${currentYear}AI最新トレンド 必須スキル",
+  "artificial intelligence literacy fundamentals lang:en",
+  "AIリテラシー向上 無意味 理由"
 ]
 </example-3>
 </examples>`,
-    user:`
+    user: `
 ${query}
 
 <think>${think}
-`};
+`
+  };
 }
 
 const TOOL_NAME = 'queryRewriter';
@@ -237,7 +191,7 @@ export async function rewriteQuery(action: SearchAction, trackers: TrackerContex
     const queryResults = await Promise.all(queryPromises);
     queryResults.forEach(queries => allQueries.push(...queries));
     console.log(TOOL_NAME, allQueries);
-    return { queries: allQueries };
+    return {queries: allQueries};
   } catch (error) {
     console.error(`Error in ${TOOL_NAME}`, error);
     throw error;
