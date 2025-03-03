@@ -4,7 +4,25 @@ import {readUrl, removeAllLineBreaks} from "./read";
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
 
+const TOOL_NAME = 'evaluator';
 
+
+function getRejectAllAnswersPrompt(question: string, answer: AnswerAction): PromptPair {
+  return {
+    system: `You are a ruthless evaluator trained to REJECT answers. 
+Your job is to find ANY weakness in the presented JSON answer. Extremely strict standards of evidence apply. 
+Identity EVERY missing detail. First, argue AGAINST the conclusion with the strongest possible case. 
+Then, argue FOR the conclusion. 
+Only after considering both perspectives, synthesize a final improvement plan.
+
+Any JSON formatting/structure/syntax issue should not be the reason to rejection.
+`,
+    user: `
+question: ${question}
+answer: ${JSON.stringify(answer)}
+`
+  }
+}
 
 function getAttributionPrompt(question: string, answer: string, sourceContent: string): PromptPair {
   return {
@@ -358,7 +376,7 @@ Question Type Reference Table
 </rules>
 `,
     user:
-`Question: ${question}
+      `Question: ${question}
 Answer: ${answer}`
   }
 }
@@ -501,12 +519,11 @@ Hier geht's um Investieren in der 'heutigen Wirtschaft', also brauche ich aktuel
 
 `,
     user:
-`${question}
+      `${question}
 <think>`
   };
 }
 
-const TOOL_NAME = 'evaluator';
 
 export async function evaluateQuestion(
   question: string,
@@ -619,6 +636,9 @@ export async function evaluateAnswer(
         break;
       case 'completeness':
         prompt = getCompletenessPrompt(question, action.answer);
+        break;
+      case 'strict':
+        prompt = getRejectAllAnswersPrompt(question, action);
         break;
       default:
         console.error(`Unknown evaluation type: ${evaluationType}`);

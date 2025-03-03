@@ -288,6 +288,7 @@ export async function getResponse(question?: string,
   const evaluationMetrics: Record<string, EvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
   const regularBudget = tokenBudget * 0.9;
+  let finalAnswerPIP: string = '';
   while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
     step++;
@@ -301,7 +302,12 @@ export async function getResponse(question?: string,
       evaluationMetrics[currentQuestion] =
         await evaluateQuestion(currentQuestion, context, SchemaGen)
     }
-    if (step===1 && evaluationMetrics[currentQuestion].includes('freshness')) {
+    if (currentQuestion.trim() === question && !evaluationMetrics[currentQuestion].includes('strict') && step===1) {
+      // force strict eval for the original question, only once.
+      evaluationMetrics[currentQuestion].push('strict')
+    }
+
+    if (step === 1 && evaluationMetrics[currentQuestion].includes('freshness')) {
       // if it detects freshness, avoid direct answer at step 1
       allowAnswer = false;
       allowReflect = false;
@@ -326,7 +332,7 @@ export async function getResponse(question?: string,
       getUnvisitedURLs(allURLs, visitedURLs),
       false,
     );
-    schema = SchemaGen.getAgentSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding)
+    schema = SchemaGen.getAgentSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding, finalAnswerPIP)
     const result = await generator.generateObject({
       model: 'agent',
       schema,
@@ -376,7 +382,7 @@ export async function getResponse(question?: string,
       });
 
       context.actionTracker.trackThink('eval_first', SchemaGen.languageCode)
-
+      console.log(currentQuestion, evaluationMetrics[currentQuestion])
       const evaluation = await evaluateAnswer(currentQuestion, thisStep,
         evaluationMetrics[currentQuestion],
         context,
@@ -403,6 +409,11 @@ Your journey ends here. You have successfully answered the original question. Co
           thisStep.isFinal = true;
           break
         } else {
+          if (evaluation.type === 'strict') {
+            finalAnswerPIP = evaluation.improvement_plan || '';
+            // remove 'strict' from the evaluation metrics
+            evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e !== 'strict');
+          }
           if (badAttempts >= maxBadAttempts) {
             thisStep.isFinal = false;
             break
@@ -736,7 +747,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       true,
     );
 
-    schema = SchemaGen.getAgentSchema(false, false, true, false, false);
+    schema = SchemaGen.getAgentSchema(false, false, true, false, false, finalAnswerPIP);
     const result = await generator.generateObject({
       model: 'agentBeastMode',
       schema,
@@ -744,9 +755,9 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       messages
     });
     thisStep = {
-        action: result.object.action,
-        think: result.object.think,
-        ...result.object[result.object.action]
+      action: result.object.action,
+      think: result.object.think,
+      ...result.object[result.object.action]
     } as AnswerAction;
     (thisStep as AnswerAction).isFinal = true;
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});

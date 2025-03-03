@@ -54,7 +54,7 @@ export type CodingAction = BaseAction & {
 
 export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitAction | CodingAction;
 
-export type EvaluationType = 'definitive' | 'freshness' | 'plurality' | 'attribution' | 'completeness';
+export type EvaluationType = 'definitive' | 'freshness' | 'plurality' | 'attribution' | 'completeness' | 'strict';
 
 
 // Following Vercel AI SDK's token counting interface
@@ -155,7 +155,8 @@ export type EvaluationResponse = {
   completeness_analysis?: {
     aspects_expected: string,
     aspects_provided: string,
-  }
+  },
+  improvement_plan?: string;
 };
 
 export type CodeGenResponse = {
