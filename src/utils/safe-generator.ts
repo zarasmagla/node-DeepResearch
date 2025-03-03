@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import {generateObject, LanguageModelUsage, NoObjectGeneratedError} from "ai";
+import {generateObject, LanguageModelUsage, NoObjectGeneratedError, Schema} from "ai";
 import {TokenTracker} from "./token-tracker";
 import {getModel, ToolName, getToolConfig} from "../config";
 
@@ -10,7 +10,7 @@ interface GenerateObjectResult<T> {
 
 interface GenerateOptions<T> {
   model: ToolName;
-  schema: z.ZodType<T>;
+  schema: z.ZodType<T> | Schema<T>;
   prompt?: string;
   system?:string;
   messages?: any;

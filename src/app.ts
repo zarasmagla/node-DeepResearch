@@ -11,6 +11,8 @@ import {
 } from './types';
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
+import {ObjectGeneratorSafe} from "./utils/safe-generator";
+import {jsonSchema} from "ai"; // or another converter library
 
 const app = express();
 
@@ -189,7 +191,7 @@ async function emitRemainingContent(
     system_fingerprint: 'fp_' + requestId,
     choices: [{
       index: 0,
-      delta: {content},
+      delta: {content, type: "think"},
       logprobs: null,
       finish_reason: null
     }],
@@ -335,7 +337,7 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
           system_fingerprint: 'fp_' + requestId,
           choices: [{
             index: 0,
-            delta: {content: word},
+            delta: {content: word, type: "think"},
             logprobs: null,
             finish_reason: null
           }]
@@ -404,6 +406,17 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     maxBadAttempts = body.max_attempts;
   }
 
+  let responseSchema = undefined;
+  if (body.response_format?.json_schema) {
+    // Convert JSON schema to Zod schema using a proper converter
+    try {
+      responseSchema = jsonSchema(body.response_format.json_schema);
+      console.log(responseSchema)
+    } catch (error: any) {
+      return res.status(400).json({error: `Invalid JSON schema: ${error.message}`});
+    }
+  }
+
   const requestId = Date.now().toString();
   const created = Math.floor(Date.now() / 1000);
   const context: TrackerContext = {
@@ -436,7 +449,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       system_fingerprint: 'fp_' + requestId,
       choices: [{
         index: 0,
-        delta: {role: 'assistant', content: '<think>'},
+        delta: {role: 'assistant', content: '<think>', type: "text"},
         logprobs: null,
         finish_reason: null
       }]
@@ -476,12 +489,31 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       visitedURLs: visitedURLs,
       readURLs: readURLs
     } = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
+    let finalAnswer = (finalStep as AnswerAction).mdAnswer;
+
+    if (responseSchema) {
+      try {
+        console.log('hello2')
+        const generator = new ObjectGeneratorSafe(context?.tokenTracker);
+        const result = await generator.generateObject({
+          model: 'agent',
+          schema: responseSchema,
+          prompt: finalAnswer,
+          system: "Extract the structured data from the text according to the JSON schema.",
+        });
+
+        // Use the generated object as the response content
+        finalAnswer = JSON.stringify(result.object, null, 2);
+        console.log('Generated object:', finalAnswer)
+      } catch (error) {
+        console.error('Error processing response with schema:', error);
+      }
+    }
 
     const usage = context.tokenTracker.getTotalUsageSnakeCase();
     if (body.stream) {
       // Complete any ongoing streaming before sending final answer
       await completeCurrentStreaming(streamingState, res, requestId, created, body.model);
-      const finalAnswer = (finalStep as AnswerAction).mdAnswer;
       // Send closing think tag
       const closeThinkChunk: ChatCompletionChunk = {
         id: requestId,
@@ -491,7 +523,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: `</think>\n\n${finalAnswer}`},
+          delta: {content: `</think>\n\n`, type: "think"},
           logprobs: null,
           finish_reason: null
         }]
@@ -507,7 +539,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: ''},
+          delta: {content: finalAnswer, type: "text"},
           logprobs: null,
           finish_reason: 'stop'
         }],
@@ -529,7 +561,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           index: 0,
           message: {
             role: 'assistant',
-            content: finalStep.action === 'answer' ? (finalStep.mdAnswer || '') : finalStep.think
+            content: finalStep.action === 'answer' ? (finalAnswer || '') : finalStep.think
           },
           logprobs: null,
           finish_reason: 'stop'
@@ -580,7 +612,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: '</think>'},
+          delta: {content: '</think>', type: "think"},
           logprobs: null,
           finish_reason: null
         }],
@@ -597,7 +629,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: errorMessage},
+          delta: {content: errorMessage, type: "error"},
           logprobs: null,
           finish_reason: 'stop'
         }],

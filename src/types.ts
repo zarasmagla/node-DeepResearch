@@ -185,15 +185,21 @@ export interface Model {
 
 export type PromptPair = { system: string, user: string };
 
+export type ResponseFormat = {
+  type: 'json_schema' | 'json_object';
+  json_schema?: any;
+}
 export interface ChatCompletionRequest {
   model: string;
   messages: Array<CoreUserMessage | CoreAssistantMessage>;
   stream?: boolean;
-  reasoning_effort?: 'low' | 'medium' | 'high' | null;
-  max_completion_tokens?: number | null;
+  reasoning_effort?: 'low' | 'medium' | 'high';
+  max_completion_tokens?: number;
 
-  budget_tokens?: number | null;
-  max_attempts?: number | null;
+  budget_tokens?: number;
+  max_attempts?: number;
+
+  response_format?: ResponseFormat;
 }
 
 export interface ChatCompletionResponse {
@@ -231,6 +237,7 @@ export interface ChatCompletionChunk {
     delta: {
       role?: 'assistant';
       content?: string;
+      type?: 'text' | 'think' | 'json' | 'error';
     };
     logprobs: null;
     finish_reason: null | 'stop';
