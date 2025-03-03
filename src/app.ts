@@ -493,7 +493,6 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
 
     if (responseSchema) {
       try {
-        console.log('hello2')
         const generator = new ObjectGeneratorSafe(context?.tokenTracker);
         const result = await generator.generateObject({
           model: 'agent',
@@ -539,7 +538,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: finalAnswer, type: "text"},
+          delta: {content: finalAnswer, type: responseSchema? 'json': 'text'},
           logprobs: null,
           finish_reason: 'stop'
         }],
@@ -561,7 +560,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           index: 0,
           message: {
             role: 'assistant',
-            content: finalStep.action === 'answer' ? (finalAnswer || '') : finalStep.think
+            content: finalStep.action === 'answer' ? (finalAnswer || '') : finalStep.think,
+            type: responseSchema? 'json': 'text'
           },
           logprobs: null,
           finish_reason: 'stop'
@@ -649,7 +649,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           index: 0,
           message: {
             role: 'assistant',
-            content: `Error: ${errorMessage}`
+            content: `Error: ${errorMessage}`,
+            type: 'error'
           },
           logprobs: null,
           finish_reason: 'stop'

@@ -213,6 +213,7 @@ export interface ChatCompletionResponse {
     message: {
       role: 'assistant';
       content: string;
+      type: 'text' | 'think' | 'json' | 'error';
     };
     logprobs: null;
     finish_reason: 'stop';
