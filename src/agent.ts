@@ -11,7 +11,7 @@ import {evaluateAnswer, evaluateQuestion} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
-import {StepAction, AnswerAction, KnowledgeItem, SearchResult, EvaluationType} from "./types";
+import {StepAction, AnswerAction, KnowledgeItem, SearchResult, EvaluationType, BoostedSearchResult} from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
 // import {grounding} from "./tools/grounding";
@@ -19,8 +19,8 @@ import {zodToJsonSchema} from "zod-to-json-schema";
 import {ObjectGeneratorSafe} from "./utils/safe-generator";
 import {CodeSandbox} from "./tools/code-sandbox";
 import {serperSearch} from './tools/serper-search';
-import {getUnvisitedURLs, normalizeUrl} from "./utils/url-tools";
-import {buildMdFromAnswer, chooseK, removeExtraLineBreaks, removeHTMLtags} from "./utils/text-tools";
+import {calculateBoostedWeights, getUnvisitedURLs, normalizeUrl} from "./utils/url-tools";
+import {buildMdFromAnswer, chooseK, removeExtraLineBreaks, removeHTMLtags, smartMergeStrings} from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 
 async function sleep(ms: number) {
@@ -132,18 +132,22 @@ ${learnedStrategy}
   if (allowRead) {
     let urlList = '';
     if (allURLs && allURLs.length > 0) {
-      urlList = allURLs
+      const weightedURLs = calculateBoostedWeights(allURLs) as BoostedSearchResult[]
+
+      urlList = (weightedURLs)
         .filter(r => 'url' in r)
-        .map(r => `  + "${r.url}": "${r.title}"`)
+        .sort((a, b) => (b.boostedWeight || 0) - (a.boostedWeight || 0))
+        .slice(0, 10)  // save context window and reduce noise, only keep top 10 urls
+        .map(r => `  + weight: ${r.boostedWeight.toFixed(3)} "${r.url}": "${r.title}"`)
         .join('\n');
     }
 
     actionSections.push(`
 <action-visit>
 - Access and read full content from URLs
-- Must check URLs mentioned in <question>
+- Must check URLs mentioned in <question> if any
 ${urlList ? `    
-- Review relevant URLs below for additional information
+- Choose and visit relevant URLs below for more knowledge. higher weight means more relevant and you should visit first:
 <url-list>
 ${urlList}
 </url-list>
@@ -302,7 +306,7 @@ export async function getResponse(question?: string,
       evaluationMetrics[currentQuestion] =
         await evaluateQuestion(currentQuestion, context, SchemaGen)
     }
-    if (currentQuestion.trim() === question && !evaluationMetrics[currentQuestion].includes('strict') && step===1) {
+    if (currentQuestion.trim() === question && !evaluationMetrics[currentQuestion].includes('strict') && step === 1) {
       // force strict eval for the original question, only once.
       evaluationMetrics[currentQuestion].push('strict')
     }
@@ -315,7 +319,7 @@ export async function getResponse(question?: string,
 
     // update all urls with buildURLMap
     // allowRead = allowRead && (Object.keys(allURLs).length > 0);
-    allowSearch = allowSearch && (getUnvisitedURLs(allURLs, visitedURLs).length < 50);  // disable search when too many urls already
+    allowSearch = allowSearch && (getUnvisitedURLs(allURLs, visitedURLs).length < 70);  // disable search when too many urls already
 
     // generate prompt for this step
     system = getPrompt(
@@ -568,10 +572,20 @@ But then you realized you have asked them before. You decided to to think out of
           const minResults = (results).map(r => ({
             title: r.title,
             url: normalizeUrl('url' in r ? r.url : r.link),
-            description: 'description' in r ? r.description : r.snippet
+            description: 'description' in r ? r.description : r.snippet,
           }));
 
-          minResults.forEach(r => allURLs[r.url] = r);
+          minResults.forEach(r => {
+            if (!allURLs[r.url]) {
+              allURLs[r.url] = r;
+              allURLs[r.url].weight = 1;
+            } else {
+              (allURLs[r.url].weight as number)++;
+              const curDesc = (allURLs[r.url] as { title: string; url: string; description: string; weight?: number }).description;
+              (allURLs[r.url] as { title: string; url: string; description: string; weight?: number }).description = smartMergeStrings(curDesc, r.description);
+            }
+
+          });
           allKeywords.push(query);
 
           allKnowledge.push({
@@ -722,11 +736,11 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     }
 
 
-    await storeContext(system, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+    await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, allURLs}, totalStep);
     await sleep(STEP_SLEEP);
   }
 
-  await storeContext(system, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, allURLs}, totalStep);
   if (!(thisStep as AnswerAction).isFinal) {
     console.log('Enter Beast mode!!!')
     // any answer is better than no answer, humanity last resort
@@ -766,7 +780,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   (thisStep as AnswerAction).mdAnswer = buildMdFromAnswer((thisStep as AnswerAction))
   console.log(thisStep)
 
-  await storeContext(system, schema, [allContext, allKeywords, allQuestions, allKnowledge], totalStep);
+  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, allURLs}, totalStep);
   return {
     result: thisStep,
     context,
@@ -776,16 +790,25 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
 }
 
-async function storeContext(prompt: string, schema: any, memory: any[][], step: number) {
+async function storeContext(prompt: string, schema: any, memory: {
+                              allContext: StepAction[];
+                              allKeywords: string[];
+                              allQuestions: string[];
+                              allKnowledge: KnowledgeItem[];
+                              allURLs: Record<string, SearchResult>;
+                            }
+  , step: number) {
+
+  const {allContext, allKeywords, allQuestions, allKnowledge, allURLs} = memory;
   if ((process as any).asyncLocalContext?.available?.()) {
-    const [context, keywords, questions, knowledge] = memory;
+
     (process as any).asyncLocalContext.ctx.promptContext = {
       prompt,
       schema,
-      context,
-      keywords,
-      questions,
-      knowledge,
+      allContext,
+      allKeywords,
+      allQuestions,
+      allKnowledge,
       step
     };
     return;
@@ -799,11 +822,11 @@ ${prompt}
 JSONSchema:
 ${JSON.stringify(zodToJsonSchema(schema), null, 2)}
 `);
-    const [context, keywords, questions, knowledge] = memory;
-    await fs.writeFile('context.json', JSON.stringify(context, null, 2));
-    await fs.writeFile('queries.json', JSON.stringify(keywords, null, 2));
-    await fs.writeFile('questions.json', JSON.stringify(questions, null, 2));
-    await fs.writeFile('knowledge.json', JSON.stringify(knowledge, null, 2));
+    await fs.writeFile('context.json', JSON.stringify(allContext, null, 2));
+    await fs.writeFile('queries.json', JSON.stringify(allKeywords, null, 2));
+    await fs.writeFile('questions.json', JSON.stringify(allQuestions, null, 2));
+    await fs.writeFile('knowledge.json', JSON.stringify(allKnowledge, null, 2));
+    await fs.writeFile('urls.json', JSON.stringify(calculateBoostedWeights(Object.entries(allURLs).map(([, result]) => result)), null, 2));
   } catch (error) {
     console.error('Context storage failed:', error);
   }

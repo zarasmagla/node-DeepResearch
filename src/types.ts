@@ -172,9 +172,20 @@ export type ErrorAnalysisResponse = {
 };
 
 export type SearchResult =
-  | { title: string; url: string; description: string }
-  | { title: string; link: string; snippet: string };
+  | { title: string; url: string; description: string; weight?: number }
+  | { title: string; link: string; snippet: string; weight?: number };
 
+export type BoostedSearchResult = {
+  title: string;
+  url: string;
+  description: string;
+  weight: number;
+  originalWeight: number;
+  hostnameBoost: number;
+  pathBoost: number;
+  boostScore: number;
+  boostedWeight: number;
+}
 
 // OpenAI API Types
 export interface Model {
@@ -190,6 +201,7 @@ export type ResponseFormat = {
   type: 'json_schema' | 'json_object';
   json_schema?: any;
 }
+
 export interface ChatCompletionRequest {
   model: string;
   messages: Array<CoreUserMessage | CoreAssistantMessage>;

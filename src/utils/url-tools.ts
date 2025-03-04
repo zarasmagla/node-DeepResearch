@@ -1,4 +1,4 @@
-import {SearchResult} from "../types";
+import {BoostedSearchResult, SearchResult} from "../types";
 
 export function normalizeUrl(urlString: string, debug = false): string {
     if (!urlString?.trim()) {
@@ -102,3 +102,109 @@ export function getUnvisitedURLs(allURLs: Record<string, SearchResult>, visitedU
         .filter(([url]) => !visitedURLs.includes(url))
         .map(([, result]) => result);
 }
+
+
+// Function to extract hostname and path from a URL
+const extractUrlParts = (urlStr: string) => {
+  try {
+    const url = new URL(urlStr);
+    return {
+      hostname: url.hostname,
+      path: url.pathname
+    };
+  } catch (e) {
+    console.error(`Error parsing URL: ${urlStr}`, e);
+    return { hostname: "", path: "" };
+  }
+};
+
+// Function to count occurrences of hostnames and paths
+const countUrlParts = (urlItems: SearchResult[]) => {
+  const hostnameCount: Record<string, number> = {};
+  const pathPrefixCount: Record<string, number> = {};
+  let totalUrls = 0;
+
+  urlItems.forEach(item => {
+    item = (item as { title: string; url: string; description: string; weight?: number })
+    if (!item || !item.url) return; // Skip invalid items
+
+    totalUrls++;
+    const { hostname, path } = extractUrlParts(item.url);
+
+    // Count hostnames
+    hostnameCount[hostname] = (hostnameCount[hostname] || 0) + 1;
+
+    // Count path prefixes (segments)
+    const pathSegments = path.split('/').filter(segment => segment.length > 0);
+    pathSegments.forEach((segment, index) => {
+      const prefix = '/' + pathSegments.slice(0, index + 1).join('/');
+      pathPrefixCount[prefix] = (pathPrefixCount[prefix] || 0) + 1;
+    });
+  });
+
+  return { hostnameCount, pathPrefixCount, totalUrls };
+};
+
+// Calculate normalized frequency for boosting
+const normalizeCount = (count: any, total: any) => {
+  return total > 0 ? count / total : 0;
+};
+
+// Calculate boosted weights
+export const calculateBoostedWeights = (urlItems: SearchResult[], options: any = {}): any[] => {
+  // Default parameters for boosting - can be overridden
+  const {
+    hostnameBoostFactor = 0.7,  // How much to boost based on hostname frequency
+    pathBoostFactor = 0.4,      // How much to boost based on path frequency
+    decayFactor = 0.8,          // Decay factor for longer paths (0-1)
+    minBoost = 0,               // Minimum boost score
+    maxBoost = 5                // Maximum boost score cap
+  } = options;
+
+  // Count URL parts first
+  const counts = countUrlParts(urlItems);
+  const { hostnameCount, pathPrefixCount, totalUrls } = counts;
+
+  return urlItems.map(item => {
+    item = (item as BoostedSearchResult)
+    if (!item || !item.url) {
+      console.error('Skipping invalid item:', item);
+      return item; // Return unchanged
+    }
+
+    const { hostname, path } = extractUrlParts(item.url);
+
+    // Base weight from original
+    const originalWeight = item.weight || 1.0; // Default to 1 if weight is missing
+
+    // Hostname boost (normalized by total URLs)
+    const hostnameFreq = normalizeCount(hostnameCount[hostname] || 0, totalUrls);
+    const hostnameBoost = hostnameFreq * hostnameBoostFactor;
+
+    // Path boost (consider all path prefixes with decay for longer paths)
+    let pathBoost = 0;
+    const pathSegments = path.split('/').filter(segment => segment.length > 0);
+    pathSegments.forEach((segment, index) => {
+      const prefix = '/' + pathSegments.slice(0, index + 1).join('/');
+      const prefixCount = pathPrefixCount[prefix] || 0;
+      const prefixFreq = normalizeCount(prefixCount, totalUrls);
+
+      // Apply decay factor based on path depth
+      const decayedBoost = prefixFreq * Math.pow(decayFactor, index) * pathBoostFactor;
+      pathBoost += decayedBoost;
+    });
+
+    // Calculate new weight with clamping
+    const boostScore = Math.min(Math.max(hostnameBoost + pathBoost, minBoost), maxBoost);
+    const boostedWeight = originalWeight + boostScore;
+
+    return {
+      ...item,
+      originalWeight,
+      hostnameBoost,
+      pathBoost,
+      boostScore,
+      boostedWeight
+    } as BoostedSearchResult;
+  });
+};

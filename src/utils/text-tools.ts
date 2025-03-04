@@ -161,3 +161,39 @@ export function getI18nText(key: string, lang = 'en', params: Record<string, str
 
   return text;
 }
+
+export function smartMergeStrings(str1: string, str2: string): string {
+  // If either string is empty, return the other
+  if (!str1) return str2;
+  if (!str2) return str1;
+
+  // Check if one string is entirely contained within the other
+  if (str1.includes(str2)) return str1;
+  if (str2.includes(str1)) return str2;
+
+  // Find the maximum possible overlap length
+  const maxOverlap = Math.min(str1.length, str2.length);
+  let bestOverlapLength = 0;
+
+  // Check for overlaps starting from the largest possible
+  for (let overlapLength = maxOverlap; overlapLength > 0; overlapLength--) {
+    // Get the end of first string with the current overlap length
+    const endOfStr1 = str1.slice(str1.length - overlapLength);
+    // Get the beginning of second string with the current overlap length
+    const startOfStr2 = str2.slice(0, overlapLength);
+
+    // If they match, we've found our overlap
+    if (endOfStr1 === startOfStr2) {
+      bestOverlapLength = overlapLength;
+      break;
+    }
+  }
+
+  // Merge the strings using the best overlap
+  if (bestOverlapLength > 0) {
+    return str1.slice(0, str1.length - bestOverlapLength) + str2;
+  } else {
+    // No overlap found, concatenate normally
+    return str1 + str2;
+  }
+}
