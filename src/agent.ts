@@ -137,8 +137,7 @@ ${learnedStrategy}
       urlList = (weightedURLs)
         .filter(r => 'url' in r)
         .sort((a, b) => (b.boostedWeight || 0) - (a.boostedWeight || 0))
-        .slice(0, 10)  // save context window and reduce noise, only keep top 10 urls
-        .map(r => `  + weight: ${r.boostedWeight.toFixed(3)} "${r.url}": "${r.title}"`)
+        .map(r => `  + weight: ${r.boostedWeight.toFixed(2)} "${r.url}": "${r.title}"`)
         .join('\n');
     }
 
@@ -147,7 +146,7 @@ ${learnedStrategy}
 - Access and read full content from URLs
 - Must check URLs mentioned in <question> if any
 ${urlList ? `    
-- Choose and visit relevant URLs below for more knowledge. higher weight means more relevant and you should visit first:
+- Choose and visit relevant URLs below for more knowledge. higher weight suggests more relevant:
 <url-list>
 ${urlList}
 </url-list>
