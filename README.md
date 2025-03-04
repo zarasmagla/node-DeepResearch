@@ -28,6 +28,23 @@ flowchart LR
 
 ```
 
+## [Blog Post](https://jina.ai/news/a-practical-guide-to-implementing-deepsearch-deepresearch)
+
+Whether you like this implementation or not, I highly recommend you to read DeepSearch/DeepResearch implementation guide I wrote, which gives you a gentle intro to this topic.
+
+- [English](https://jina.ai/news/a-practical-guide-to-implementing-deepsearch-deepresearch)
+- [中文微信公众号](https://mp.weixin.qq.com/s/-pPhHDi2nz8hp5R3Lm_mww)
+- [日本語: DeepSearch/DeepResearch 実装の実践ガイド](https://jina.ai/ja/news/a-practical-guide-to-implementing-deepsearch-deepresearch)
+
+## Test it yourself
+
+We host an online deployment of this **exact** codebase, which allows you to do a vibe-check; or use it as daily productivity tools.
+
+https://search.jina.ai
+
+
+
+
 ## Install
 
 ```bash
