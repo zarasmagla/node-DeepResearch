@@ -49,8 +49,24 @@ export function buildMdFromAnswer(answer: AnswerAction) {
     footnotes.push(match[1]);
   }
 
+  // Remove footnote markers that don't have corresponding references
+  let cleanedAnswer = processedAnswer;
+  footnotes.forEach(footnote => {
+    const footnoteNumber = parseInt(footnote);
+    if (footnoteNumber > answer.references.length) {
+      const footnoteRegexExact = new RegExp(`\\[\\^${footnoteNumber}\\]`, 'g');
+      cleanedAnswer = cleanedAnswer.replace(footnoteRegexExact, '');
+    }
+  });
+
+  // Get valid footnotes after cleaning
+  const validFootnotes: string[] = [];
+  while ((match = footnoteRegex.exec(cleanedAnswer)) !== null) {
+    validFootnotes.push(match[1]);
+  }
+
   // No footnotes in answer but we have references - append them at the end
-  if (footnotes.length === 0) {
+  if (validFootnotes.length === 0) {
     const appendedCitations = Array.from(
       {length: answer.references.length},
       (_, i) => `[^${i + 1}]`
@@ -59,7 +75,7 @@ export function buildMdFromAnswer(answer: AnswerAction) {
     const references = formatReferences(answer.references);
 
     return `
-${processedAnswer}
+${cleanedAnswer}
 
 ⁜${appendedCitations}
 
@@ -69,14 +85,14 @@ ${references}
 
   // Check if correction is needed
   const needsCorrection =
-    (footnotes.length === answer.references.length && footnotes.every(n => n === footnotes[0])) ||
-    (footnotes.every(n => n === footnotes[0]) && parseInt(footnotes[0]) > answer.references.length) ||
-    (footnotes.length > 0 && footnotes.every(n => parseInt(n) > answer.references.length));
+    (validFootnotes.length === answer.references.length && validFootnotes.every(n => n === validFootnotes[0])) ||
+    (validFootnotes.every(n => n === validFootnotes[0]) && parseInt(validFootnotes[0]) > answer.references.length) ||
+    (validFootnotes.length > 0 && validFootnotes.every(n => parseInt(n) > answer.references.length));
 
   // New case: we have more references than footnotes
-  if (answer.references.length > footnotes.length && !needsCorrection) {
+  if (answer.references.length > validFootnotes.length && !needsCorrection) {
     // Get the used indices
-    const usedIndices = new Set(footnotes.map(n => parseInt(n)));
+    const usedIndices = new Set(validFootnotes.map(n => parseInt(n)));
 
     // Create citations for unused references
     const unusedReferences = Array.from(
@@ -85,7 +101,7 @@ ${references}
     ).join('');
 
     return `
-${processedAnswer} 
+${cleanedAnswer} 
 
 ⁜${unusedReferences}
 
@@ -95,7 +111,7 @@ ${formatReferences(answer.references)}
 
   if (!needsCorrection) {
     return `
-${processedAnswer}
+${cleanedAnswer}
 
 ${formatReferences(answer.references)}
 `.trim();
@@ -103,7 +119,7 @@ ${formatReferences(answer.references)}
 
   // Apply correction: sequentially number the footnotes
   let currentIndex = 0;
-  const correctedAnswer = processedAnswer.replace(footnoteRegex, () =>
+  const correctedAnswer = cleanedAnswer.replace(footnoteRegex, () =>
     `[^${++currentIndex}]`
   );
 
