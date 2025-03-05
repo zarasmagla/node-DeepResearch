@@ -2,8 +2,8 @@ import {AnswerAction} from "../types";
 import i18nJSON from './i18n.json';
 
 export function buildMdFromAnswer(answer: AnswerAction) {
-  // Standard footnote regex
-  const footnoteRegex = /\[\^(\d+)]/g;
+  // Standard footnote regex - updated to handle both [^1] and [1^] formats
+  const footnoteRegex = /\[(\^(\d+)|(\d+)\^)]/g;
 
   // New regex to catch grouped footnotes like [^1, ^2, ^3] or [^1,^2,^3]
   const groupedFootnoteRegex = /\[\^(\d+)(?:,\s*\^(\d+))+]/g;
@@ -35,8 +35,11 @@ export function buildMdFromAnswer(answer: AnswerAction) {
       .replace(footnoteRegex, '');
   }
 
-  // Fix grouped footnotes first
-  const processedAnswer = answer.answer.replace(groupedFootnoteRegex, (match) => {
+  // Normalize footnotes first (convert [1^] to [^1] format)
+  let processedAnswer = answer.answer.replace(/\[(\d+)\^]/g, (_, num) => `[^${num}]`);
+
+  // Fix grouped footnotes
+  processedAnswer = processedAnswer.replace(groupedFootnoteRegex, (match) => {
     // Extract all numbers from the grouped footnote
     const numbers = match.match(/\d+/g) || [];
     return numbers.map(num => `[^${num}]`).join(', ');
@@ -45,7 +48,8 @@ export function buildMdFromAnswer(answer: AnswerAction) {
   // Now extract all footnotes from the processed answer
   const footnotes: string[] = [];
   let match;
-  while ((match = footnoteRegex.exec(processedAnswer)) !== null) {
+  const standardFootnoteRegex = /\[\^(\d+)]/g; // Use standard format after normalization
+  while ((match = standardFootnoteRegex.exec(processedAnswer)) !== null) {
     footnotes.push(match[1]);
   }
 
@@ -61,7 +65,7 @@ export function buildMdFromAnswer(answer: AnswerAction) {
 
   // Get valid footnotes after cleaning
   const validFootnotes: string[] = [];
-  while ((match = footnoteRegex.exec(cleanedAnswer)) !== null) {
+  while ((match = standardFootnoteRegex.exec(cleanedAnswer)) !== null) {
     validFootnotes.push(match[1]);
   }
 
@@ -119,7 +123,7 @@ ${formatReferences(answer.references)}
 
   // Apply correction: sequentially number the footnotes
   let currentIndex = 0;
-  const correctedAnswer = cleanedAnswer.replace(footnoteRegex, () =>
+  const correctedAnswer = cleanedAnswer.replace(standardFootnoteRegex, () =>
     `[^${++currentIndex}]`
   );
 
@@ -129,7 +133,6 @@ ${correctedAnswer}
 ${formatReferences(answer.references)}
 `.trim();
 }
-
 export const removeExtraLineBreaks = (text: string) => {
   return text.replace(/\n{2,}/gm, '\n\n');
 }
