@@ -135,7 +135,7 @@ export class Schemas {
       think: z.string().describe(`Explanation the thought process why the answer does not pass the evaluation, ${this.getLanguagePrompt()}`).max(500),
     };
     const baseSchemaAfter = {
-      pass: z.boolean().describe('Whether the answer passes the evaluation criteria defined by the evaluator')
+      pass: z.boolean().describe('If the answer passes the test defined by the evaluator')
     };
     switch (evalType) {
       case "definitive":
@@ -149,20 +149,20 @@ export class Schemas {
           type: z.literal('freshness'),
           ...baseSchemaBefore,
           freshness_analysis: z.object({
-            days_ago: z.number().describe('Inferred dates or timeframes mentioned in the answer and relative to the current time'),
-            max_age_days: z.number().optional().describe('Maximum allowed age in days before content is considered outdated')
+            days_ago: z.number().describe(`Inferenced dates or timeframes mentioned in the **answer** and relative to ${new Date().toISOString().slice(0, 10)}.`).min(0),
+            max_age_days: z.number().optional().describe('Maximum allowed age in days for this kind of question-answer type before it is considered outdated')
           }),
-          ...baseSchemaAfter
+          pass: z.boolean().describe('If "days_ago" <= "max_age_days" then pass!')
         });
       case "plurality":
         return z.object({
           type: z.literal('plurality'),
           ...baseSchemaBefore,
           plurality_analysis: z.object({
-            count_expected: z.number().optional().describe('Number of items expected if specified in question'),
-            count_provided: z.number().describe('Number of items provided in answer')
+            minimum_count_required: z.number().describe('Minimum required number of items from the **question**'),
+            actual_count_provided: z.number().describe('Number of items provided in **answer**')
           }),
-          ...baseSchemaAfter
+          pass: z.boolean().describe('If count_provided >= count_expected then pass!')
         });
       case "attribution":
         return z.object({
@@ -180,8 +180,8 @@ export class Schemas {
           type: z.literal('completeness'),
           ...baseSchemaBefore,
           completeness_analysis: z.object({
-            aspects_expected: z.string().describe('Comma-separated list of all aspects or dimensions that the question explicitly asks for.'),
-            aspects_provided: z.string().describe('Comma-separated list of all aspects or dimensions that were actually addressed in the answer'),
+            aspects_expected: z.string().describe('Comma-separated list of all aspects or dimensions that the question explicitly asks for.').max(100),
+            aspects_provided: z.string().describe('Comma-separated list of all aspects or dimensions that were actually addressed in the answer').max(100),
           }),
           ...baseSchemaAfter
         });

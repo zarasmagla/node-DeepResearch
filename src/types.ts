@@ -144,8 +144,8 @@ export type EvaluationResponse = {
     max_age_days?: number;
   };
   plurality_analysis?: {
-    count_expected?: number;
-    count_provided: number;
+    minimum_count_required: number;
+    actual_count_provided: number;
   };
   attribution_analysis?: {
     sources_provided: boolean,
