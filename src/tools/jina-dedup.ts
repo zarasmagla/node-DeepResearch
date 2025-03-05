@@ -177,6 +177,10 @@ export async function dedupQueries(
     };
   } catch (error) {
     console.error('Error in deduplication analysis:', error);
-    throw error;
+
+    // return all new queries if there is an error
+    return {
+      unique_queries: newQueries,
+    };
   }
 }

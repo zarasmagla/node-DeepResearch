@@ -119,7 +119,7 @@ const extractUrlParts = (urlStr: string) => {
 };
 
 // Function to count occurrences of hostnames and paths
-const countUrlParts = (urlItems: SearchResult[]) => {
+export const countUrlParts = (urlItems: SearchResult[]) => {
   const hostnameCount: Record<string, number> = {};
   const pathPrefixCount: Record<string, number> = {};
   let totalUrls = 0;

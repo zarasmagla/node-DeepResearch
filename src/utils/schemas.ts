@@ -2,12 +2,13 @@ import {z} from "zod";
 import {ObjectGeneratorSafe} from "./safe-generator";
 import {EvaluationType, PromptPair} from "../types";
 
-export const MAX_URLS_PER_STEP = 2
+export const MAX_URLS_PER_STEP = 4
 export const MAX_QUERIES_PER_STEP = 7
 export const MAX_REFLECT_PER_STEP = 3
 
 function getLanguagePrompt(question: string): PromptPair {
-  return {system:`Identifies both the language used and the overall vibe of the question
+  return {
+    system: `Identifies both the language used and the overall vibe of the question
 
 <rules>
 Combine both language and emotional vibe in a descriptive phrase, considering:
@@ -54,7 +55,8 @@ Evaluation: {
     "languageStyle": "casual English"
 }
 </examples>`,
-  user: question};
+    user: question
+  };
 }
 
 export class Schemas {
@@ -92,6 +94,7 @@ export class Schemas {
   getQuestionEvaluateSchema(): z.ZodObject<any> {
     return z.object({
       think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()}`).max(500),
+      needsDefinitive: z.boolean(),
       needsFreshness: z.boolean(),
       needsPlurality: z.boolean(),
       needsCompleteness: z.boolean(),
@@ -128,58 +131,66 @@ export class Schemas {
   }
 
   getEvaluatorSchema(evalType: EvaluationType): z.ZodObject<any> {
-    const baseSchema = {
-      pass: z.boolean().describe('Whether the answer passes the evaluation criteria defined by the evaluator'),
-      think: z.string().describe(`Explanation the thought process why the answer does not pass the evaluation criteria, ${this.getLanguagePrompt()}`).max(500)
+    const baseSchemaBefore = {
+      think: z.string().describe(`Explanation the thought process why the answer does not pass the evaluation, ${this.getLanguagePrompt()}`).max(500),
+    };
+    const baseSchemaAfter = {
+      pass: z.boolean().describe('Whether the answer passes the evaluation criteria defined by the evaluator')
     };
     switch (evalType) {
       case "definitive":
         return z.object({
-          ...baseSchema,
-          type: z.literal('definitive')
+          type: z.literal('definitive'),
+          ...baseSchemaBefore,
+          ...baseSchemaAfter
         });
       case "freshness":
         return z.object({
-          ...baseSchema,
           type: z.literal('freshness'),
+          ...baseSchemaBefore,
           freshness_analysis: z.object({
             days_ago: z.number().describe('Inferred dates or timeframes mentioned in the answer and relative to the current time'),
             max_age_days: z.number().optional().describe('Maximum allowed age in days before content is considered outdated')
-          })
+          }),
+          ...baseSchemaAfter
         });
       case "plurality":
         return z.object({
-          ...baseSchema,
           type: z.literal('plurality'),
+          ...baseSchemaBefore,
           plurality_analysis: z.object({
             count_expected: z.number().optional().describe('Number of items expected if specified in question'),
             count_provided: z.number().describe('Number of items provided in answer')
-          })
+          }),
+          ...baseSchemaAfter
         });
       case "attribution":
         return z.object({
-          ...baseSchema,
           type: z.literal('attribution'),
+          ...baseSchemaBefore,
           attribution_analysis: z.object({
             sources_provided: z.boolean().describe('Whether the answer provides source references'),
             sources_verified: z.boolean().describe('Whether the provided sources contain the claimed information'),
             quotes_accurate: z.boolean().describe('Whether the quotes accurately represent the source content')
-          })
+          }),
+          ...baseSchemaAfter
         });
       case "completeness":
         return z.object({
-          ...baseSchema,
           type: z.literal('completeness'),
+          ...baseSchemaBefore,
           completeness_analysis: z.object({
             aspects_expected: z.string().describe('Comma-separated list of all aspects or dimensions that the question explicitly asks for.'),
             aspects_provided: z.string().describe('Comma-separated list of all aspects or dimensions that were actually addressed in the answer'),
-          })
+          }),
+          ...baseSchemaAfter
         });
       case 'strict':
         return z.object({
-          ...baseSchema,
           type: z.literal('strict'),
+          ...baseSchemaBefore,
           improvement_plan: z.string().describe('Short explain how a perfect answer should look like and what revisions are needed to improve the current answer.').max(500),
+          ...baseSchemaAfter
         });
       default:
         throw new Error(`Unknown evaluation type: ${evalType}`);

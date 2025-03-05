@@ -113,13 +113,22 @@ function getDefinitivePrompt(question: string, answer: string): PromptPair {
     system: `You are an evaluator of answer definitiveness. Analyze if the given answer provides a definitive response or not.
 
 <rules>
-First, if the answer is not a direct response to the question, it must return false. 
-Definitiveness is the king! The following types of responses are NOT definitive and must return false:
-  1. Expressions of uncertainty: "I don't know", "not sure", "might be", "probably"
+First, if the answer is not a direct response to the question, it must return false.
+
+Definitiveness means providing a clear, confident response. The following approaches are considered definitive:
+  1. Direct, clear statements that address the question
+  2. Comprehensive answers that cover multiple perspectives or both sides of an issue
+  3. Answers that acknowledge complexity while still providing substantive information
+  4. Balanced explanations that present pros and cons or different viewpoints
+
+The following types of responses are NOT definitive and must return false:
+  1. Expressions of personal uncertainty: "I don't know", "not sure", "might be", "probably"
   2. Lack of information statements: "doesn't exist", "lack of information", "could not find"
   3. Inability statements: "I cannot provide", "I am unable to", "we cannot"
   4. Negative statements that redirect: "However, you can...", "Instead, try..."
-  5. Non-answers that suggest alternatives
+  5. Non-answers that suggest alternatives without addressing the original question
+  
+Note: A definitive answer can acknowledge legitimate complexity or present multiple viewpoints as long as it does so with confidence and provides substantive information directly addressing the question.
 </rules>
 
 <examples>
@@ -177,6 +186,27 @@ Answer: "Ein Beweis für P ≠ NP erfordert, dass man zeigt, dass mindestens ein
 Evaluation: {
   "think": "The answer provides concrete mathematical approaches to proving P ≠ NP without uncertainty markers, presenting definitive methods that could be used."
   "pass": true,
+}
+
+Question: "Is universal healthcare a good policy?"
+Answer: "Universal healthcare has both advantages and disadvantages. Proponents argue it provides coverage for all citizens, reduces administrative costs, and leads to better public health outcomes. Critics contend it may increase wait times, raise taxes, and potentially reduce innovation in medical treatments. Most developed nations have implemented some form of universal healthcare with varying structures and degrees of coverage."
+Evaluation: {
+  "think": "The answer confidently presents both sides of the debate with specific points for each perspective. It provides substantive information directly addressing the question without expressions of personal uncertainty."
+  "pass": true,
+}
+
+Question: "Should companies use AI for hiring decisions?"
+Answer: "There are compelling arguments on both sides of this issue. Companies using AI in hiring can benefit from reduced bias in initial screening, faster processing of large applicant pools, and potentially better matches based on skills assessment. However, these systems can also perpetuate historical biases in training data, may miss nuanced human qualities, and raise privacy concerns. The effectiveness depends on careful implementation, human oversight, and regular auditing of these systems."
+Evaluation: {
+  "think": "The answer provides a balanced, detailed examination of both perspectives on AI in hiring. It acknowledges complexity while delivering substantive information with confidence."
+  "pass": true,
+}
+
+Question: "Is nuclear energy safe?"
+Answer: "I'm not an expert on energy policy, so I can't really say if nuclear energy is safe or not. There have been some accidents but also many successful plants."
+Evaluation: {
+  "think": "The answer contains explicit expressions of personal uncertainty ('I'm not an expert', 'I can't really say') and provides only vague information without substantive content."
+  "pass": false,
 }
 </examples>`,
     user: `
@@ -384,29 +414,38 @@ Answer: ${answer}`
 
 function getQuestionEvaluationPrompt(question: string): PromptPair {
   return {
-    system: `You are an evaluator that determines if a question requires freshness, plurality, and/or completeness checks.
+    system: `You are an evaluator that determines if a question requires definitive, freshness, plurality, and/or completeness checks.
 
 <evaluation_types>
-1. freshness - Checks if the question is time-sensitive or requires very recent information
-2. plurality - Checks if the question asks for multiple items, examples, or a specific count or enumeration
-3. completeness - Checks if the question explicitly mentions multiple named elements that all need to be addressed
+definitive - Checks if the question requires a definitive answer or if uncertainty is acceptable (open-ended, speculative, discussion-based)
+freshness - Checks if the question is time-sensitive or requires very recent information
+plurality - Checks if the question asks for multiple items, examples, or a specific count or enumeration
+completeness - Checks if the question explicitly mentions multiple named elements that all need to be addressed
 </evaluation_types>
 
 <rules>
-1. Freshness Evaluation:
+1. Definitive Evaluation:
+   - Required for ALMOST ALL questions - assume by default that definitive evaluation is needed
+   - Not required ONLY for questions that are genuinely impossible to evaluate definitively
+   - Examples of impossible questions: paradoxes, questions beyond all possible knowledge
+   - Even subjective-seeming questions can be evaluated definitively based on evidence
+   - Future scenarios can be evaluated definitively based on current trends and information
+   - Look for cases where the question is inherently unanswerable by any possible means
+
+2. Freshness Evaluation:
    - Required for questions about current state, recent events, or time-sensitive information
    - Required for: prices, versions, leadership positions, status updates
    - Look for terms: "current", "latest", "recent", "now", "today", "new"
    - Consider company positions, product versions, market data time-sensitive
 
-2. Plurality Evaluation:
+3. Plurality Evaluation:
    - ONLY apply when completeness check is NOT triggered
    - Required when question asks for multiple examples, items, or specific counts
    - Check for: numbers ("5 examples"), list requests ("list the ways"), enumeration requests
    - Look for: "examples", "list", "enumerate", "ways to", "methods for", "several"
    - Focus on requests for QUANTITY of items or examples
 
-3. Completeness Evaluation:
+4. Completeness Evaluation:
    - Takes precedence over plurality check - if completeness applies, set plurality to false
    - Required when question EXPLICITLY mentions multiple named elements that all need to be addressed
    - This includes:
@@ -424,9 +463,10 @@ function getQuestionEvaluationPrompt(question: string): PromptPair {
 <example-1>
 谁发明了微积分？牛顿和莱布尼兹各自的贡献是什么？
 <think>
-这是关于微积分历史的问题，不需要最新信息。问题特别提到了牛顿和莱布尼兹两个人，要求分析他们各自的贡献，所以我需要全面回答这两部分内容。完整性比较重要，而不是提供多个不同答案。
+这是关于微积分历史的问题，不涉及需要最新信息的内容。问题明确提到了牛顿和莱布尼兹两位数学家，要求分析他们各自的贡献，所以需要全面评估这两个特定的方面。这个问题涉及历史事实，有明确的学术研究可以参考，因此需要确定性评估。
 </think>
 <output>
+"needsDefinitive": true,
 "needsFreshness": false,
 "needsPlurality": false,
 "needsCompleteness": true,
@@ -436,9 +476,10 @@ function getQuestionEvaluationPrompt(question: string): PromptPair {
 <example-2>
 fam PLEASE help me calculate the eigenvalues of this 4x4 matrix ASAP!! [matrix details] got an exam tmrw 😭
 <think>
-This is a math question about eigenvalues which doesn't change over time, so I don't need fresh info. A 4x4 matrix has multiple eigenvalues, so I'll need to provide several results. The student just wants the eigenvalues calculated, not asking me to address multiple specific topics.
+This is a mathematical question about eigenvalues which doesn't change over time, so no need for recent information. A 4x4 matrix has multiple eigenvalues, so this requires identifying several distinct values. This is a pure mathematics problem with precise, verifiable solutions that can be definitively evaluated. The question asks for calculation of eigenvalues only, not addressing multiple distinct topics.
 </think>
 <output>
+"needsDefinitive": true,
 "needsFreshness": false,
 "needsPlurality": true,
 "needsCompleteness": false,
@@ -447,10 +488,11 @@ This is a math question about eigenvalues which doesn't change over time, so I d
 
 <example-3>
 Quelles sont les principales différences entre le romantisme et le réalisme dans la littérature du 19ème siècle?
-<output>
 <think>
-C'est une question sur l'histoire littéraire, donc je n'ai pas besoin d'informations récentes. Je dois comparer deux mouvements spécifiques: le romantisme et le réalisme. Ma réponse doit couvrir ces deux éléments, donc l'exhaustivité est importante ici. La pluralité n'est pas la priorité dans ce cas.
+C'est une question sur l'histoire littéraire, donc aucun besoin d'informations récentes. La question mentionne spécifiquement deux mouvements: le romantisme et le réalisme. Je dois évaluer ces deux éléments nommés, donc l'exhaustivité est importante ici. Cette question porte sur des concepts littéraires établis avec des caractéristiques documentées, donc une évaluation définitive est possible. La question ne demande pas une liste ou énumération multiple au-delà des deux mouvements spécifiés.
 </think>
+<output>
+"needsDefinitive": true,
 "needsFreshness": false,
 "needsPlurality": false,
 "needsCompleteness": true,
@@ -460,9 +502,10 @@ C'est une question sur l'histoire littéraire, donc je n'ai pas besoin d'informa
 <example-4>
 Shakespeare の最も有名な悲劇を5つ挙げ、簡単にあらすじを説明してください。
 <think>
-シェイクスピアの悲劇についての質問だから、最新情報は必要ないな。「5つ挙げ」とはっきり書いてあるから、複数の回答が必要だ。どの悲劇を選ぶかは私次第で、特定の作品について比較するよう求められているわけじゃないから、完全性よりも複数性が重要だな。
+シェイクスピアの悲劇についての質問であり、時事的な情報は不要。「5つ挙げ」という指定があるため、複数の項目が求められている。「最も有名な」という基準は学術的コンセンサスや文化的重要性に基づいて判断できるため、確定的な評価が可能。特定の作品を分析するよう求められているわけではなく、複数の作品を列挙することが主な要件。
 </think>
 <output>
+"needsDefinitive": true,
 "needsFreshness": false,
 "needsPlurality": true,
 "needsCompleteness": false,
@@ -472,9 +515,10 @@ Shakespeare の最も有名な悲劇を5つ挙げ、簡単にあらすじを説�
 <example-5>
 What are the current interest rates for mortgage loans from Bank of America, Wells Fargo, and Chase Bank in the US?
 <think>
-This is asking about 'current' interest rates, so I definitely need up-to-date info. The person wants rates from three specific banks: Bank of America, Wells Fargo, and Chase. I need to cover all three to properly answer, so addressing these specific elements is more important than providing multiple different answers.
+This question asks about "current" interest rates, so it clearly requires up-to-date information. The query specifically names three banks: Bank of America, Wells Fargo, and Chase Bank. Each of these named entities must be addressed, making completeness necessary. This question seeks factual financial data that can be objectively verified, so definitive evaluation is needed. The question isn't asking for multiple types of information beyond the specified banks.
 </think>
 <output>
+"needsDefinitive": true,
 "needsFreshness": true,
 "needsPlurality": false,
 "needsCompleteness": true,
@@ -484,8 +528,10 @@ This is asking about 'current' interest rates, so I definitely need up-to-date i
 <example-6>
 2025年に注目すべき人工知能の3つのトレンドは何ですか？
 <think>
-これは将来のAIトレンドについての質問だから、最新の情報が必要だね。「3つの」と明確に数を指定しているから、複数の回答が求められている。特定のトレンドについて詳しく説明するというより、重要なトレンドを3つ挙げることが大事そうだから、複数性の方が完全性より重要だな。
+これは将来のAIトレンドに関する質問なので、最新の情報が必要。「3つの」という明確な数を指定しているため、複数の項目が求められている。未来の予測だが、現在のAI開発動向や研究から推測できる範囲であり、確定的な評価が可能。特定の側面について言及しておらず、トレンドの列挙が主な要件なので、複数性のほうが重要。
 </think>
+<output>
+"needsDefinitive": true,
 "needsFreshness": true,
 "needsPlurality": true,
 "needsCompleteness": false,
@@ -495,9 +541,10 @@ This is asking about 'current' interest rates, so I definitely need up-to-date i
 <example-7>
 Was sind die besten Strategien für nachhaltiges Investieren in der heutigen Wirtschaft?
 <think>
-Hier geht's um Investieren in der 'heutigen Wirtschaft', also brauche ich aktuelle Informationen. Die Frage ist nach 'Strategien' im Plural gestellt, daher sollte ich mehrere Beispiele nennen. Es werden keine bestimmten Aspekte genannt, die ich alle behandeln muss - ich soll einfach verschiedene gute Strategien vorschlagen. Aktualität und mehrere Antworten sind hier wichtig.
+Diese Frage bezieht sich auf die "heutige Wirtschaft", daher sind aktuelle Informationen erforderlich. "Strategien" steht im Plural, was auf die Notwendigkeit mehrerer Beispiele hindeutet. Obwohl "beste" subjektiv klingen mag, lässt sich die Frage anhand von Rendite-Daten, Risikobewertungen und Nachhaltigkeitskriterien definitiv evaluieren. Es werden keine spezifischen Aspekte genannt, die alle behandelt werden müssen - der Fokus liegt auf der Vielfalt der Strategien.
 </think>
 <output>
+"needsDefinitive": true,
 "needsFreshness": true,
 "needsPlurality": true,
 "needsCompleteness": false,
@@ -507,14 +554,54 @@ Hier geht's um Investieren in der 'heutigen Wirtschaft', also brauche ich aktuel
 <example-8>
 请解释赤壁之战的历史背景、主要参与者以及战略意义，这对中国历史产生了什么影响？
 <think>
-这是关于历史事件的问题，不需要最新信息。问题清楚地列出了几个需要我回答的方面：历史背景、主要参与者、战略意义和历史影响。我需要涵盖所有这些特定方面，而不是提供多个不同的答案。这里完整性比复数性更重要。
+这是关于历史事件的问题，不需要最新信息。问题明确列出了多个需要评估的方面：历史背景、主要参与者、战略意义和历史影响。这些都是特定的历史课题，需要完整地覆盖。关于历史事件的问题有明确的史料记载和学术研究，可以进行确定性评估。
 </think>
 <output>
+"needsDefinitive": true,
 "needsFreshness": false,
 "needsPlurality": false,
 "needsCompleteness": true,
 </output>
 </example-8>
+
+<example-9>
+How might artificial intelligence transform the healthcare industry over the next decade?
+<think>
+This question asks about future developments that require recent AI and healthcare information to properly evaluate. The query is about transformations (plural) suggesting multiple changes should be identified. While it concerns future trends, the patterns can be evaluated definitively based on current research, development pipelines, and industry analyses. No specific aspects of healthcare are mentioned that must all be addressed, so plurality is more relevant than completeness.
+</think>
+<output>
+"needsDefinitive": true,
+"needsFreshness": true,
+"needsPlurality": true,
+"needsCompleteness": false,
+</output>
+</example-9>
+
+<example-10>
+What do you think is the best approach to learning a new language as an adult?
+<think>
+This question about language learning does not require time-sensitive information as fundamental language acquisition principles remain relatively stable. The phrasing suggests looking for multiple elements or methods that constitute an effective approach, indicating plurality. Though the question uses subjective language ("what do you think"), it can be evaluated definitively using linguistic research and proven methodologies. No specific language learning aspects are explicitly named that must all be covered.
+</think>
+<output>
+"needsDefinitive": true,
+"needsFreshness": false,
+"needsPlurality": true,
+"needsCompleteness": false,
+</output>
+</example-10>
+
+<example-11>
+If a tree falls in a forest with absolutely no observers, instruments, or any possible way to detect it, does it make a sound?
+<think>
+This is a classic philosophical paradox that is inherently unanswerable in a definitive way. The question deliberately constructs a scenario that removes all possible means of verification, making it logically impossible to evaluate. This kind of question represents one of the rare cases where a definitive evaluation is truly impossible. The question doesn't involve recent events, doesn't request multiple items, and doesn't specify multiple elements that must be addressed.
+</think>
+<output>
+"needsDefinitive": false,
+"needsFreshness": false,
+"needsPlurality": false,
+"needsCompleteness": false,
+</output>
+</example-11>
 </examples>
 
 `,
@@ -523,7 +610,6 @@ Hier geht's um Investieren in der 'heutigen Wirtschaft', also brauche ich aktuel
 <think>`
   };
 }
-
 
 export async function evaluateQuestion(
   question: string,
@@ -544,7 +630,8 @@ export async function evaluateQuestion(
     console.log('Question Evaluation:', result.object);
 
     // Always include definitive in types
-    const types: EvaluationType[] = ['definitive'];
+    const types: EvaluationType[] = [];
+    if (result.object.needsDefinitive) types.push('definitive');
     if (result.object.needsFreshness) types.push('freshness');
     if (result.object.needsPlurality) types.push('plurality');
     if (result.object.needsCompleteness) types.push('completeness');

@@ -19,7 +19,7 @@ import {zodToJsonSchema} from "zod-to-json-schema";
 import {ObjectGeneratorSafe} from "./utils/safe-generator";
 import {CodeSandbox} from "./tools/code-sandbox";
 import {serperSearch} from './tools/serper-search';
-import {calculateBoostedWeights, getUnvisitedURLs, normalizeUrl} from "./utils/url-tools";
+import {calculateBoostedWeights, countUrlParts, getUnvisitedURLs, normalizeUrl} from "./utils/url-tools";
 import {buildMdFromAnswer, chooseK, removeExtraLineBreaks, removeHTMLtags, smartMergeStrings} from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 
@@ -41,7 +41,7 @@ function getPrompt(
   allowCoding: boolean = true,
   badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
   knowledge?: KnowledgeItem[],
-  allURLs?: SearchResult[],
+  allURLs?: BoostedSearchResult[],
   beastMode?: boolean,
 ): string {
   const sections: string[] = [];
@@ -65,10 +65,10 @@ ${k.question}
 <answer>
 ${k.answer}
 </answer>
-${k.references ? `
-<references>
-${JSON.stringify(k.references)}
-</references>
+${k.references && k.type === 'url' ? `
+<url>
+${k.references[0]}
+</url>
 ` : ''}
 </knowledge-${i + 1}>
 `)
@@ -132,9 +132,7 @@ ${learnedStrategy}
   if (allowRead) {
     let urlList = '';
     if (allURLs && allURLs.length > 0) {
-      const weightedURLs = calculateBoostedWeights(allURLs) as BoostedSearchResult[]
-
-      urlList = (weightedURLs)
+      urlList = (allURLs)
         .filter(r => 'url' in r)
         .sort((a, b) => (b.boostedWeight || 0) - (a.boostedWeight || 0))
         .map(r => `  + weight: ${r.boostedWeight.toFixed(2)} "${r.url}": "${r.title}"`)
@@ -278,6 +276,7 @@ export async function getResponse(question?: string,
 
   const badContext = [];
   let diaryContext = [];
+  let weightedURLs: BoostedSearchResult[] = [];
   let allowAnswer = true;
   let allowSearch = true;
   let allowRead = true;
@@ -318,7 +317,12 @@ export async function getResponse(question?: string,
 
     // update all urls with buildURLMap
     // allowRead = allowRead && (Object.keys(allURLs).length > 0);
-    allowSearch = allowSearch && (getUnvisitedURLs(allURLs, visitedURLs).length < 70);  // disable search when too many urls already
+    if (allURLs && Object.keys(allURLs).length > 0) {
+      // rerank urls
+      weightedURLs = calculateBoostedWeights(getUnvisitedURLs(allURLs, visitedURLs));
+    }
+
+    allowSearch = allowSearch && (weightedURLs.length < 70);  // disable search when too many urls already
 
     // generate prompt for this step
     system = getPrompt(
@@ -332,7 +336,7 @@ export async function getResponse(question?: string,
       allowCoding,
       badContext,
       allKnowledge,
-      getUnvisitedURLs(allURLs, visitedURLs),
+      weightedURLs,
       false,
     );
     schema = SchemaGen.getAgentSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding, finalAnswerPIP)
@@ -436,14 +440,6 @@ ${evaluation.think}
             // store the bad context and reset the diary context
             const errorAnalysis = await analyzeSteps(diaryContext, context, SchemaGen);
 
-            allKnowledge.push({
-              question: currentQuestion,
-              answer: thisStep.answer,
-              references: thisStep.references,
-              type: 'qa',
-              updated: new Date().toISOString()
-            });
-
             badContext.push({
               question: currentQuestion,
               answer: thisStep.answer,
@@ -526,6 +522,9 @@ But then you realized you have asked them before. You decided to to think out of
       thisStep.searchRequests = chooseK((await dedupQueries(thisStep.searchRequests, [], context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
 
       // rewrite queries
+      console.log(countUrlParts(weightedURLs).hostnameCount)
+      const topHosts = Object.entries(countUrlParts(weightedURLs).hostnameCount).sort((a, b) => b[1] - a[1]).map(([host]) => host).slice(0, 2);
+      console.log(topHosts)
       let {queries: keywordsQueries} = await rewriteQuery(thisStep, context, SchemaGen);
       // avoid exisitng searched queries
       keywordsQueries = chooseK((await dedupQueries(keywordsQueries, allKeywords, context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
@@ -533,8 +532,6 @@ But then you realized you have asked them before. You decided to to think out of
       let anyResult = false;
 
       if (keywordsQueries.length > 0) {
-
-
         context.actionTracker.trackThink('search_for', SchemaGen.languageCode, {keywords: keywordsQueries.join(', ')});
         for (const query of keywordsQueries) {
           console.log(`Search query: ${query}`);
@@ -542,18 +539,22 @@ But then you realized you have asked them before. You decided to to think out of
           let results: SearchResult[] = []
 
           try {
+            let siteQuery = query
+            if (topHosts.length > 0) {
+              siteQuery = query + ' site:' + chooseK(topHosts, 1)[0];
+            }
             switch (SEARCH_PROVIDER) {
               case 'jina':
-                results = (await search(query, context.tokenTracker)).response?.data || [];
+                results = (await search(siteQuery, context.tokenTracker)).response?.data || [];
                 break;
               case 'duck':
-                results = (await duckSearch(query, {safeSearch: SafeSearchType.STRICT})).results;
+                results = (await duckSearch(siteQuery, {safeSearch: SafeSearchType.STRICT})).results;
                 break;
               case 'brave':
-                results = (await braveSearch(query)).response.web?.results || [];
+                results = (await braveSearch(siteQuery)).response.web?.results || [];
                 break;
               case 'serper':
-                results = (await serperSearch(query)).response.organic || [];
+                results = (await serperSearch(siteQuery)).response.organic || [];
                 break;
               default:
                 results = [];
@@ -627,10 +628,14 @@ You decided to think out of the box or cut from a completely different angle.
       }
     } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
       // normalize URLs
-      thisStep.URLTargets = thisStep.URLTargets.map(url => normalizeUrl(url));
-      thisStep.URLTargets = chooseK(thisStep.URLTargets.filter(url => !visitedURLs.includes(url)), MAX_URLS_PER_STEP)
+      thisStep.URLTargets = thisStep.URLTargets
+        .filter(url => url.startsWith('http'))
+        .map(url => normalizeUrl(url))
+        .filter(url => !visitedURLs.includes(url));
+      thisStep.URLTargets = [...new Set([...thisStep.URLTargets, ...weightedURLs.map(r => r.url)])].slice(0, MAX_URLS_PER_STEP);
 
       const uniqueURLs = thisStep.URLTargets;
+      console.log(uniqueURLs)
 
       if (uniqueURLs.length > 0) {
         context.actionTracker.trackThink('read_for', SchemaGen.languageCode, {urls: uniqueURLs.join(', ')});
@@ -647,7 +652,7 @@ You decided to think out of the box or cut from a completely different angle.
               }
 
               allKnowledge.push({
-                question: `What is in ${data.url}?`,
+                question: `What do expert say about "${data.title}"?`,
                 answer: removeAllLineBreaks(data.content),
                 references: [data.url],
                 type: 'url',
@@ -756,7 +761,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       false,
       badContext,
       allKnowledge,
-      getUnvisitedURLs(allURLs, visitedURLs),
+      weightedURLs,
       true,
     );
 
