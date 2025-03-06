@@ -816,10 +816,13 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   console.log(thisStep)
 
   await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
+
+  // max return 300 urls
+  const returnedURLs = weightedURLs.slice(0, 300).map(r => r.url)
   return {
     result: thisStep,
     context,
-    visitedURLs: [...new Set([...visitedURLs, ...Object.keys(allURLs)])],
+    visitedURLs: returnedURLs,
     readURLs: visitedURLs,
   };
 
