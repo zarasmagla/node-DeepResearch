@@ -167,8 +167,8 @@ export async function dedupQueries(
 
     // Track token usage from the API
     (tracker || new TokenTracker()).trackUsage('dedup', {
-        promptTokens: tokens,
-        completionTokens: 0,
+        promptTokens: 0,
+        completionTokens: tokens,
         totalTokens: tokens
     });
     console.log('Dedup:', uniqueQueries);

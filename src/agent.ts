@@ -11,7 +11,15 @@ import {evaluateAnswer, evaluateQuestion} from "./tools/evaluator";
 import {analyzeSteps} from "./tools/error-analyzer";
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
-import {StepAction, AnswerAction, KnowledgeItem, SearchResult, EvaluationType, BoostedSearchResult} from "./types";
+import {
+  StepAction,
+  AnswerAction,
+  KnowledgeItem,
+  SearchResult,
+  EvaluationType,
+  BoostedSearchSnippet,
+  SearchSnippet, EvaluationResponse
+} from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
 // import {grounding} from "./tools/grounding";
@@ -19,8 +27,15 @@ import {zodToJsonSchema} from "zod-to-json-schema";
 import {ObjectGeneratorSafe} from "./utils/safe-generator";
 import {CodeSandbox} from "./tools/code-sandbox";
 import {serperSearch} from './tools/serper-search';
-import {calculateBoostedWeights, countUrlParts, getUnvisitedURLs, normalizeUrl} from "./utils/url-tools";
-import {buildMdFromAnswer, chooseK, removeExtraLineBreaks, removeHTMLtags, smartMergeStrings} from "./utils/text-tools";
+import {
+  addToAllURLs,
+  rankURLs,
+  countUrlParts,
+  getUnvisitedURLs,
+  normalizeUrl, sampleMultinomial,
+  weightedURLToString
+} from "./utils/url-tools";
+import {buildMdFromAnswer, chooseK, removeExtraLineBreaks, removeHTMLtags} from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 
 async function sleep(ms: number) {
@@ -41,7 +56,7 @@ function getPrompt(
   allowCoding: boolean = true,
   badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
   knowledge?: KnowledgeItem[],
-  allURLs?: BoostedSearchResult[],
+  allURLs?: BoostedSearchSnippet[],
   beastMode?: boolean,
 ): string {
   const sections: string[] = [];
@@ -130,14 +145,7 @@ ${learnedStrategy}
   // Build actions section
 
   if (allowRead) {
-    let urlList = '';
-    if (allURLs && allURLs.length > 0) {
-      urlList = (allURLs)
-        .filter(r => 'url' in r)
-        .sort((a, b) => (b.boostedWeight || 0) - (a.boostedWeight || 0))
-        .map(r => `  + weight: ${r.boostedWeight.toFixed(2)} "${r.url}": "${r.title}"`)
-        .join('\n');
-    }
+    const urlList = weightedURLToString(allURLs || [], 20);
 
     actionSections.push(`
 <action-visit>
@@ -276,7 +284,7 @@ export async function getResponse(question?: string,
 
   const badContext = [];
   let diaryContext = [];
-  let weightedURLs: BoostedSearchResult[] = [];
+  let weightedURLs: BoostedSearchSnippet[] = [];
   let allowAnswer = true;
   let allowSearch = true;
   let allowRead = true;
@@ -285,7 +293,7 @@ export async function getResponse(question?: string,
   let system = '';
   let thisStep: StepAction = {action: 'answer', answer: '', references: [], think: '', isFinal: false};
 
-  const allURLs: Record<string, SearchResult> = {};
+  const allURLs: Record<string, SearchSnippet> = {};
   const visitedURLs: string[] = [];
   const evaluationMetrics: Record<string, EvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
@@ -319,10 +327,12 @@ export async function getResponse(question?: string,
     // allowRead = allowRead && (Object.keys(allURLs).length > 0);
     if (allURLs && Object.keys(allURLs).length > 0) {
       // rerank urls
-      weightedURLs = calculateBoostedWeights(getUnvisitedURLs(allURLs, visitedURLs));
+      weightedURLs = rankURLs(getUnvisitedURLs(allURLs, visitedURLs), {
+        question: currentQuestion
+      }, context);
     }
 
-    allowSearch = allowSearch && (weightedURLs.length < 70);  // disable search when too many urls already
+    // allowSearch = allowSearch && (weightedURLs.length < 70);  // disable search when too many urls already
 
     // generate prompt for this step
     system = getPrompt(
@@ -367,8 +377,20 @@ export async function getResponse(question?: string,
 
     // execute the step and action
     if (thisStep.action === 'answer') {
-      if (step === 1) {
+      // normalize all references urls, add title to it
+      thisStep.references = thisStep.references?.filter(ref => ref?.url && typeof ref.url === 'string' && ref.url.startsWith('http'))
+        .map(ref => {
+          const normalizedUrl = ref?.url ? normalizeUrl(ref.url) : '';
+          return {
+            exactQuote: ref?.exactQuote || '',
+            title: normalizedUrl ? (allURLs[normalizedUrl]?.title || '') : '',
+            url: normalizedUrl
+          }
+        });
+
+      if (step === 1 && thisStep.references.length === 0) {
         // LLM is so confident and answer immediately, skip all evaluations
+        // however, if it does give any reference, it must be evaluated, case study: "How to configure a timeout when loading a huggingface dataset with python?"
         thisStep.isFinal = true;
         break
       }
@@ -379,23 +401,18 @@ export async function getResponse(question?: string,
         ...thisStep,
       });
 
-      // normalize all references urls, add title to it
-      thisStep.references = thisStep.references?.filter(ref => ref.url.startsWith('http')).map(ref => {
-        return {
-          exactQuote: ref.exactQuote,
-          title: allURLs[ref.url]?.title,
-          url: ref.url ? normalizeUrl(ref.url) : ''
-        }
-      });
 
-      context.actionTracker.trackThink('eval_first', SchemaGen.languageCode)
       console.log(currentQuestion, evaluationMetrics[currentQuestion])
-      const evaluation = await evaluateAnswer(currentQuestion, thisStep,
-        evaluationMetrics[currentQuestion],
-        context,
-        visitedURLs,
-        SchemaGen
-      );
+      let evaluation: EvaluationResponse = {pass: true, think: ''};
+      if (evaluationMetrics[currentQuestion].length > 0) {
+        context.actionTracker.trackThink('eval_first', SchemaGen.languageCode)
+        evaluation = await evaluateAnswer(currentQuestion, thisStep,
+          evaluationMetrics[currentQuestion],
+          context,
+          visitedURLs,
+          SchemaGen
+        ) || evaluation;
+      }
 
       if (currentQuestion.trim() === question) {
         if (evaluation.pass) {
@@ -522,9 +539,6 @@ But then you realized you have asked them before. You decided to to think out of
       thisStep.searchRequests = chooseK((await dedupQueries(thisStep.searchRequests, [], context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
 
       // rewrite queries
-      console.log(countUrlParts(weightedURLs).hostnameCount)
-      const topHosts = Object.entries(countUrlParts(weightedURLs).hostnameCount).sort((a, b) => b[1] - a[1]).map(([host]) => host).slice(0, 2);
-      console.log(topHosts)
       let {queries: keywordsQueries} = await rewriteQuery(thisStep, context, SchemaGen);
       // avoid exisitng searched queries
       keywordsQueries = chooseK((await dedupQueries(keywordsQueries, allKeywords, context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
@@ -540,8 +554,19 @@ But then you realized you have asked them before. You decided to to think out of
 
           try {
             let siteQuery = query
-            if (topHosts.length > 0) {
-              siteQuery = query + ' site:' + chooseK(topHosts, 1)[0];
+            if (allURLs && Object.keys(allURLs).length > 0) {
+              // rerank urls
+              weightedURLs = rankURLs(getUnvisitedURLs(allURLs, visitedURLs), {
+                question: currentQuestion
+              }, context);
+            }
+
+            const topHosts = Object.entries(countUrlParts(weightedURLs).hostnameCount).sort((a, b) => b[1] - a[1]);
+            console.log(topHosts)
+            if (topHosts.length > 0 && Math.random() < 0.6 && !query.includes('site:')) {
+              // explore-exploit
+              siteQuery = query + ' site:' + sampleMultinomial(topHosts);
+              console.log('Site query:', siteQuery)
             }
             switch (SEARCH_PROVIDER) {
               case 'jina':
@@ -569,22 +594,15 @@ But then you realized you have asked them before. You decided to to think out of
             await sleep(STEP_SLEEP)
           }
 
-          const minResults = (results).map(r => ({
+          const minResults: SearchSnippet[] = (results).map(r => ({
             title: r.title,
             url: normalizeUrl('url' in r ? r.url : r.link),
             description: 'description' in r ? r.description : r.snippet,
+            weight: 1
           }));
 
           minResults.forEach(r => {
-            if (!allURLs[r.url]) {
-              allURLs[r.url] = r;
-              allURLs[r.url].weight = 1;
-            } else {
-              (allURLs[r.url].weight as number)++;
-              const curDesc = (allURLs[r.url] as { title: string; url: string; description: string; weight?: number }).description;
-              (allURLs[r.url] as { title: string; url: string; description: string; weight?: number }).description = smartMergeStrings(curDesc, r.description);
-            }
-
+            addToAllURLs(r, allURLs);
           });
           allKeywords.push(query);
 
@@ -632,6 +650,7 @@ You decided to think out of the box or cut from a completely different angle.
         .filter(url => url.startsWith('http'))
         .map(url => normalizeUrl(url))
         .filter(url => !visitedURLs.includes(url));
+
       thisStep.URLTargets = [...new Set([...thisStep.URLTargets, ...weightedURLs.map(r => r.url)])].slice(0, MAX_URLS_PER_STEP);
 
       const uniqueURLs = thisStep.URLTargets;
@@ -658,6 +677,15 @@ You decided to think out of the box or cut from a completely different angle.
                 type: 'url',
                 updated: new Date().toISOString()
               });
+
+              data.links?.forEach(link => {
+                const r: SearchSnippet = {
+                  title: link[0],
+                  url: normalizeUrl(link[1]),
+                  description: link[0]
+                }
+                addToAllURLs(r, allURLs);
+              })
 
               return {url, result: response};
             } catch (error) {
@@ -740,11 +768,11 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     }
 
 
-    await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, allURLs}, totalStep);
+    await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
     await sleep(STEP_SLEEP);
   }
 
-  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, allURLs}, totalStep);
+  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
   if (!(thisStep as AnswerAction).isFinal) {
     console.log('Enter Beast mode!!!')
     // any answer is better than no answer, humanity last resort
@@ -784,7 +812,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   (thisStep as AnswerAction).mdAnswer = buildMdFromAnswer((thisStep as AnswerAction))
   console.log(thisStep)
 
-  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, allURLs}, totalStep);
+  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
   return {
     result: thisStep,
     context,
@@ -799,11 +827,11 @@ async function storeContext(prompt: string, schema: any, memory: {
                               allKeywords: string[];
                               allQuestions: string[];
                               allKnowledge: KnowledgeItem[];
-                              allURLs: Record<string, SearchResult>;
+                              weightedURLs: BoostedSearchSnippet[];
                             }
   , step: number) {
 
-  const {allContext, allKeywords, allQuestions, allKnowledge, allURLs} = memory;
+  const {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs} = memory;
   if ((process as any).asyncLocalContext?.available?.()) {
 
     (process as any).asyncLocalContext.ctx.promptContext = {
@@ -830,7 +858,7 @@ ${JSON.stringify(zodToJsonSchema(schema), null, 2)}
     await fs.writeFile('queries.json', JSON.stringify(allKeywords, null, 2));
     await fs.writeFile('questions.json', JSON.stringify(allQuestions, null, 2));
     await fs.writeFile('knowledge.json', JSON.stringify(allKnowledge, null, 2));
-    await fs.writeFile('urls.json', JSON.stringify(calculateBoostedWeights(Object.entries(allURLs).map(([, result]) => result)), null, 2));
+    await fs.writeFile('urls.json', JSON.stringify(weightedURLs, null, 2));
   } catch (error) {
     console.error('Context storage failed:', error);
   }

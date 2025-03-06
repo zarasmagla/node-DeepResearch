@@ -1,106 +1,108 @@
-import {BoostedSearchResult, SearchResult} from "../types";
+import {BoostedSearchSnippet, SearchResult, SearchSnippet, TrackerContext} from "../types";
+import {smartMergeStrings} from "./text-tools";
+import {rerankDocuments} from "../tools/jina-rerank";
 
 export function normalizeUrl(urlString: string, debug = false): string {
-    if (!urlString?.trim()) {
-        throw new Error('Empty URL');
+  if (!urlString?.trim()) {
+    throw new Error('Empty URL');
+  }
+
+  urlString = urlString.trim();
+
+  if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(urlString)) {
+    urlString = 'https://' + urlString;
+  }
+
+  try {
+    const url = new URL(urlString);
+
+    url.hostname = url.hostname.toLowerCase();
+    if (url.hostname.startsWith('www.')) {
+      url.hostname = url.hostname.slice(4);
     }
 
-    urlString = urlString.trim();
-
-    if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(urlString)) {
-        urlString = 'https://' + urlString;
+    if ((url.protocol === 'http:' && url.port === '80') ||
+      (url.protocol === 'https:' && url.port === '443')) {
+      url.port = '';
     }
 
-    try {
-        const url = new URL(urlString);
-
-        url.hostname = url.hostname.toLowerCase();
-        if (url.hostname.startsWith('www.')) {
-            url.hostname = url.hostname.slice(4);
-        }
-
-        if ((url.protocol === 'http:' && url.port === '80') ||
-            (url.protocol === 'https:' && url.port === '443')) {
-            url.port = '';
-        }
-
-        // Path normalization with error tracking
-        url.pathname = url.pathname
-            .split('/')
-            .map(segment => {
-                try {
-                    return decodeURIComponent(segment);
-                } catch (e) {
-                    if (debug) console.error(`Failed to decode path segment: ${segment}`, e);
-                    return segment;
-                }
-            })
-            .join('/')
-            .replace(/\/+/g, '/')
-            .replace(/\/+$/, '') || '/';
-
-        // Query parameter normalization with error details
-        const searchParams = new URLSearchParams(url.search);
-        const sortedParams = Array.from(searchParams.entries())
-            .map(([key, value]) => {
-                if (value === '') return [key, ''];
-                try {
-                    const decodedValue = decodeURIComponent(value);
-                    if (encodeURIComponent(decodedValue) === value) {
-                        return [key, decodedValue];
-                    }
-                } catch (e) {
-                    if (debug) console.error(`Failed to decode query param ${key}=${value}`, e);
-                }
-                return [key, value];
-            })
-            .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-            .filter(([key]) => key !== '');
-
-        url.search = new URLSearchParams(sortedParams).toString();
-
-        // Fragment handling with validation
-        if (url.hash === '#' || url.hash === '#top' || url.hash === '#/' || !url.hash) {
-            url.hash = '';
-        } else if (url.hash) {
-            try {
-                const decodedHash = decodeURIComponent(url.hash.slice(1));
-                const encodedBack = encodeURIComponent(decodedHash);
-                // Only use decoded version if it's safe
-                if (encodedBack === url.hash.slice(1)) {
-                    url.hash = '#' + decodedHash;
-                }
-            } catch (e) {
-                if (debug) console.error(`Failed to decode fragment: ${url.hash}`, e);
-            }
-        }
-
-        let normalizedUrl = url.toString();
-
-        // Final URL normalization with validation
+    // Path normalization with error tracking
+    url.pathname = url.pathname
+      .split('/')
+      .map(segment => {
         try {
-            const decodedUrl = decodeURIComponent(normalizedUrl);
-            const encodedBack = encodeURIComponent(decodedUrl);
-            // Only use decoded version if it's safe
-            if (encodedBack === normalizedUrl) {
-                normalizedUrl = decodedUrl;
-            }
+          return decodeURIComponent(segment);
         } catch (e) {
-            if (debug) console.error('Failed to decode final URL', e);
+          if (debug) console.error(`Failed to decode path segment: ${segment}`, e);
+          return segment;
         }
+      })
+      .join('/')
+      .replace(/\/+/g, '/')
+      .replace(/\/+$/, '') || '/';
 
-        return normalizedUrl;
-    } catch (error) {
-        // Main URL parsing error - this one we should throw
-        throw new Error(`Invalid URL "${urlString}": ${error}`);
+    // Query parameter normalization with error details
+    const searchParams = new URLSearchParams(url.search);
+    const sortedParams = Array.from(searchParams.entries())
+      .map(([key, value]) => {
+        if (value === '') return [key, ''];
+        try {
+          const decodedValue = decodeURIComponent(value);
+          if (encodeURIComponent(decodedValue) === value) {
+            return [key, decodedValue];
+          }
+        } catch (e) {
+          if (debug) console.error(`Failed to decode query param ${key}=${value}`, e);
+        }
+        return [key, value];
+      })
+      .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
+      .filter(([key]) => key !== '');
+
+    url.search = new URLSearchParams(sortedParams).toString();
+
+    // Fragment handling with validation
+    if (url.hash === '#' || url.hash === '#top' || url.hash === '#/' || !url.hash) {
+      url.hash = '';
+    } else if (url.hash) {
+      try {
+        const decodedHash = decodeURIComponent(url.hash.slice(1));
+        const encodedBack = encodeURIComponent(decodedHash);
+        // Only use decoded version if it's safe
+        if (encodedBack === url.hash.slice(1)) {
+          url.hash = '#' + decodedHash;
+        }
+      } catch (e) {
+        if (debug) console.error(`Failed to decode fragment: ${url.hash}`, e);
+      }
     }
+
+    let normalizedUrl = url.toString();
+
+    // Final URL normalization with validation
+    try {
+      const decodedUrl = decodeURIComponent(normalizedUrl);
+      const encodedBack = encodeURIComponent(decodedUrl);
+      // Only use decoded version if it's safe
+      if (encodedBack === normalizedUrl) {
+        normalizedUrl = decodedUrl;
+      }
+    } catch (e) {
+      if (debug) console.error('Failed to decode final URL', e);
+    }
+
+    return normalizedUrl;
+  } catch (error) {
+    // Main URL parsing error - this one we should throw
+    throw new Error(`Invalid URL "${urlString}": ${error}`);
+  }
 }
 
 
-export function getUnvisitedURLs(allURLs: Record<string, SearchResult>, visitedURLs: string[]): SearchResult[] {
-    return Object.entries(allURLs)
-        .filter(([url]) => !visitedURLs.includes(url))
-        .map(([, result]) => result);
+export function getUnvisitedURLs(allURLs: Record<string, SearchSnippet>, visitedURLs: string[]): SearchSnippet[] {
+  return Object.entries(allURLs)
+    .filter(([url]) => !visitedURLs.includes(url))
+    .map(([, result]) => result);
 }
 
 
@@ -114,7 +116,7 @@ const extractUrlParts = (urlStr: string) => {
     };
   } catch (e) {
     console.error(`Error parsing URL: ${urlStr}`, e);
-    return { hostname: "", path: "" };
+    return {hostname: "", path: ""};
   }
 };
 
@@ -129,7 +131,7 @@ export const countUrlParts = (urlItems: SearchResult[]) => {
     if (!item || !item.url) return; // Skip invalid items
 
     totalUrls++;
-    const { hostname, path } = extractUrlParts(item.url);
+    const {hostname, path} = extractUrlParts(item.url);
 
     // Count hostnames
     hostnameCount[hostname] = (hostnameCount[hostname] || 0) + 1;
@@ -142,7 +144,7 @@ export const countUrlParts = (urlItems: SearchResult[]) => {
     });
   });
 
-  return { hostnameCount, pathPrefixCount, totalUrls };
+  return {hostnameCount, pathPrefixCount, totalUrls};
 };
 
 // Calculate normalized frequency for boosting
@@ -151,31 +153,44 @@ const normalizeCount = (count: any, total: any) => {
 };
 
 // Calculate boosted weights
-export const calculateBoostedWeights = (urlItems: SearchResult[], options: any = {}): any[] => {
+export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers: TrackerContext): any[] => {
   // Default parameters for boosting - can be overridden
   const {
-    hostnameBoostFactor = 0.7,  // How much to boost based on hostname frequency
+    freqFactor = 0.5,           // How much to boost based on term frequency
+    hostnameBoostFactor = 0.5,  // How much to boost based on hostname frequency
     pathBoostFactor = 0.4,      // How much to boost based on path frequency
     decayFactor = 0.8,          // Decay factor for longer paths (0-1)
+    jinaRerankFactor = 0.8,     // How much to boost based on Jina reranking
     minBoost = 0,               // Minimum boost score
-    maxBoost = 5                // Maximum boost score cap
+    maxBoost = 5,                // Maximum boost score cap
+    question = '',              // Optional question for Jina reranking
   } = options;
 
   // Count URL parts first
   const counts = countUrlParts(urlItems);
-  const { hostnameCount, pathPrefixCount, totalUrls } = counts;
+  const {hostnameCount, pathPrefixCount, totalUrls} = counts;
 
-  return urlItems.map(item => {
-    item = (item as BoostedSearchResult)
+  if (question.trim().length > 0) {
+    // get from jina rerank
+    rerankDocuments(question, urlItems.map(item => smartMergeStrings(item.title, item.description)), trackers.tokenTracker)
+      .then(({results}) => {
+        results.forEach(({index, relevance_score}) => {
+          (urlItems[index] as BoostedSearchSnippet).jinaRerankBoost = relevance_score * jinaRerankFactor;
+        });
+      })
+  }
+
+
+  return (urlItems as BoostedSearchSnippet[]).map(item => {
     if (!item || !item.url) {
       console.error('Skipping invalid item:', item);
       return item; // Return unchanged
     }
 
-    const { hostname, path } = extractUrlParts(item.url);
+    const {hostname, path} = extractUrlParts(item.url);
 
     // Base weight from original
-    const originalWeight = item.weight || 1.0; // Default to 1 if weight is missing
+    const freq = item.weight || 1.0; // Default to 1 if weight is missing
 
     // Hostname boost (normalized by total URLs)
     const hostnameFreq = normalizeCount(hostnameCount[hostname] || 0, totalUrls);
@@ -194,17 +209,91 @@ export const calculateBoostedWeights = (urlItems: SearchResult[], options: any =
       pathBoost += decayedBoost;
     });
 
+    const freqBoost = freq / totalUrls * freqFactor;
+    const jinaRerankBoost = item.jinaRerankBoost || 0;
     // Calculate new weight with clamping
-    const boostScore = Math.min(Math.max(hostnameBoost + pathBoost, minBoost), maxBoost);
-    const boostedWeight = originalWeight + boostScore;
+    const finalScore = Math.min(
+      Math.max(
+        hostnameBoost
+        + pathBoost
+        + freqBoost
+        + jinaRerankBoost, minBoost),
+      maxBoost);
 
     return {
       ...item,
-      originalWeight,
+      freqBoost,
       hostnameBoost,
       pathBoost,
-      boostScore,
-      boostedWeight
-    } as BoostedSearchResult;
-  });
+      jinaRerankBoost,
+      finalScore
+    } as BoostedSearchSnippet;
+  }).sort((a, b) => b.finalScore - a.finalScore);
 };
+
+export const addToAllURLs = (r: SearchSnippet, allURLs: Record<string, SearchSnippet>) => {
+  if (!allURLs[r.url]) {
+    allURLs[r.url] = r;
+    allURLs[r.url].weight = 1;
+  } else {
+    (allURLs[r.url].weight as number)++;
+    const curDesc = allURLs[r.url].description;
+    allURLs[r.url].description = smartMergeStrings(curDesc, r.description);
+  }
+}
+
+export const weightedURLToString = (allURLs: BoostedSearchSnippet[], maxURLs = 70) => {
+  if (!allURLs || allURLs.length === 0) return '';
+
+  return (allURLs)
+    .map(r => {
+      const merged = smartMergeStrings(r.title, r.description);
+      return {
+        url: r.url,
+        score: r.finalScore,
+        merged
+      };
+    })
+    .filter(item => item.merged !== '' && item.merged !== undefined && item.merged !== null)
+    .sort((a, b) => (b.score || 0) - (a.score || 0))
+    .slice(0, maxURLs)
+    .map(item => `  + weight: ${item.score.toFixed(2)} "${item.url}": "${item.merged}"`)
+    .join('\n');
+}
+
+
+/**
+ * Draw a sample from a multinomial distribution
+ * @param items Array of [name, weight] tuples
+ * @returns A randomly selected item based on the weights, or null if array is empty
+ */
+export function sampleMultinomial<T>(items: [T, number][]): T | null {
+  // Handle empty array
+  if (!items || items.length === 0) {
+    return null;
+  }
+
+  // Calculate total weight
+  const totalWeight = items.reduce((sum, [, weight]) => sum + weight, 0);
+
+  // Handle case where all weights are 0
+  if (totalWeight === 0) {
+    return null;
+  }
+
+  // Generate a random number between 0 and total weight
+  const randValue = Math.random() * totalWeight;
+
+  // Find the item corresponding to the random value
+  let cumulativeWeight = 0;
+
+  for (const [item, weight] of items) {
+    cumulativeWeight += weight;
+    if (randValue <= cumulativeWeight) {
+      return item;
+    }
+  }
+
+  // Fallback (should rarely happen due to floating point precision)
+  return items[items.length - 1][0];
+}

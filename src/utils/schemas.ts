@@ -168,11 +168,7 @@ export class Schemas {
         return z.object({
           type: z.literal('attribution'),
           ...baseSchemaBefore,
-          attribution_analysis: z.object({
-            sources_provided: z.boolean().describe('Whether the answer provides source references'),
-            sources_verified: z.boolean().describe('Whether the provided sources contain the claimed information'),
-            quotes_accurate: z.boolean().describe('Whether the quotes accurately represent the source content')
-          }),
+          exactQuote: z.string().describe('Exact relevant quote and evidence from the source that strongly support the answer and justify this question-answer pair').max(200).optional(),
           ...baseSchemaAfter
         });
       case "completeness":
@@ -223,7 +219,7 @@ export class Schemas {
         references: z.array(
           z.object({
             exactQuote: z.string().describe("Exact relevant quote from the document, must be a soundbite, short and to the point, no fluff").max(30),
-            url: z.string().describe("source URL; must be directly from the context").max(100),
+            url: z.string().describe("source URL; must be copy directly from existing knowledge real URLs, avoid example.com or any placeholder fake URLs").max(100),
             dateTime: z.string().describe("Apply this evidence hierarchy to determine the source timestamp: (1) Explicit dates in metadata/content, (2) Internal time references, (3) Contextual clues, (4) Version history if available. Format as YYYY-MM-DD when possible; otherwise provide narrowest defensible range with confidence level (High/Medium/Low).").max(16),
           }).required()
         ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document"),

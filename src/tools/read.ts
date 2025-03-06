@@ -23,7 +23,7 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
         'Content-Type': 'application/json',
         'Content-Length': data.length,
         'X-Retain-Images': 'none',
-        'X-Engine': 'direct'
+        'X-With-Links-Summary': 'all'
       }
     };
 

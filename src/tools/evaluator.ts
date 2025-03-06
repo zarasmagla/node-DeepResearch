@@ -26,85 +26,14 @@ answer: ${JSON.stringify(answer)}
 
 function getAttributionPrompt(question: string, answer: string, sourceContent: string): PromptPair {
   return {
-    system: `You are an evaluator that verifies if answer content is properly attributed to and supported by the provided sources.
-
-<rules>
-1. Source Verification:
-   - Check if answer claims are supported by the provided source content
-   - Verify that quotes are accurate and in proper context
-   - Ensure numerical data and statistics match the source
-   - Flag any claims that go beyond what the sources support
-
-2. Attribution Analysis:
-   - Check if answer properly references its sources
-   - Verify that important claims have clear source attribution
-   - Ensure quotes are properly marked and cited
-   - Check for any unsupported generalizations
-
-3. Accuracy Requirements:
-   - Direct quotes must match source exactly
-   - Paraphrasing must maintain original meaning
-   - Statistics and numbers must be precise
-   - Context must be preserved
-</rules>
-
-<examples>
-Question: "What are Jina AI's main products?"
-Answer: "According to Jina AI's website, their main products are DocArray and Jina Framework."
-Source Content: "Jina AI's flagship products include DocArray, Jina Framework, and JCloud, offering a complete ecosystem for neural search applications."
-Evaluation: {
-  "think": "The answer omits JCloud which is mentioned as a main product in the source. The information provided is incomplete and potentially misleading as it fails to mention a significant product from the company's ecosystem.",
-  "attribution_analysis": {
-    "sources_provided": true,
-    "sources_verified": false,
-    "quotes_accurate": false
-  }
-  "pass": false,
-}
-
-Question: "When was Python first released?"
-Answer: "Python was first released in 1991 by Guido van Rossum."
-Source Content: "Python was first released in 1991 by Guido van Rossum while working at CWI."
-Evaluation: {
-  "think": "The answer accurately reflects the core information from the source about Python's release date and creator, though it omits the additional context about CWI which isn't essential to the question.",
-  "attribution_analysis": {
-    "sources_provided": true,
-    "sources_verified": true,
-    "quotes_accurate": true
-  }
-  "pass": true,
-}
-
-Question: "长城是什么时候建造的？"
-Answer: "长城始建于公元前7世纪，但现存的大部分长城是明朝时期修建的。"
-Source Content: "中国长城始建于公元前7世纪的春秋战国时期，历经多个朝代修建和扩展，但现存的大部分长城是明朝（1368-1644年）时期修建的。"
-Evaluation: {
-  "think": "这个回答准确地反映了原文中关于长城建造时间的核心信息，包括最初的建造时期和现存长城的主要来源。虽然省略了具体的年份范围（1368-1644年），但这对回答问题的核心内容不是必要的。",
-  "attribution_analysis": {
-    "sources_provided": true,
-    "sources_verified": true,
-    "quotes_accurate": true
-  }
-  "pass": true,
-}
-
-Question: "Wann wurde die Berliner Mauer gebaut?"
-Answer: "Die Berliner Mauer wurde am 13. August 1961 errichtet."
-Source Content:  "Die Berliner Mauer wurde am 13. August 1961 von der DDR-Regierung errichtet und fiel am 9. November 1989."
-Evaluation: {
-  "think": "Die Antwort gibt das korrekte Datum des Mauerbaus wieder, wie in der Quelle angegeben. Der zusätzliche Kontext über den Fall der Mauer wurde weggelassen, da er für die spezifische Frage nach dem Bauzeitpunkt nicht wesentlich ist.",
-  "attribution_analysis": {
-    "sources_provided": true,
-    "sources_verified": true,
-    "quotes_accurate": true
-  }
-  "pass": true,
-}
-</examples>`,
+    system: `You are an evaluator that verifies if answer content is properly attributed to and supported by the provided context.`,
     user: `
+Context: ${sourceContent}    
 Question: ${question}
 Answer: ${answer}
-Source Content: ${sourceContent}`
+
+Let me think
+`
   }
 }
 
@@ -739,13 +668,14 @@ export async function evaluateAnswer(
       );
 
       // fail one, return immediately
-      if (!(result?.object as EvaluationResponse).pass) {
-        return (result.object as EvaluationResponse);
+      if (!(result?.object as EvaluationResponse)?.pass) {
+        return result?.object as EvaluationResponse;
       }
     }
   }
 
-  return (result!.object as EvaluationResponse);
+    return result?.object as EvaluationResponse;
+
 }
 
 // Helper function to fetch and combine source content

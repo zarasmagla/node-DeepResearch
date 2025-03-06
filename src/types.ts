@@ -128,6 +128,7 @@ export interface ReadResponse {
     url: string;
     content: string;
     usage: { tokens: number; };
+    links: Array<[string, string]>; // [anchor, url]
   };
   name?: string;
   message?: string;
@@ -147,11 +148,7 @@ export type EvaluationResponse = {
     minimum_count_required: number;
     actual_count_provided: number;
   };
-  attribution_analysis?: {
-    sources_provided: boolean,
-    sources_verified: boolean,
-    quotes_accurate: boolean,
-  };
+  exactQuote? : string;
   completeness_analysis?: {
     aspects_expected: string,
     aspects_provided: string,
@@ -171,20 +168,19 @@ export type ErrorAnalysisResponse = {
   questionsToAnswer: string[];
 };
 
+
 export type SearchResult =
-  | { title: string; url: string; description: string; weight?: number }
+  | SearchSnippet
   | { title: string; link: string; snippet: string; weight?: number };
 
-export type BoostedSearchResult = {
-  title: string;
-  url: string;
-  description: string;
-  weight: number;
-  originalWeight: number;
+export type SearchSnippet = { title: string; url: string; description: string; weight?: number }
+
+export type BoostedSearchSnippet = SearchSnippet & {
+  freqBoost: number;
   hostnameBoost: number;
   pathBoost: number;
-  boostScore: number;
-  boostedWeight: number;
+  jinaRerankBoost: number;
+  finalScore: number;
 }
 
 // OpenAI API Types
