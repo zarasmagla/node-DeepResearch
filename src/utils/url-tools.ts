@@ -2,7 +2,12 @@ import {BoostedSearchSnippet, SearchResult, SearchSnippet, TrackerContext} from 
 import {smartMergeStrings} from "./text-tools";
 import {rerankDocuments} from "../tools/jina-rerank";
 
-export function normalizeUrl(urlString: string, debug = false): string {
+export function normalizeUrl(urlString: string, debug = false, options = {
+  removeAnchors: true,
+  removeSessionIDs: true,
+  removeUTMParams: true,
+  removeTrackingParams: true
+}): string {
   if (!urlString?.trim()) {
     throw new Error('Empty URL');
   }
@@ -56,13 +61,37 @@ export function normalizeUrl(urlString: string, debug = false): string {
         }
         return [key, value];
       })
-      .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
-      .filter(([key]) => key !== '');
+      // Filter out tracking, session and UTM parameters
+      .filter(([key]) => {
+        if (key === '') return false;
+
+        // Remove session IDs
+        if (options.removeSessionIDs &&
+            /^(s|session|sid|sessionid|phpsessid|jsessionid|aspsessionid|asp\.net_sessionid)$/i.test(key)) {
+          return false;
+        }
+
+        // Remove UTM parameters
+        if (options.removeUTMParams && /^utm_/i.test(key)) {
+          return false;
+        }
+
+        // Remove common tracking parameters
+        if (options.removeTrackingParams &&
+            /^(ref|referrer|fbclid|gclid|cid|mcid|source|medium|campaign|term|content|sc_rid|mc_[a-z]+)$/i.test(key)) {
+          return false;
+        }
+
+        return true;
+      })
+      .sort(([keyA], [keyB]) => keyA.localeCompare(keyB));
 
     url.search = new URLSearchParams(sortedParams).toString();
 
-    // Fragment handling with validation
-    if (url.hash === '#' || url.hash === '#top' || url.hash === '#/' || !url.hash) {
+    // Fragment (anchor) handling - remove completely if requested
+    if (options.removeAnchors) {
+      url.hash = '';
+    } else if (url.hash === '#' || url.hash === '#top' || url.hash === '#/' || !url.hash) {
       url.hash = '';
     } else if (url.hash) {
       try {
@@ -78,6 +107,11 @@ export function normalizeUrl(urlString: string, debug = false): string {
     }
 
     let normalizedUrl = url.toString();
+
+    // Remove trailing slash from paths that aren't just "/"
+    if (url.pathname.length > 1 && url.pathname.endsWith('/')) {
+      url.pathname = url.pathname.slice(0, -1);
+    }
 
     // Final URL normalization with validation
     try {
@@ -97,7 +131,6 @@ export function normalizeUrl(urlString: string, debug = false): string {
     throw new Error(`Invalid URL "${urlString}": ${error}`);
   }
 }
-
 
 export function getUnvisitedURLs(allURLs: Record<string, SearchSnippet>, visitedURLs: string[]): SearchSnippet[] {
   return Object.entries(allURLs)
