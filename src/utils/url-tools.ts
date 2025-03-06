@@ -297,3 +297,35 @@ export function sampleMultinomial<T>(items: [T, number][]): T | null {
   // Fallback (should rarely happen due to floating point precision)
   return items[items.length - 1][0];
 }
+
+
+
+
+/**
+ * Fetches the last modified date for a URL using the datetime detection API
+ * @param url The URL to check for last modified date
+ * @returns Promise containing the last modified date or null if not found
+ */
+export async function getLastModified(url: string): Promise<string | null> {
+  try {
+    // Call the API with proper encoding
+    const apiUrl = `https://api-beta-datetime.jina.ai?url=${encodeURIComponent(url)}`;
+    const response = await fetch(apiUrl);
+
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Return the bestGuess date if available
+    if (data.bestGuess) {
+      return data.bestGuess;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Failed to fetch last modified date:', error);
+    return null;
+  }
+}

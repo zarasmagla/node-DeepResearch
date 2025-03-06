@@ -33,7 +33,7 @@ import {
   countUrlParts,
   getUnvisitedURLs,
   normalizeUrl, sampleMultinomial,
-  weightedURLToString
+  weightedURLToString, getLastModified
 } from "./utils/url-tools";
 import {buildMdFromAnswer, chooseK, removeExtraLineBreaks, removeHTMLtags} from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
@@ -384,9 +384,16 @@ export async function getResponse(question?: string,
           return {
             exactQuote: ref?.exactQuote || '',
             title: normalizedUrl ? (allURLs[normalizedUrl]?.title || '') : '',
-            url: normalizedUrl
+            url: normalizedUrl,
           }
         });
+
+      // parallel process guess all url datetime
+      await Promise.all(thisStep.references.map(async ref => {
+        ref.dateTime = await getLastModified(ref.url) || ref?.dateTime || ''
+      }));
+
+      console.log('Updated references:', thisStep.references)
 
       if (step === 1 && thisStep.references.length === 0) {
         // LLM is so confident and answer immediately, skip all evaluations

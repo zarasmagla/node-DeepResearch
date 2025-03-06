@@ -220,7 +220,7 @@ export class Schemas {
           z.object({
             exactQuote: z.string().describe("Exact relevant quote from the document, must be a soundbite, short and to the point, no fluff").max(30),
             url: z.string().describe("source URL; must be copy directly from existing knowledge real URLs, avoid example.com or any placeholder fake URLs").max(100),
-            dateTime: z.string().describe("Apply this evidence hierarchy to determine the source timestamp: (1) Explicit dates in metadata/content, (2) Internal time references, (3) Contextual clues, (4) Version history if available. Format as YYYY-MM-DD when possible; otherwise provide narrowest defensible range with confidence level (High/Medium/Low).").max(16),
+            dateTime: z.string().describe("Apply this evidence hierarchy to determine the source timestamp: (1) Explicit dates in metadata/content, (2) Internal time references, (3) Contextual clues, (4) Version history if available. Format as YYYY-MM-DD when possible; otherwise provide narrowest defensible range.").max(16),
           }).required()
         ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote and the URL of the document"),
         answer: z.string()
