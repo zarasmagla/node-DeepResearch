@@ -2,8 +2,8 @@ import {AnswerAction} from "../types";
 import i18nJSON from './i18n.json';
 
 export function buildMdFromAnswer(answer: AnswerAction) {
-  // Standard footnote regex - updated to handle both [^1] and [1^] formats
-  const footnoteRegex = /\[(\^(\d+)|(\d+)\^)]/g;
+  // Standard footnote regex - updated to handle [^1], [1^], and [1] formats
+  const footnoteRegex = /\[(\^(\d+)|(\d+)\^|(\d+))]/g;
 
   // New regex to catch grouped footnotes like [^1, ^2, ^3] or [^1,^2,^3]
   const groupedFootnoteRegex = /\[\^(\d+)(?:,\s*\^(\d+))+]/g;
@@ -35,8 +35,10 @@ export function buildMdFromAnswer(answer: AnswerAction) {
       .replace(footnoteRegex, '');
   }
 
-  // Normalize footnotes first (convert [1^] to [^1] format)
-  let processedAnswer = answer.answer.replace(/\[(\d+)\^]/g, (_, num) => `[^${num}]`);
+  // Normalize footnotes first (convert [1^] to [^1] format and [1] to [^1] format)
+  let processedAnswer = answer.answer
+    .replace(/\[(\d+)\^]/g, (_, num) => `[^${num}]`)
+    .replace(/\[(\d+)]/g, (_, num) => `[^${num}]`);
 
   // Fix grouped footnotes
   processedAnswer = processedAnswer.replace(groupedFootnoteRegex, (match) => {
@@ -133,6 +135,7 @@ ${correctedAnswer}
 ${formatReferences(answer.references)}
 `.trim();
 }
+
 export const removeExtraLineBreaks = (text: string) => {
   return text.replace(/\n{2,}/gm, '\n\n');
 }

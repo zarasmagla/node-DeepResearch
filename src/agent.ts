@@ -554,14 +554,10 @@ But then you realized you have asked them before. You decided to to think out of
 
           try {
             let siteQuery = query
-            if (allURLs && Object.keys(allURLs).length > 0) {
-              // rerank urls
-              weightedURLs = rankURLs(getUnvisitedURLs(allURLs, visitedURLs), {
-                question: currentQuestion
-              }, context);
-            }
 
-            const topHosts = Object.entries(countUrlParts(weightedURLs).hostnameCount).sort((a, b) => b[1] - a[1]);
+            const topHosts = Object.entries(countUrlParts(
+              Object.entries(allURLs).map(([, result]) => result)
+            ).hostnameCount).sort((a, b) => b[1] - a[1]);
             console.log(topHosts)
             if (topHosts.length > 0 && Math.random() < 0.6 && !query.includes('site:')) {
               // explore-exploit
