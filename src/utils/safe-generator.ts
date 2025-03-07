@@ -1,5 +1,11 @@
-import { z } from 'zod';
-import {generateObject, LanguageModelUsage, NoObjectGeneratedError, Schema} from "ai";
+import {z} from 'zod';
+import {
+  CoreMessage,
+  generateObject,
+  LanguageModelUsage,
+  NoObjectGeneratedError,
+  Schema
+} from "ai";
 import {TokenTracker} from "./token-tracker";
 import {getModel, ToolName, getToolConfig} from "../config";
 
@@ -12,8 +18,8 @@ interface GenerateOptions<T> {
   model: ToolName;
   schema: z.ZodType<T> | Schema<T>;
   prompt?: string;
-  system?:string;
-  messages?: any;
+  system?: string;
+  messages?: CoreMessage[];
 }
 
 export class ObjectGeneratorSafe {

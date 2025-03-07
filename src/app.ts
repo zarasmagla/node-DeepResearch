@@ -388,11 +388,21 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     return res.status(400).json({error: 'Last message must be from user'});
   }
 
+  console.log('messages', JSON.stringify(body.messages));
+
   // clean <think> from all assistant messages
   body.messages?.filter(message => message.role === 'assistant').forEach(message => {
-    message.content = (message.content as string).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    // 2 cases message.content can be a string or an array
+    if (typeof message.content === 'string') {
+        message.content = (message.content as string).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    } else if (Array.isArray(message.content)) {
+      // find all type: text and clean <think> from .text
+      message.content.forEach((content: any) => {
+        if (content.type === 'text') {
+          content.text = (content.text as string).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+      }});
+    }
   });
-  console.log('messages', body.messages);
 
   let {tokenBudget, maxBadAttempts} = getTokenBudgetAndMaxAttempts(
     body.reasoning_effort,

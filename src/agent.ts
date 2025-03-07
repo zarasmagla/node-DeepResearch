@@ -1,5 +1,5 @@
 import {ZodObject} from 'zod';
-import {CoreAssistantMessage, CoreUserMessage} from 'ai';
+import {CoreMessage} from 'ai';
 import {SEARCH_PROVIDER, STEP_SLEEP} from "./config";
 import {readUrl, removeAllLineBreaks} from "./tools/read";
 import fs from 'fs/promises';
@@ -73,6 +73,14 @@ Using your training data and prior lessons learned, answer the user question wit
   if (knowledge?.length) {
     const knowledgeItems = knowledge
       .map((k, i) => `
+<knowledge-0>
+<question>
+How can I get the last update time of a URL?
+</question>
+<answer>
+Just choose <action-visit> and put URL in it, it will fetch full text and estimate the last update datetime of that URL. 
+</answer>
+</knowledge-0>
 <knowledge-${i + 1}>
 <question>
 ${k.question}
@@ -194,7 +202,8 @@ ${allKeywords.join('\n')}
   if (allowAnswer) {
     actionSections.push(`
 <action-answer>
-- For greetings, casual conversation, or general knowledge questions, answer directly without references.
+- For greetings, casual conversation, general knowledge questions answer directly without references.
+- If user ask you to retrieve previous messages or chat history, remember you do have access to the chat history, answer directly without references.
 - For all other questions, provide a verified answer with references. Each reference must include exactQuote, url and datetime.
 - You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
 - You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
@@ -257,7 +266,7 @@ export async function getResponse(question?: string,
                                   tokenBudget: number = 1_000_000,
                                   maxBadAttempts: number = 3,
                                   existingContext?: Partial<TrackerContext>,
-                                  messages?: Array<CoreAssistantMessage | CoreUserMessage>
+                                  messages?: Array<CoreMessage>
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[] }> {
 
   let step = 0;
@@ -266,7 +275,14 @@ export async function getResponse(question?: string,
 
   question = question?.trim() as string;
   if (messages && messages.length > 0) {
-    question = (messages[messages.length - 1]?.content as string).trim();
+    // 2 cases
+    const lastContent = messages[messages.length - 1].content;
+    if (typeof lastContent === 'string') {
+      question = lastContent.trim();
+    } else if (typeof lastContent === 'object' && Array.isArray(lastContent)) {
+      // find the very last sub content whose 'type' is 'text'  and use 'text' as the question
+      question = lastContent.filter(c => c.type === 'text').pop()?.text || '';
+    }
   } else {
     messages = [{role: 'user', content: question.trim()}]
   }
@@ -401,7 +417,7 @@ export async function getResponse(question?: string,
 
       console.log('Updated references:', thisStep.references)
 
-      if (step === 1 && thisStep.references.length === 0 && thisStep.answer.length < 300) {
+      if (step === 1 && thisStep.references.length === 0) {
         // LLM is so confident and answer immediately, skip all evaluations
         // however, if it does give any reference, it must be evaluated, case study: "How to configure a timeout when loading a huggingface dataset with python?"
         thisStep.isFinal = true;
