@@ -153,7 +153,7 @@ ${learnedStrategy}
 
     actionSections.push(`
 <action-visit>
-- Access and read full content from URLs
+- Crawl and read full content from URLs, you can get the fulltext, last updated datetime etc of any URL.  
 - Must check URLs mentioned in <question> if any
 ${urlList ? `    
 - Choose and visit relevant URLs below for more knowledge. higher weight suggests more relevant:
