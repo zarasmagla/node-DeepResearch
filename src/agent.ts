@@ -693,9 +693,10 @@ You decided to think out of the box or cut from a completely different angle.
                 const r: SearchSnippet = {
                   title: link[0],
                   url: normalizeUrl(link[1]),
-                  description: link[0]
+                  description: link[0],
                 }
-                addToAllURLs(r, allURLs);
+                // in-page link has lower initial weight comparing to search links
+                addToAllURLs(r, allURLs, 0.1);
               })
 
               return {url, result: response};

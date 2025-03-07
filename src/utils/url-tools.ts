@@ -223,7 +223,7 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
     const {hostname, path} = extractUrlParts(item.url);
 
     // Base weight from original
-    const freq = item.weight || 1.0; // Default to 1 if weight is missing
+    const freq = item.weight || 0; // Default to 1 if weight is missing
 
     // Hostname boost (normalized by total URLs)
     const hostnameFreq = normalizeCount(hostnameCount[hostname] || 0, totalUrls);
@@ -264,12 +264,12 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
   }).sort((a, b) => b.finalScore - a.finalScore);
 };
 
-export const addToAllURLs = (r: SearchSnippet, allURLs: Record<string, SearchSnippet>) => {
+export const addToAllURLs = (r: SearchSnippet, allURLs: Record<string, SearchSnippet>, weightDelta = 1) => {
   if (!allURLs[r.url]) {
     allURLs[r.url] = r;
-    allURLs[r.url].weight = 1;
+    allURLs[r.url].weight = weightDelta;
   } else {
-    (allURLs[r.url].weight as number)++;
+    (allURLs[r.url].weight as number)+= weightDelta;
     const curDesc = allURLs[r.url].description;
     allURLs[r.url].description = smartMergeStrings(curDesc, r.description);
   }
