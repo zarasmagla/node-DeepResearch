@@ -339,7 +339,7 @@ export function sampleMultinomial<T>(items: [T, number][]): T | null {
  * @param url The URL to check for last modified date
  * @returns Promise containing the last modified date or null if not found
  */
-export async function getLastModified(url: string): Promise<string | null> {
+export async function getLastModified(url: string): Promise<string | undefined> {
   try {
     // Call the API with proper encoding
     const apiUrl = `https://api-beta-datetime.jina.ai?url=${encodeURIComponent(url)}`;
@@ -356,9 +356,9 @@ export async function getLastModified(url: string): Promise<string | null> {
       return data.bestGuess;
     }
 
-    return null;
+    return undefined;
   } catch (error) {
     console.error('Failed to fetch last modified date:', error);
-    return null;
+    return undefined;
   }
 }

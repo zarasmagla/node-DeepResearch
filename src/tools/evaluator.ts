@@ -32,7 +32,7 @@ Context: ${sourceContent}
 Question: ${question}
 Answer: ${answer}
 
-Let me think
+Please look at my answer and think.
 `
   }
 }
@@ -204,7 +204,10 @@ Question-Answer Freshness Checker Guidelines
     user: `
 Question: ${question}
 Answer: 
-${JSON.stringify(answer)}`
+${JSON.stringify(answer)}
+
+Please look at my answer and references and think.
+`
   }
 }
 
@@ -293,6 +296,8 @@ Pass: false
     user: `
 Question: ${question}
 Answer: ${answer}
+
+Please look at my answer and think.
 `
   }
 }
@@ -335,8 +340,12 @@ Question Type Reference Table
 </rules>
 `,
     user:
-      `Question: ${question}
-Answer: ${answer}`
+      `
+Question: ${question}
+Answer: ${answer}
+
+Please look at my answer and think.
+`
   }
 }
 
@@ -535,7 +544,8 @@ This is a classic philosophical paradox that is inherently unanswerable in a def
 
 `,
     user:
-      `${question}
+      `
+${question}
 <think>`
   };
 }

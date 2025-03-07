@@ -80,6 +80,10 @@ ${k.question}
 <answer>
 ${k.answer}
 </answer>
+${k.updated && k.type === 'url' ? `
+<answer-datetime>
+${k.updated}` : ''}
+</answer-datetime>
 ${k.references && k.type === 'url' ? `
 <url>
 ${k.references[0]}
@@ -191,7 +195,7 @@ ${allKeywords.join('\n')}
     actionSections.push(`
 <action-answer>
 - For greetings, casual conversation, or general knowledge questions, answer directly without references.
-- For all other questions, provide a verified answer with references. Each reference must include exactQuote and url.
+- For all other questions, provide a verified answer with references. Each reference must include exactQuote, url and datetime.
 - You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
 - You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
 - If uncertain, use <action-reflect>
@@ -385,17 +389,19 @@ export async function getResponse(question?: string,
             exactQuote: ref?.exactQuote || '',
             title: normalizedUrl ? (allURLs[normalizedUrl]?.title || '') : '',
             url: normalizedUrl,
+            dateTime: ref?.dateTime || ''
           }
         });
 
       // parallel process guess all url datetime
-      await Promise.all(thisStep.references.map(async ref => {
-        ref.dateTime = await getLastModified(ref.url) || ref?.dateTime || ''
-      }));
+      await Promise.all(thisStep.references.filter(ref => !(ref?.dateTime))
+        .map(async ref => {
+          ref.dateTime = await getLastModified(ref.url) || ''
+        }));
 
       console.log('Updated references:', thisStep.references)
 
-      if (step === 1 && thisStep.references.length === 0) {
+      if (step === 1 && thisStep.references.length === 0 && thisStep.answer.length < 300) {
         // LLM is so confident and answer immediately, skip all evaluations
         // however, if it does give any reference, it must be evaluated, case study: "How to configure a timeout when loading a huggingface dataset with python?"
         thisStep.isFinal = true;
@@ -667,6 +673,8 @@ You decided to think out of the box or cut from a completely different angle.
             try {
               const {response} = await readUrl(url, context.tokenTracker);
               const {data} = response;
+              const guessedTime = await getLastModified(url);
+              console.log('Guessed time for', url, guessedTime)
 
               // Early return if no valid data
               if (!data?.url || !data?.content) {
@@ -678,7 +686,7 @@ You decided to think out of the box or cut from a completely different angle.
                 answer: removeAllLineBreaks(data.content),
                 references: [data.url],
                 type: 'url',
-                updated: new Date().toISOString()
+                updated: guessedTime
               });
 
               data.links?.forEach(link => {

@@ -33,7 +33,7 @@ export type KnowledgeItem = {
     dateTime?: string;
   }> | Array<any>;
   type: 'qa' | 'side-info' | 'chat-history' | 'url' | 'coding',
-  updated: string,
+  updated?: string,
   sourceCode?: string,
 }
 
