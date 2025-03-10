@@ -1,7 +1,7 @@
 import {ZodObject} from 'zod';
 import {CoreMessage} from 'ai';
 import {SEARCH_PROVIDER, STEP_SLEEP} from "./config";
-import {readUrl, removeAllLineBreaks} from "./tools/read";
+import {readUrl} from "./tools/read";
 import fs from 'fs/promises';
 import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
 import {braveSearch} from "./tools/brave-search";
@@ -35,7 +35,13 @@ import {
   normalizeUrl, sampleMultinomial,
   weightedURLToString, getLastModified
 } from "./utils/url-tools";
-import {buildMdFromAnswer, chooseK, removeExtraLineBreaks, removeHTMLtags} from "./utils/text-tools";
+import {
+  buildMdFromAnswer,
+  chooseK,
+  removeAllLineBreaks,
+  removeExtraLineBreaks,
+  removeHTMLtags
+} from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 
 async function sleep(ms: number) {
@@ -687,7 +693,7 @@ You decided to think out of the box or cut from a completely different angle.
         const urlResults = await Promise.all(
           uniqueURLs.map(async url => {
             try {
-              const {response} = await readUrl(url, context.tokenTracker);
+              const {response} = await readUrl(url, true, context.tokenTracker);
               const {data} = response;
               const guessedTime = await getLastModified(url);
               console.log('Guessed time for', url, guessedTime)

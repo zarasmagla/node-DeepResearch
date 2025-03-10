@@ -1,8 +1,9 @@
 import {GenerateObjectResult} from 'ai';
 import {AnswerAction, EvaluationResponse, EvaluationType, PromptPair, TrackerContext} from '../types';
-import {readUrl, removeAllLineBreaks} from "./read";
+import {readUrl} from "./read";
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
+import {removeAllLineBreaks} from "../utils/text-tools";
 
 const TOOL_NAME = 'evaluator';
 
@@ -696,7 +697,7 @@ async function fetchSourceContent(urls: string[], trackers: TrackerContext, sche
     const results = await Promise.all(
       urls.map(async (url) => {
         try {
-          const {response} = await readUrl(url, trackers.tokenTracker);
+          const {response} = await readUrl(url, false, trackers.tokenTracker);
           const content = response?.data?.content || '';
           return removeAllLineBreaks(content);
         } catch (error) {

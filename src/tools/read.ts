@@ -3,7 +3,7 @@ import { TokenTracker } from "../utils/token-tracker";
 import { ReadResponse } from '../types';
 import { JINA_API_KEY } from "../config";
 
-export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response: ReadResponse }> {
+export function readUrl(url: string, withAllLinks?: boolean, tracker?: TokenTracker): Promise<{ response: ReadResponse }> {
   return new Promise((resolve, reject) => {
     if (!url.trim()) {
       reject(new Error('URL cannot be empty'));
@@ -11,21 +11,22 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
     }
 
     const data = JSON.stringify({ url });
+    const headers: Record<string, any> = {
+        'Accept': 'application/json',
+        'Authorization': `Bearer ${JINA_API_KEY}`,
+        'Content-Type': 'application/json',
+        'X-Retain-Images': 'none',
+      };
+    if (withAllLinks) {
+      headers['X-With-Links-Summary'] = 'all'
+    }
 
     const options = {
       hostname: 'r.jina.ai',
       port: 443,
       path: '/',
       method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${JINA_API_KEY}`,
-        'Content-Type': 'application/json',
-        'Content-Length': data.length,
-        'X-Retain-Images': 'none',
-        'X-With-Links-Summary': 'all',
-        'X-Timeout': '30'
-      }
+      headers
     };
 
     const req = https.request(options, (res) => {
@@ -96,8 +97,4 @@ export function readUrl(url: string, tracker?: TokenTracker): Promise<{ response
     req.write(data);
     req.end();
   });
-}
-
-export function removeAllLineBreaks(text: string) {
-  return text.replace(/(\r\n|\n|\r)/gm, " ");
 }

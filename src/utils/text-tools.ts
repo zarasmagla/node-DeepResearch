@@ -149,6 +149,9 @@ export function removeHTMLtags(text: string) {
   return text.replace(/<[^>]*>?/gm, '');
 }
 
+export function removeAllLineBreaks(text: string) {
+  return text.replace(/(\r\n|\n|\r)/gm, " ");
+}
 
 export function getI18nText(key: string, lang = 'en', params: Record<string, string> = {}) {
   // 获取i18n数据
