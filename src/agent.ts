@@ -330,11 +330,14 @@ export async function getResponse(question?: string,
     console.log('Gaps:', gaps);
     allowReflect = allowReflect && (gaps.length <= 1);
     const currentQuestion: string = gaps.length > 0 ? gaps.shift()! : question
-    if (!evaluationMetrics[currentQuestion]) {
+    // if (!evaluationMetrics[currentQuestion]) {
+    //   evaluationMetrics[currentQuestion] =
+    //     await evaluateQuestion(currentQuestion, context, SchemaGen)
+    // }
+    if (currentQuestion.trim() === question && step === 1) {
+      // only add evaluation for initial question, once at step 1
       evaluationMetrics[currentQuestion] =
         await evaluateQuestion(currentQuestion, context, SchemaGen)
-    }
-    if (currentQuestion.trim() === question && !evaluationMetrics[currentQuestion].includes('strict') && step === 1) {
       // force strict eval for the original question, only once.
       evaluationMetrics[currentQuestion].push('strict')
     }
