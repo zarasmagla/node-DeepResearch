@@ -465,10 +465,10 @@ Your journey ends here. You have successfully answered the original question. Co
           thisStep.isFinal = true;
           break
         } else {
-          evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e !== evaluation.type);
           if (evaluation.type === 'strict') {
             finalAnswerPIP = evaluation.improvement_plan || '';
             // remove 'strict' from the evaluation metrics
+            evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e === 'strict');
           }
           if (badAttempts >= maxBadAttempts) {
             thisStep.isFinal = false;
