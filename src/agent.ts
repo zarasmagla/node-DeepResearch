@@ -31,7 +31,7 @@ import {
   addToAllURLs,
   rankURLs,
   countUrlParts,
-  getUnvisitedURLs,
+  removeBFromA,
   normalizeUrl, sampleMultinomial,
   weightedURLToString, getLastModified
 } from "./utils/url-tools";
@@ -79,14 +79,6 @@ Using your training data and prior lessons learned, answer the user question wit
   if (knowledge?.length) {
     const knowledgeItems = knowledge
       .map((k, i) => `
-<knowledge-0>
-<question>
-How can I get the last update time of a URL?
-</question>
-<answer>
-Just choose <action-visit> and put URL in it, it will fetch full text and estimate the last update datetime of that URL. 
-</answer>
-</knowledge-0>
 <knowledge-${i + 1}>
 <question>
 ${k.question}
@@ -96,8 +88,9 @@ ${k.answer}
 </answer>
 ${k.updated && k.type === 'url' ? `
 <answer-datetime>
-${k.updated}` : ''}
+${k.updated}
 </answer-datetime>
+` : ''}
 ${k.references && k.type === 'url' ? `
 <url>
 ${k.references[0]}
@@ -110,7 +103,14 @@ ${k.references[0]}
     sections.push(`
 You have successfully gathered some knowledge which might be useful for answering the original question. Here is the knowledge you have gathered so far:
 <knowledge>
-
+<knowledge-0>
+<question>
+How can I get the last update time of a URL?
+</question>
+<answer>
+Just choose <action-visit> and put URL in it, it will fetch full text and estimate the last update datetime of that URL. 
+</answer>
+</knowledge-0>
 ${knowledgeItems}
 
 </knowledge>
@@ -237,12 +237,8 @@ FAILURE IS NOT AN OPTION. EXECUTE WITH EXTREME PREJUDICE! ⚡️
   if (allowReflect) {
     actionSections.push(`
 <action-reflect>
-- Critically examine <question>, <context>, <knowledge>, <bad-attempts>, and <learned-strategy> to identify gaps and the problems. 
-- Identify gaps and ask key clarifying questions that deeply related to the original question and lead to the answer
-- Ensure each reflection:
- - Cuts to core emotional truths while staying anchored to original <question>
- - Transforms surface-level problems into deeper psychological insights
- - Makes the unconscious conscious
+- Think slowly and planning lookahead. Examine <question>, <context>, <knowledge>, <bad-attempts>, and <learned-strategy> to identify knowledge gaps. 
+- Reflect the gaps and plan a list key clarifying questions that deeply related to the original question and lead to the answer
 </action-reflect>
 `);
   }
@@ -353,9 +349,15 @@ export async function getResponse(question?: string,
     // allowRead = allowRead && (Object.keys(allURLs).length > 0);
     if (allURLs && Object.keys(allURLs).length > 0) {
       // rerank urls
-      weightedURLs = rankURLs(getUnvisitedURLs(allURLs, visitedURLs), {
-        question: currentQuestion
-      }, context);
+      weightedURLs = rankURLs(
+        removeBFromA(allURLs,
+          [
+            ...visitedURLs,
+            ...weightedURLs.map(r => r.url).slice(Math.floor(weightedURLs.length * 0.5))]),
+        {
+          question: currentQuestion
+        }, context);
+      console.log('Weighted URLs:', weightedURLs.length);
     }
 
     // allowSearch = allowSearch && (weightedURLs.length < 70);  // disable search when too many urls already
@@ -375,7 +377,7 @@ export async function getResponse(question?: string,
       weightedURLs,
       false,
     );
-    schema = SchemaGen.getAgentSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding, finalAnswerPIP)
+    schema = SchemaGen.getAgentSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding, finalAnswerPIP, currentQuestion)
     const result = await generator.generateObject({
       model: 'agent',
       schema,
@@ -468,10 +470,10 @@ Your journey ends here. You have successfully answered the original question. Co
           thisStep.isFinal = true;
           break
         } else {
+          evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e !== evaluation.type);
           if (evaluation.type === 'strict') {
             finalAnswerPIP = evaluation.improvement_plan || '';
             // remove 'strict' from the evaluation metrics
-            evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e !== 'strict');
           }
           if (badAttempts >= maxBadAttempts) {
             thisStep.isFinal = false;
@@ -500,7 +502,6 @@ ${evaluation.think}
             });
 
             if (errorAnalysis.questionsToAnswer) {
-              // reranker? maybe
               errorAnalysis.questionsToAnswer = chooseK(errorAnalysis.questionsToAnswer, MAX_REFLECT_PER_STEP);
               gaps.push(...errorAnalysis.questionsToAnswer);
               allQuestions.push(...errorAnalysis.questionsToAnswer);
@@ -574,31 +575,35 @@ But then you realized you have asked them before. You decided to to think out of
       thisStep.searchRequests = chooseK((await dedupQueries(thisStep.searchRequests, [], context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
 
       // rewrite queries
-      let {queries: keywordsQueries} = await rewriteQuery(thisStep, context, SchemaGen);
+      let keywordsQueries = await rewriteQuery(thisStep, context, SchemaGen);
+      const qOnly = keywordsQueries.filter(q => q.q).map(q => q.q)
       // avoid exisitng searched queries
-      keywordsQueries = chooseK((await dedupQueries(keywordsQueries, allKeywords, context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
+      const uniqQOnly = chooseK((await dedupQueries(qOnly, allKeywords, context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
+      keywordsQueries = keywordsQueries.filter(q => q.q).filter(q => uniqQOnly.includes(q.q));
 
       let anyResult = false;
 
       if (keywordsQueries.length > 0) {
-        context.actionTracker.trackThink('search_for', SchemaGen.languageCode, {keywords: keywordsQueries.join(', ')});
+        context.actionTracker.trackThink('search_for', SchemaGen.languageCode, {keywords: uniqQOnly.join(', ')});
         for (const query of keywordsQueries) {
-          console.log(`Search query: ${query}`);
 
           let results: SearchResult[] = []
 
           try {
-            let siteQuery = query
+            let siteQuery = query.q;
 
             const topHosts = Object.entries(countUrlParts(
               Object.entries(allURLs).map(([, result]) => result)
             ).hostnameCount).sort((a, b) => b[1] - a[1]);
             console.log(topHosts)
-            if (topHosts.length > 0 && Math.random() < 0.6 && !query.includes('site:')) {
+            if (topHosts.length > 0 && Math.random() < 0.6 && !query.q.includes('site:')) {
               // explore-exploit
-              siteQuery = query + ' site:' + sampleMultinomial(topHosts);
+              siteQuery = query.q + ' site:' + sampleMultinomial(topHosts);
+              query.q = siteQuery;
               console.log('Site query:', siteQuery)
             }
+
+            console.log('Search query:', query);
             switch (SEARCH_PROVIDER) {
               case 'jina':
                 results = (await search(siteQuery, context.tokenTracker)).response?.data || [];
@@ -610,7 +615,7 @@ But then you realized you have asked them before. You decided to to think out of
                 results = (await braveSearch(siteQuery)).response.web?.results || [];
                 break;
               case 'serper':
-                results = (await serperSearch(siteQuery)).response.organic || [];
+                results = (await serperSearch(query)).response.organic || [];
                 break;
               default:
                 results = [];
@@ -619,7 +624,7 @@ But then you realized you have asked them before. You decided to to think out of
               throw new Error('No results found');
             }
           } catch (error) {
-            console.error(`${SEARCH_PROVIDER} search failed for query "${query}":`, error);
+            console.error(`${SEARCH_PROVIDER} search failed for query:`, query, error);
             continue
           } finally {
             await sleep(STEP_SLEEP)
@@ -635,10 +640,10 @@ But then you realized you have asked them before. You decided to to think out of
           minResults.forEach(r => {
             addToAllURLs(r, allURLs);
           });
-          allKeywords.push(query);
+          allKeywords.push(query.q);
 
           allKnowledge.push({
-            question: `What do Internet say about "${query}"?`,
+            question: `What do Internet say about "${query.q}"?`,
             answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
             type: 'side-info',
             updated: new Date().toISOString()
@@ -718,7 +723,9 @@ You decided to think out of the box or cut from a completely different angle.
                   description: link[0],
                 }
                 // in-page link has lower initial weight comparing to search links
-                addToAllURLs(r, allURLs, 0.1);
+                if (r.url && r.url.startsWith('http')) {
+                  addToAllURLs(r, allURLs, 0.1);
+                }
               })
 
               return {url, result: response};
@@ -827,7 +834,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       true,
     );
 
-    schema = SchemaGen.getAgentSchema(false, false, true, false, false, finalAnswerPIP);
+    schema = SchemaGen.getAgentSchema(false, false, true, false, false, finalAnswerPIP, question);
     const result = await generator.generateObject({
       model: 'agentBeastMode',
       schema,

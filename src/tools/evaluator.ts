@@ -576,7 +576,7 @@ export async function evaluateQuestion(
     if (result.object.needsPlurality) types.push('plurality');
     if (result.object.needsCompleteness) types.push('completeness');
 
-    console.log('Question Metrics:', types);
+    console.log('Question Metrics:', question, types);
     trackers?.actionTracker.trackThink(result.object.think);
 
     // Always evaluate definitive first, then freshness (if needed), then plurality (if needed)

@@ -1,10 +1,18 @@
 // Action Types
-import { CoreMessage, LanguageModelUsage} from "ai";
+import {CoreMessage, LanguageModelUsage} from "ai";
 
 type BaseAction = {
   action: "search" | "answer" | "reflect" | "visit" | "coding";
   think: string;
 };
+
+export type SERPQuery = {
+  q: string,
+  hl?: string,
+  gl?: string,
+  location?: string,
+  tbs?: string,
+}
 
 export type SearchAction = BaseAction & {
   action: "search";
@@ -148,7 +156,7 @@ export type EvaluationResponse = {
     minimum_count_required: number;
     actual_count_provided: number;
   };
-  exactQuote? : string;
+  exactQuote?: string;
   completeness_analysis?: {
     aspects_expected: string,
     aspects_provided: string,

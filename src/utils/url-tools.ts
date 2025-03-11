@@ -132,7 +132,7 @@ export function normalizeUrl(urlString: string, debug = false, options = {
   }
 }
 
-export function getUnvisitedURLs(allURLs: Record<string, SearchSnippet>, visitedURLs: string[]): SearchSnippet[] {
+export function removeBFromA(allURLs: Record<string, SearchSnippet>, visitedURLs: string[]): SearchSnippet[] {
   return Object.entries(allURLs)
     .filter(([url]) => !visitedURLs.includes(url))
     .map(([, result]) => result);
@@ -290,7 +290,7 @@ export const weightedURLToString = (allURLs: BoostedSearchSnippet[], maxURLs = 7
     .filter(item => item.merged !== '' && item.merged !== undefined && item.merged !== null)
     .sort((a, b) => (b.score || 0) - (a.score || 0))
     .slice(0, maxURLs)
-    .map(item => `  + weight: ${item.score.toFixed(2)} "${item.url}": "${item.merged}"`)
+    .map(item => `  + weight: ${item.score.toFixed(2)} "${item.url}"`)
     .join('\n');
 }
 

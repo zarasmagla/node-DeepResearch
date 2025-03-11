@@ -123,8 +123,14 @@ export class Schemas {
   getQueryRewriterSchema(): z.ZodObject<any> {
     return z.object({
       think: z.string().describe(`Explain why you choose those search queries. ${this.getLanguagePrompt()}`).max(500),
-      queries: z.array(z.string().describe('keyword-based search query, 2-3 words preferred, total length < 30 characters'))
-        .min(1)
+      queries: z.array(
+        z.object({
+          tbs: z.enum(['qdr:h', 'qdr:d', 'qdr:w', 'qdr:m', 'qdr:y']).optional().describe('time-based search filter, must use this field if the search request asks for latest info. qdr:h for past hour, qdr:d for past 24 hours, qdr:w for past week, qdr:m for past month, qdr:y for past year. Choose exactly one.'),
+          gl: z.string().describe('defines the country to use for the search. a two-letter country code. e.g., us for the United States, uk for United Kingdom, or fr for France.'),
+          hl: z.string().describe('the language to use for the search. a two-letter language code. e.g., en for English, es for Spanish, or fr for French.'),
+          location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the city level in order to simulate a real user’s search.').optional(),
+          q: z.string().describe('keyword-based search query, 2-3 words preferred, total length < 30 characters').max(50),
+        }))
         .max(MAX_QUERIES_PER_STEP)
         .describe(`'Array of search keywords queries, orthogonal to each other. Maximum ${MAX_QUERIES_PER_STEP} queries allowed.'`)
     });
@@ -193,7 +199,8 @@ export class Schemas {
     }
   }
 
-  getAgentSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean, finalAnswerPIP?: string) {
+  getAgentSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean,
+                 finalAnswerPIP?: string, currentQuestion?: string): z.ZodObject<any> {
     const actionSchemas: Record<string, z.ZodObject<any>> = {};
 
     if (allowSearch) {
@@ -204,7 +211,6 @@ export class Schemas {
             .max(30)
             .describe(`A natual language search request in ${this.languageStyle}. Based on the deep intention behind the original question and the expected answer format.`))
           .describe(`Required when action='search'. Always prefer a single request, only add another request if the original question covers multiple aspects or elements and one search request is definitely not enough, each request focus on one specific aspect of the original question. Minimize mutual information between each request. Maximum ${MAX_QUERIES_PER_STEP} search requests.`)
-          .min(1)
           .max(MAX_QUERIES_PER_STEP)
       });
     }
@@ -241,9 +247,15 @@ export class Schemas {
     if (allowReflect) {
       actionSchemas.reflect = z.object({
         questionsToAnswer: z.array(
-          z.string().describe("each question must be a single line, Questions must be: Original (not variations of existing questions); Focused on single concepts; Under 20 words; Non-compound/non-complex")
+          z.string().describe(`
+Ensure each reflection question:
+ - Cuts to core emotional truths while staying anchored to the original question
+ - Transforms surface-level problems into deeper psychological insights
+ - Makes the unconscious conscious
+ - NEVER pose general questions like: "How can I verify the accuracy of information before including it in my answer?", "What information was actually contained in the URLs I found?"         
+          `)
         ).max(MAX_REFLECT_PER_STEP)
-          .describe(`Required when action='reflect'. List of most important questions to fill the knowledge gaps of finding the answer to the original question. Maximum provide ${MAX_REFLECT_PER_STEP} reflect questions.`)
+          .describe(`Required when action='reflect'. Reflection and planing, generate a list of most important questions to fill the knowledge gaps to the original question ${currentQuestion}. Maximum provide ${MAX_REFLECT_PER_STEP} reflect questions.`)
       });
     }
 
@@ -257,7 +269,7 @@ export class Schemas {
 
     // Create an object with action as a string literal and exactly one action property
     return z.object({
-      think: z.string().describe(`Articulate your strategic reasoning process: (1) What specific information is still needed? (2) Why is this action most likely to provide that information? (3) What alternatives did you consider and why were they rejected? (4) How will this action advance toward the complete answer? Be concise yet thorough in ${this.getLanguagePrompt()}.`).max(500),
+      think: z.string().describe(`Concisely explain your reasoning process: (1) What specific information is still needed? (2) Why is this action most likely to provide that information? (3) What alternatives did you consider and why were they rejected? (4) How will this action advance toward the complete answer? Be extremely concise and in ${this.getLanguagePrompt()}.`).max(500),
       action: z.enum(Object.keys(actionSchemas).map(key => key) as [string, ...string[]])
         .describe("Choose exactly one best action from the available actions"),
       ...actionSchemas,
