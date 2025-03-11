@@ -601,7 +601,7 @@ But then you realized you have asked them before. You decided to to think out of
               Object.entries(allURLs).map(([, result]) => result)
             ).hostnameCount).sort((a, b) => b[1] - a[1]);
             console.log(topHosts)
-            if (topHosts.length > 0 && Math.random() < 0.6 && !query.q.includes('site:')) {
+            if (topHosts.length > 0 && Math.random() < 0.2 && !query.q.includes('site:')) {
               // explore-exploit
               siteQuery = query.q + ' site:' + sampleMultinomial(topHosts);
               query.q = siteQuery;
