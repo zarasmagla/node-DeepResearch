@@ -399,7 +399,7 @@ export async function getResponse(question?: string,
     // allowCoding = true;
 
     // execute the step and action
-    if (thisStep.action === 'answer') {
+    if (thisStep.action === 'answer' && thisStep.answer) {
       // normalize all references urls, add title to it
       thisStep.references = thisStep.references?.filter(ref => ref?.url && typeof ref.url === 'string' && ref.url.startsWith('http'))
         .map(ref => {
@@ -532,7 +532,8 @@ Although you solved a sub-question, you still need to find the answer to the ori
           updated: new Date().toISOString()
         });
       }
-    } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
+    }
+    else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
       thisStep.questionsToAnswer = chooseK((await dedupQueries(thisStep.questionsToAnswer, allQuestions, context.tokenTracker)).unique_queries, MAX_REFLECT_PER_STEP);
       const newGapQuestions = thisStep.questionsToAnswer
       if (newGapQuestions.length > 0) {
@@ -562,10 +563,10 @@ But then you realized you have asked them before. You decided to to think out of
           ...thisStep,
           result: 'You have tried all possible questions and found no useful information. You must think out of the box or different angle!!!'
         });
-
-        allowReflect = false;
       }
-    } else if (thisStep.action === 'search' && thisStep.searchRequests) {
+      allowReflect = false;
+    }
+    else if (thisStep.action === 'search' && thisStep.searchRequests) {
       // dedup search requests
       thisStep.searchRequests = chooseK((await dedupQueries(thisStep.searchRequests, [], context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
 
@@ -673,10 +674,10 @@ You decided to think out of the box or cut from a completely different angle.
           ...thisStep,
           result: 'You have tried all possible queries and found no new information. You must think out of the box or different angle!!!'
         });
-
-        allowSearch = false;
       }
-    } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
+      allowSearch = false;
+    }
+    else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
       // normalize URLs
       thisStep.URLTargets = thisStep.URLTargets
         .filter(url => url.startsWith('http'))
@@ -753,8 +754,6 @@ You found some useful information on the web and add them to your knowledge for 
             result: 'You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!'
           })
         });
-
-        allowRead = false;
       } else {
         diaryContext.push(`
 At step ${step}, you took the **visit** action. But then you realized you have already visited these URLs and you already know very well about their contents.
@@ -765,10 +764,10 @@ You decided to think out of the box or cut from a completely different angle.`);
           ...thisStep,
           result: 'You have visited all possible URLs and found no new information. You must think out of the box or different angle!!!'
         });
-
-        allowRead = false;
       }
-    } else if (thisStep.action === 'coding' && thisStep.codingIssue) {
+      allowRead = false;
+    }
+    else if (thisStep.action === 'coding' && thisStep.codingIssue) {
       const sandbox = new CodeSandbox({allContext, visitedURLs, allURLs, allKnowledge}, context, SchemaGen);
       try {
         const result = await sandbox.solve(thisStep.codingIssue);
@@ -803,7 +802,6 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
         allowCoding = false;
       }
     }
-
 
     await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
     await sleep(STEP_SLEEP);
