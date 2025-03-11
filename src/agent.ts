@@ -477,8 +477,7 @@ export async function getResponse(question?: string,
 
           const success = urlResults.length > 0;
           if (success) {
-            // skip the rest, knowledge updated, answer again
-            continue
+            // knowledge updated
           }
         }
       }
@@ -901,7 +900,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
 
   // max return 300 urls
-  const returnedURLs = weightedURLs.slice(0, 300).map(r => r.url);
+  const returnedURLs = weightedURLs.slice(0, 50).map(r => r.url);
   return {
     result: thisStep,
     context,
