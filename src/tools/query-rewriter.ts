@@ -224,12 +224,12 @@ queries: [
 </example-3>
 </examples>
 
-Each generated query must follow JSON schema format. Add 'tbs' if the query is time-sensitive. 
+Each generated query must follow JSON schema format.
 `,
     user: `
 ${query}
 
-<think>${think}
+<think>${think} Please add correct 'tbs' you think the query requires time-sensitive results. 
 `
   };
 }

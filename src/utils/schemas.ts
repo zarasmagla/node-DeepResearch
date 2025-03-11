@@ -125,7 +125,7 @@ export class Schemas {
       think: z.string().describe(`Explain why you choose those search queries. ${this.getLanguagePrompt()}`).max(500),
       queries: z.array(
         z.object({
-          tbs: z.enum(['qdr:h', 'qdr:d', 'qdr:w', 'qdr:m', 'qdr:y']).optional().describe('time-based search filter, must use this field if the search request asks for latest info. qdr:h for past hour, qdr:d for past 24 hours, qdr:w for past week, qdr:m for past month, qdr:y for past year. Choose exactly one.'),
+          tbs: z.enum(['qdr:h', 'qdr:d', 'qdr:w', 'qdr:m', 'qdr:y']).describe('time-based search filter, must use this field if the search request asks for latest info. qdr:h for past hour, qdr:d for past 24 hours, qdr:w for past week, qdr:m for past month, qdr:y for past year. Choose exactly one.'),
           gl: z.string().describe('defines the country to use for the search. a two-letter country code. e.g., us for the United States, uk for United Kingdom, or fr for France.'),
           hl: z.string().describe('the language to use for the search. a two-letter language code. e.g., en for English, es for Spanish, or fr for French.'),
           location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the city level in order to simulate a real user’s search.').optional(),
@@ -269,9 +269,9 @@ Ensure each reflection question:
 
     // Create an object with action as a string literal and exactly one action property
     return z.object({
-      think: z.string().describe(`Concisely explain your reasoning process: (1) What specific information is still needed? (2) Why is this action most likely to provide that information? (3) What alternatives did you consider and why were they rejected? (4) How will this action advance toward the complete answer? Be extremely concise and in ${this.getLanguagePrompt()}.`).max(500),
+      think: z.string().describe(`Concisely explain your reasoning process in ${this.getLanguagePrompt()}.`).max(500),
       action: z.enum(Object.keys(actionSchemas).map(key => key) as [string, ...string[]])
-        .describe("Choose exactly one best action from the available actions"),
+        .describe("Choose exactly one best action from the available actions, fill in the corresponding action schema. Keep the reasons in mind: (1) What specific information is still needed? (2) Why is this action most likely to provide that information? (3) What alternatives did you consider and why were they rejected? (4) How will this action advance toward the complete answer?"),
       ...actionSchemas,
     });
   }
