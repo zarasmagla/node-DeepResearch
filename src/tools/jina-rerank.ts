@@ -69,7 +69,6 @@ export async function rerankDocuments(
       totalTokens: response.data.usage.total_tokens
     });
 
-    console.log('Rerank results:', response.data.results);
     return {
       results: response.data.results
     };

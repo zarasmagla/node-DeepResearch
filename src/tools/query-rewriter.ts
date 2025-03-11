@@ -65,7 +65,6 @@ Ensure each persona contributes exactly ONE high-quality query. These 7 queries 
    - Use appropriate operators and filters
 
 3. Query structure rules:
-   - Use exact match quotes for specific phrases
    - Split queries for distinct aspects
    - Add operators only when necessary
    - Ensure each query targets a specific intent
@@ -74,16 +73,9 @@ Ensure each persona contributes exactly ONE high-quality query. These 7 queries 
 
 <query-operators>
 A query can't only have operators; and operators can't be at the start a query;
-
-- "phrase" : exact match for phrases
 - +term : must include term; for critical terms that must appear
 - -term : exclude term; exclude irrelevant or ambiguous terms
 - filetype:pdf/doc : specific file type
-- site:example.com : limit to specific site
-- lang:xx : language filter (ISO 639-1 code)
-- loc:xx : location filter (ISO 3166-1 code)
-- intitle:term : term must be in title
-- inbody:term : term must be in body text
 </query-operators>
 
 </rules>
@@ -108,7 +100,7 @@ queries: [
   "二手宝马价格趋势 2018-${currentYear}",
   "二手宝马vs奔驰vs丰田 性价比",
   "${currentYear}年${currentMonth}月 宝马行情",
-  "BMW Gebrauchtwagen Probleme lang:de",
+  "BMW Gebrauchtwagen Probleme",
   "二手宝马后悔案例 最差投资"
 ]
 </example-1>
@@ -132,7 +124,6 @@ queries: [
   "Django authentication deprecation timeline",
   "Django auth vs OAuth vs JWT",
   "Django ${currentYear} security updates",
-  "site:docs.djangoproject.com authentication",
   "Django built-in auth limitations problems"
 ]
 </example-2>
@@ -156,7 +147,7 @@ queries: [
   "AI歴史 失敗事例 教訓",
   "AIリテラシー vs プログラミング vs 批判思考",
   "${currentYear}AI最新トレンド 必須スキル",
-  "artificial intelligence literacy fundamentals lang:en",
+  "artificial intelligence literacy fundamentals",
   "AIリテラシー向上 無意味 理由"
 ]
 </example-3>
