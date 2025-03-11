@@ -754,7 +754,7 @@ You found some useful information on the web and add them to your knowledge for 
           })
         });
 
-        allowRead = success;
+        allowRead = false;
       } else {
         diaryContext.push(`
 At step ${step}, you took the **visit** action. But then you realized you have already visited these URLs and you already know very well about their contents.
