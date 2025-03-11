@@ -103,16 +103,7 @@ ${k.references[0]}
     sections.push(`
 You have successfully gathered some knowledge which might be useful for answering the original question. Here is the knowledge you have gathered so far:
 <knowledge>
-<knowledge-0>
-<question>
-How can I get the last update time of a URL?
-</question>
-<answer>
-Just choose <action-visit> and put URL in it, it will fetch full text and estimate the last update datetime of that URL. 
-</answer>
-</knowledge-0>
 ${knowledgeItems}
-
 </knowledge>
 `);
   }
