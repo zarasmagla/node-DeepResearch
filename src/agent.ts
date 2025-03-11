@@ -468,7 +468,7 @@ Your journey ends here. You have successfully answered the original question. Co
           if (evaluation.type === 'strict') {
             finalAnswerPIP = evaluation.improvement_plan || '';
             // remove 'strict' from the evaluation metrics
-            evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e === 'strict');
+            evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e !== 'strict');
           }
           if (badAttempts >= maxBadAttempts) {
             thisStep.isFinal = false;
