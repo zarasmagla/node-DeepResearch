@@ -1,6 +1,7 @@
-import {BoostedSearchSnippet, SearchResult, SearchSnippet, TrackerContext} from "../types";
-import {smartMergeStrings} from "./text-tools";
+import {BoostedSearchSnippet, KnowledgeItem, SearchResult, SearchSnippet, TrackerContext} from "../types";
+import {removeAllLineBreaks, smartMergeStrings} from "./text-tools";
 import {rerankDocuments} from "../tools/jina-rerank";
+import {readUrl} from "../tools/read";
 
 export function normalizeUrl(urlString: string, debug = false, options = {
   removeAnchors: true,
@@ -381,4 +382,72 @@ export const keepKPerHostname = (results: BoostedSearchSnippet[], k: number) => 
     });
 
     return filteredResults;
+}
+
+export async function processURLs(
+  urls: string[],
+  context: TrackerContext,
+  allKnowledge: KnowledgeItem[],
+  allURLs: Record<string, SearchSnippet>,
+  visitedURLs: string[],
+  languageCode: string
+): Promise<{urlResults: any[], success: boolean}> {
+  // Skip if no URLs to process
+  if (urls.length === 0) {
+    return { urlResults: [], success: false };
+  }
+
+  // Track the reading action
+  context.actionTracker.trackThink('read_for', languageCode, {urls: urls.join(', ')});
+
+  // Process each URL in parallel
+  const urlResults = await Promise.all(
+    urls.map(async url => {
+      try {
+        const {response} = await readUrl(url, true, context.tokenTracker);
+        const {data} = response;
+        const guessedTime = await getLastModified(url);
+        console.log('Guessed time for', url, guessedTime);
+
+        // Early return if no valid data
+        if (!data?.url || !data?.content) {
+          throw new Error('No content found');
+        }
+
+        // Add to knowledge base
+        allKnowledge.push({
+          question: `What do expert say about "${data.title}"?`,
+          answer: removeAllLineBreaks(data.content),
+          references: [data.url],
+          type: 'url',
+          updated: guessedTime
+        });
+
+        // Process page links
+        data.links?.forEach(link => {
+          const r: SearchSnippet = {
+            title: link[0],
+            url: normalizeUrl(link[1]),
+            description: link[0],
+          }
+          // in-page link has lower initial weight comparing to search links
+          if (r.url && r.url.startsWith('http')) {
+            addToAllURLs(r, allURLs, 0.1);
+          }
+        });
+
+        return {url, result: response};
+      } catch (error) {
+        console.error('Error reading URL:', error);
+        return null;
+      } finally {
+        visitedURLs.push(url);
+      }
+    })
+  ).then(results => results.filter(Boolean));
+
+  return {
+    urlResults,
+    success: urlResults.length > 0
+  };
 }

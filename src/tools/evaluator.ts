@@ -684,31 +684,3 @@ export async function evaluateAnswer(
     return result?.object as EvaluationResponse;
 
 }
-
-// Helper function to fetch and combine source content
-async function fetchSourceContent(urls: string[], trackers: TrackerContext, schemaGen: Schemas): Promise<string> {
-  if (!urls.length) return '';
-  trackers.actionTracker.trackThink('read_for_verify', schemaGen.languageCode);
-  try {
-    const results = await Promise.all(
-      urls.map(async (url) => {
-        try {
-          const {response} = await readUrl(url, false, trackers.tokenTracker);
-          const content = response?.data?.content || '';
-          return removeAllLineBreaks(content);
-        } catch (error) {
-          console.error('Error reading URL:', error);
-          return '';
-        }
-      })
-    );
-
-    // Filter out empty results and join with proper separation
-    return results
-      .filter(content => content.trim())
-      .join('\n\n');
-  } catch (error) {
-    console.error('Error fetching source content:', error);
-    return '';
-  }
-}

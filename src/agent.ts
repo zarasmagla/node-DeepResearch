@@ -1,7 +1,6 @@
 import {ZodObject} from 'zod';
 import {CoreMessage} from 'ai';
 import {SEARCH_PROVIDER, STEP_SLEEP} from "./config";
-import {readUrl} from "./tools/read";
 import fs from 'fs/promises';
 import {SafeSearchType, search as duckSearch} from "duck-duck-scrape";
 import {braveSearch} from "./tools/brave-search";
@@ -33,12 +32,11 @@ import {
   countUrlParts,
   removeBFromA,
   normalizeUrl, sampleMultinomial,
-  weightedURLToString, getLastModified, keepKPerHostname
+  weightedURLToString, getLastModified, keepKPerHostname, processURLs
 } from "./utils/url-tools";
 import {
   buildMdFromAnswer,
   chooseK,
-  removeAllLineBreaks,
   removeExtraLineBreaks,
   removeHTMLtags
 } from "./utils/text-tools";
@@ -430,56 +428,14 @@ export async function getResponse(question?: string,
       if (thisStep.references.length > 0) {
         const urls = thisStep.references?.filter(ref => !visitedURLs.includes(ref.url)).map(ref => ref.url) || [];
         const uniqueNewURLs = [...new Set(urls)];
-        if (uniqueNewURLs.length > 0) {
-          context.actionTracker.trackThink('read_for', SchemaGen.languageCode, {urls: uniqueNewURLs.join(', ')});
-          const urlResults = await Promise.all(
-            uniqueNewURLs.map(async url => {
-              try {
-                const {response} = await readUrl(url, true, context.tokenTracker);
-                const {data} = response;
-                const guessedTime = await getLastModified(url);
-                console.log('Guessed time for', url, guessedTime)
-
-                // Early return if no valid data
-                if (!data?.url || !data?.content) {
-                  throw new Error('No content found');
-                }
-
-                allKnowledge.push({
-                  question: `What do expert say about "${data.title}"?`,
-                  answer: removeAllLineBreaks(data.content),
-                  references: [data.url],
-                  type: 'url',
-                  updated: guessedTime
-                });
-
-                data.links?.forEach(link => {
-                  const r: SearchSnippet = {
-                    title: link[0],
-                    url: normalizeUrl(link[1]),
-                    description: link[0],
-                  }
-                  // in-page link has lower initial weight comparing to search links
-                  if (r.url && r.url.startsWith('http')) {
-                    addToAllURLs(r, allURLs, 0.1);
-                  }
-                })
-
-                return {url, result: response};
-              } catch (error) {
-                console.error('Error reading URL:', error);
-                return null;
-              } finally {
-                visitedURLs.push(url);
-              }
-            })
-          ).then(results => results.filter(Boolean));
-
-          const success = urlResults.length > 0;
-          if (success) {
-            // knowledge updated
-          }
-        }
+        await processURLs(
+          uniqueNewURLs,
+          context,
+          allKnowledge,
+          allURLs,
+          visitedURLs,
+          SchemaGen.languageCode
+        );
       }
 
       updateContext({
@@ -644,12 +600,10 @@ But then you realized you have asked them before. You decided to to think out of
             const topHosts = Object.entries(countUrlParts(
               Object.entries(allURLs).map(([, result]) => result)
             ).hostnameCount).sort((a, b) => b[1] - a[1]);
-            console.log(topHosts)
             if (topHosts.length > 0 && Math.random() < 0.2 && !query.q.includes('site:')) {
               // explore-exploit
               siteQuery = query.q + ' site:' + sampleMultinomial(topHosts);
               query.q = siteQuery;
-              console.log('Site query:', siteQuery)
             }
 
             console.log('Search query:', query);
@@ -741,52 +695,15 @@ You decided to think out of the box or cut from a completely different angle.
       console.log(uniqueURLs)
 
       if (uniqueURLs.length > 0) {
-        context.actionTracker.trackThink('read_for', SchemaGen.languageCode, {urls: uniqueURLs.join(', ')});
+        const {urlResults, success} = await processURLs(
+          uniqueURLs,
+          context,
+          allKnowledge,
+          allURLs,
+          visitedURLs,
+          SchemaGen.languageCode
+        );
 
-        const urlResults = await Promise.all(
-          uniqueURLs.map(async url => {
-            try {
-              const {response} = await readUrl(url, true, context.tokenTracker);
-              const {data} = response;
-              const guessedTime = await getLastModified(url);
-              console.log('Guessed time for', url, guessedTime)
-
-              // Early return if no valid data
-              if (!data?.url || !data?.content) {
-                throw new Error('No content found');
-              }
-
-              allKnowledge.push({
-                question: `What do expert say about "${data.title}"?`,
-                answer: removeAllLineBreaks(data.content),
-                references: [data.url],
-                type: 'url',
-                updated: guessedTime
-              });
-
-              data.links?.forEach(link => {
-                const r: SearchSnippet = {
-                  title: link[0],
-                  url: normalizeUrl(link[1]),
-                  description: link[0],
-                }
-                // in-page link has lower initial weight comparing to search links
-                if (r.url && r.url.startsWith('http')) {
-                  addToAllURLs(r, allURLs, 0.1);
-                }
-              })
-
-              return {url, result: response};
-            } catch (error) {
-              console.error('Error reading URL:', error);
-              return null;
-            } finally {
-              visitedURLs.push(url);
-            }
-          })
-        ).then(results => results.filter(Boolean));
-
-        const success = urlResults.length > 0;
         diaryContext.push(success
           ? `At step ${step}, you took the **visit** action and deep dive into the following URLs:
 ${urlResults.map(r => r?.url).join('\n')}
