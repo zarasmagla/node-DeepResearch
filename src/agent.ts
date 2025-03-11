@@ -330,7 +330,7 @@ export async function getResponse(question?: string,
       evaluationMetrics[currentQuestion] =
         await evaluateQuestion(currentQuestion, context, SchemaGen)
       // force strict eval for the original question, only once.
-      evaluationMetrics[currentQuestion].push('strict')
+      // evaluationMetrics[currentQuestion].push('strict')
     } else if (currentQuestion.trim() !== question) {
       evaluationMetrics[currentQuestion] = []
     }
