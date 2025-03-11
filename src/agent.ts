@@ -33,7 +33,7 @@ import {
   countUrlParts,
   removeBFromA,
   normalizeUrl, sampleMultinomial,
-  weightedURLToString, getLastModified
+  weightedURLToString, getLastModified, keepKPerHostname
 } from "./utils/url-tools";
 import {
   buildMdFromAnswer,
@@ -350,13 +350,12 @@ export async function getResponse(question?: string,
     if (allURLs && Object.keys(allURLs).length > 0) {
       // rerank urls
       weightedURLs = rankURLs(
-        removeBFromA(allURLs,
-          [
-            ...visitedURLs,
-            ...weightedURLs.map(r => r.url).slice(Math.floor(weightedURLs.length * 0.5))]),
+        removeBFromA(allURLs, visitedURLs),
         {
           question: currentQuestion
         }, context);
+      // improve diversity by keep top 2 urls of each hostname
+      weightedURLs = keepKPerHostname(weightedURLs, 2);
       console.log('Weighted URLs:', weightedURLs.length);
     }
 
@@ -856,14 +855,13 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
 
   // max return 300 urls
-  const returnedURLs = Object.keys(allURLs).slice(0, 300);
+  const returnedURLs = weightedURLs.slice(0, 300).map(r => r.url);
   return {
     result: thisStep,
     context,
     visitedURLs: returnedURLs,
     readURLs: visitedURLs,
   };
-
 }
 
 async function storeContext(prompt: string, schema: any, memory: {

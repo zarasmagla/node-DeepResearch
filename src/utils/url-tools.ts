@@ -362,3 +362,23 @@ export async function getLastModified(url: string): Promise<string | undefined> 
     return undefined;
   }
 }
+
+
+export const keepKPerHostname = (results: BoostedSearchSnippet[], k: number) => {
+    const hostnameMap: Record<string, number> = {};
+    const filteredResults: BoostedSearchSnippet[] = [];
+
+    results.forEach((result) => {
+        const hostname = extractUrlParts(result.url).hostname;
+        if (hostnameMap[hostname] === undefined) {
+        hostnameMap[hostname] = 0;
+        }
+
+        if (hostnameMap[hostname] < k) {
+        filteredResults.push(result);
+        hostnameMap[hostname]++;
+        }
+    });
+
+    return filteredResults;
+}
