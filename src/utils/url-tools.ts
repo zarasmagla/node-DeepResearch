@@ -352,7 +352,7 @@ export async function getLastModified(url: string): Promise<string | undefined> 
     const data = await response.json();
 
     // Return the bestGuess date if available
-    if (data.bestGuess) {
+    if (data.bestGuess && data.confidence >= 70) {
       return data.bestGuess;
     }
 

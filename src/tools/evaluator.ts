@@ -1,5 +1,5 @@
 import {GenerateObjectResult} from 'ai';
-import {AnswerAction, EvaluationResponse, EvaluationType, PromptPair, TrackerContext} from '../types';
+import {AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, PromptPair, TrackerContext} from '../types';
 import {readUrl} from "./read";
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
@@ -25,13 +25,19 @@ answer: ${JSON.stringify(answer)}
   }
 }
 
-function getAttributionPrompt(question: string, answer: string, sourceContent: string): PromptPair {
+function getAttributionPrompt(question: string, answer: string, allKnowledge: KnowledgeItem[]): PromptPair {
   return {
     system: `You are an evaluator that verifies if answer content is properly attributed to and supported by the provided context.`,
     user: `
-Context: ${sourceContent}    
-Question: ${question}
-Answer: ${answer}
+<context>
+${JSON.stringify(allKnowledge)}
+</context>    
+<question>
+${question}
+</question>
+<answer>
+${answer}
+</answer>
 
 Please look at my answer and think.
 `
@@ -618,31 +624,21 @@ export async function evaluateAnswer(
   action: AnswerAction,
   evaluationTypes: EvaluationType[],
   trackers: TrackerContext,
-  visitedURLs: string[] = [],
+  allKnowledge: KnowledgeItem[],
   schemaGen: Schemas
 ): Promise<EvaluationResponse> {
   let result;
 
-  // Only add attribution if we have valid references
-  const urls = action.references?.filter(ref => ref.url.startsWith('http') && !visitedURLs.includes(ref.url)).map(ref => ref.url) || [];
-  const uniqueNewURLs = [...new Set(urls)];
-  if (uniqueNewURLs.length > 0) {
-    evaluationTypes = ['attribution', ...evaluationTypes];
-  }
 
   for (const evaluationType of evaluationTypes) {
     let prompt: { system: string; user: string } | undefined
     switch (evaluationType) {
       case 'attribution': {
         // Safely handle references and ensure we have content
-
-        const allKnowledge = await fetchSourceContent(uniqueNewURLs, trackers, schemaGen);
-        visitedURLs.push(...uniqueNewURLs);
-
-        if (allKnowledge.trim().length === 0) {
+        if (allKnowledge.length === 0) {
           return {
             pass: false,
-            think: `The answer does provide URL references ${JSON.stringify(uniqueNewURLs)}, but the content could not be fetched or is empty. Need to found some other references and URLs`,
+            think: `The knowledge is completely empty and the answer can not be derived from it. Need to found some other references and URLs`,
             type: 'attribution',
           };
         }

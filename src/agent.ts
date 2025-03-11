@@ -427,12 +427,67 @@ export async function getResponse(question?: string,
         break
       }
 
+      if (thisStep.references.length > 0) {
+        const urls = thisStep.references?.filter(ref => !visitedURLs.includes(ref.url)).map(ref => ref.url) || [];
+        const uniqueNewURLs = [...new Set(urls)];
+        if (uniqueNewURLs.length > 0) {
+          context.actionTracker.trackThink('read_for', SchemaGen.languageCode, {urls: uniqueNewURLs.join(', ')});
+          const urlResults = await Promise.all(
+            uniqueNewURLs.map(async url => {
+              try {
+                const {response} = await readUrl(url, true, context.tokenTracker);
+                const {data} = response;
+                const guessedTime = await getLastModified(url);
+                console.log('Guessed time for', url, guessedTime)
+
+                // Early return if no valid data
+                if (!data?.url || !data?.content) {
+                  throw new Error('No content found');
+                }
+
+                allKnowledge.push({
+                  question: `What do expert say about "${data.title}"?`,
+                  answer: removeAllLineBreaks(data.content),
+                  references: [data.url],
+                  type: 'url',
+                  updated: guessedTime
+                });
+
+                data.links?.forEach(link => {
+                  const r: SearchSnippet = {
+                    title: link[0],
+                    url: normalizeUrl(link[1]),
+                    description: link[0],
+                  }
+                  // in-page link has lower initial weight comparing to search links
+                  if (r.url && r.url.startsWith('http')) {
+                    addToAllURLs(r, allURLs, 0.1);
+                  }
+                })
+
+                return {url, result: response};
+              } catch (error) {
+                console.error('Error reading URL:', error);
+                return null;
+              } finally {
+                visitedURLs.push(url);
+              }
+            })
+          ).then(results => results.filter(Boolean));
+
+          const success = urlResults.length > 0;
+          if (success) {
+            // skip the rest, knowledge updated, answer again
+            continue
+          }
+        }
+      }
+
       updateContext({
         totalStep,
         question: currentQuestion,
         ...thisStep,
       });
-
 
       console.log(currentQuestion, evaluationMetrics[currentQuestion])
       let evaluation: EvaluationResponse = {pass: true, think: ''};
@@ -441,7 +496,7 @@ export async function getResponse(question?: string,
         evaluation = await evaluateAnswer(currentQuestion, thisStep,
           evaluationMetrics[currentQuestion],
           context,
-          visitedURLs,
+          allKnowledge,
           SchemaGen
         ) || evaluation;
       }
@@ -532,8 +587,7 @@ Although you solved a sub-question, you still need to find the answer to the ori
           updated: new Date().toISOString()
         });
       }
-    }
-    else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
+    } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
       thisStep.questionsToAnswer = chooseK((await dedupQueries(thisStep.questionsToAnswer, allQuestions, context.tokenTracker)).unique_queries, MAX_REFLECT_PER_STEP);
       const newGapQuestions = thisStep.questionsToAnswer
       if (newGapQuestions.length > 0) {
@@ -565,8 +619,7 @@ But then you realized you have asked them before. You decided to to think out of
         });
       }
       allowReflect = false;
-    }
-    else if (thisStep.action === 'search' && thisStep.searchRequests) {
+    } else if (thisStep.action === 'search' && thisStep.searchRequests) {
       // dedup search requests
       thisStep.searchRequests = chooseK((await dedupQueries(thisStep.searchRequests, [], context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
 
@@ -676,8 +729,7 @@ You decided to think out of the box or cut from a completely different angle.
         });
       }
       allowSearch = false;
-    }
-    else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
+    } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
       // normalize URLs
       thisStep.URLTargets = thisStep.URLTargets
         .filter(url => url.startsWith('http'))
@@ -766,8 +818,7 @@ You decided to think out of the box or cut from a completely different angle.`);
         });
       }
       allowRead = false;
-    }
-    else if (thisStep.action === 'coding' && thisStep.codingIssue) {
+    } else if (thisStep.action === 'coding' && thisStep.codingIssue) {
       const sandbox = new CodeSandbox({allContext, visitedURLs, allURLs, allKnowledge}, context, SchemaGen);
       try {
         const result = await sandbox.solve(thisStep.codingIssue);
