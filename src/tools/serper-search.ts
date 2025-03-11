@@ -33,6 +33,10 @@ export async function serperSearchOld(query: string): Promise<{ response: Serper
         timeout: 10000
     });
 
+    if (response.status !== 200) {
+        throw new Error(`Serper search failed: ${response.status} ${response.statusText}`)
+    }
+
     // Maintain the same return structure as the original code
     return { response: response.data };
 }
