@@ -12,7 +12,7 @@
   "defaults": {
     "search_provider": "serper",
     "llm_provider": "vertex",
-    "step_sleep": 100
+    "step_sleep": 500
   },
   "providers": {
     "vertex": {
