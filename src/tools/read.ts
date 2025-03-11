@@ -16,7 +16,6 @@ export function readUrl(url: string, withAllLinks?: boolean, tracker?: TokenTrac
         'Authorization': `Bearer ${JINA_API_KEY}`,
         'Content-Type': 'application/json',
         'X-Retain-Images': 'none',
-        'X-Timeout': 15,
       };
     if (withAllLinks) {
       headers['X-With-Links-Summary'] = 'all'
