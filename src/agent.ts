@@ -592,6 +592,7 @@ But then you realized you have asked them before. You decided to to think out of
         for (const query of keywordsQueries) {
 
           let results: SearchResult[] = []
+          const oldQuery = query.q;
 
           try {
             let siteQuery = query.q;
@@ -647,7 +648,7 @@ But then you realized you have asked them before. You decided to to think out of
           allKeywords.push(query.q);
 
           allKnowledge.push({
-            question: `What do Internet say about "${query.q}"?`,
+            question: `What do Internet say about "${oldQuery}"?`,
             answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
             type: 'side-info',
             updated: new Date().toISOString()
