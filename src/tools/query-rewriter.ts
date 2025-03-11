@@ -238,7 +238,7 @@ const TOOL_NAME = 'queryRewriter';
 export async function rewriteQuery(action: SearchAction, trackers: TrackerContext, schemaGen: Schemas): Promise<SERPQuery[] > {
   try {
     const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
-    const allQueries = [] as SERPQuery[];
+    const allQueries = action.searchRequests.map(q => ({ q })) as SERPQuery[];
 
     const queryPromises = action.searchRequests.map(async (req) => {
       const prompt = getPrompt(req, action.think);
