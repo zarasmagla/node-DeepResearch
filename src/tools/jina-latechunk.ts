@@ -8,10 +8,10 @@ export async function cherryPick(question: string, longContext: string, options:
   const {
     snippetLength = 3000,
     numSnippets = Math.max(2, Math.min(5, Math.floor(longContext.length / snippetLength))),
-    chunkSize = 200,
+    chunkSize = 300,
     maxTokensPerRequest = 8192, // Maximum tokens per embedding request
     // Rough estimate of tokens per character (can be adjusted based on your text)
-    tokensPerCharacter = 0.5
+    tokensPerCharacter = 0.4
   } = options;
 
   if (longContext.length < snippetLength * 2) {
