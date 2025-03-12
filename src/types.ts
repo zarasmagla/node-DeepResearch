@@ -233,7 +233,7 @@ export interface ChatCompletionResponse {
       type: 'text' | 'think' | 'json' | 'error';
     };
     logprobs: null;
-    finish_reason: 'stop';
+    finish_reason: 'stop' | 'error';
   }>;
   usage: {
     prompt_tokens: number;
@@ -256,9 +256,10 @@ export interface ChatCompletionChunk {
       role?: 'assistant';
       content?: string;
       type?: 'text' | 'think' | 'json' | 'error';
+      url?: string;
     };
     logprobs: null;
-    finish_reason: null | 'stop';
+    finish_reason: null | 'stop' | 'thinking_end' | 'error';
   }>;
   usage?: any;
   visitedURLs?: string[];

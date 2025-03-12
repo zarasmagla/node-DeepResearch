@@ -1,7 +1,7 @@
 import https from 'https';
-import { TokenTracker } from "../utils/token-tracker";
-import { ReadResponse } from '../types';
-import { JINA_API_KEY } from "../config";
+import {TokenTracker} from "../utils/token-tracker";
+import {ReadResponse} from '../types';
+import {JINA_API_KEY} from "../config";
 
 export function readUrl(url: string, withAllLinks?: boolean, tracker?: TokenTracker): Promise<{ response: ReadResponse }> {
   return new Promise((resolve, reject) => {
@@ -10,13 +10,15 @@ export function readUrl(url: string, withAllLinks?: boolean, tracker?: TokenTrac
       return;
     }
 
-    const data = JSON.stringify({ url });
+    const data = JSON.stringify({url});
     const headers: Record<string, any> = {
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${JINA_API_KEY}`,
-        'Content-Type': 'application/json',
-        'X-Retain-Images': 'none',
-      };
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${JINA_API_KEY}`,
+      'Content-Type': 'application/json',
+      'X-Retain-Images': 'none',
+      'X-Md-Link-Style': 'discarded',
+      'X-Timeout': '20'
+    };
     if (withAllLinks) {
       headers['X-With-Links-Summary'] = 'all'
     }
@@ -75,12 +77,12 @@ export function readUrl(url: string, withAllLinks?: boolean, tracker?: TokenTrac
         const tokens = response.data.usage?.tokens || 0;
         const tokenTracker = tracker || new TokenTracker();
         tokenTracker.trackUsage('read', {
-            totalTokens: tokens,
-            promptTokens: url.length,
-            completionTokens: tokens
+          totalTokens: tokens,
+          promptTokens: url.length,
+          completionTokens: tokens
         });
 
-        resolve({ response });
+        resolve({response});
       });
     });
 

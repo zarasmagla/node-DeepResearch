@@ -7,7 +7,7 @@ import {
   ChatCompletionResponse,
   ChatCompletionChunk,
   AnswerAction,
-  Model, StepAction
+  Model, StepAction, VisitAction
 } from './types';
 import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
@@ -337,7 +337,7 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
           system_fingerprint: 'fp_' + requestId,
           choices: [{
             index: 0,
-            delta: {content: word, type: "think"},
+            delta: {content: word, type: 'think'},
             logprobs: null,
             finish_reason: null
           }]
@@ -475,7 +475,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       system_fingerprint: 'fp_' + requestId,
       choices: [{
         index: 0,
-        delta: {role: 'assistant', content: '<think>', type: "text"},
+        delta: {role: 'assistant', content: '<think>', type: 'think'},
         logprobs: null,
         finish_reason: null
       }]
@@ -485,6 +485,24 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     // Set up progress listener with cleanup
     const actionListener = async (step: StepAction) => {
       // Add content to queue for both thinking steps and final answer
+      if (step.action === 'visit') {
+        (step as VisitAction).URLTargets.forEach((url) => {
+          const chunk: ChatCompletionChunk = {
+          id: requestId,
+          object: 'chat.completion.chunk',
+          created,
+          model: body.model,
+          system_fingerprint: 'fp_' + requestId,
+          choices: [{
+            index: 0,
+            delta: {type: 'think', url},
+            logprobs: null,
+            finish_reason: null,
+          }]
+        };
+        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        });
+      }
       if (step.think) {
         // if not ends with a space, add one
         const content = step.think + ' ';
@@ -548,9 +566,9 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: `</think>\n\n`, type: "think"},
+          delta: {content: `</think>\n\n`, type: 'think'},
           logprobs: null,
-          finish_reason: null
+          finish_reason: 'thinking_end'
         }]
       };
       res.write(`data: ${JSON.stringify(closeThinkChunk)}\n\n`);
@@ -638,9 +656,9 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: '</think>', type: "think"},
+          delta: {content: '</think>', type: 'think'},
           logprobs: null,
-          finish_reason: null
+          finish_reason: 'error'
         }],
         usage,
       };
@@ -655,9 +673,9 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: errorMessage, type: "error"},
+          delta: {content: errorMessage, type: 'error'},
           logprobs: null,
-          finish_reason: 'stop'
+          finish_reason: 'error'
         }],
         usage
       };
@@ -679,7 +697,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
             type: 'error'
           },
           logprobs: null,
-          finish_reason: 'stop'
+          finish_reason: 'error'
         }],
         usage,
       };

@@ -434,7 +434,8 @@ export async function getResponse(question?: string,
           allKnowledge,
           allURLs,
           visitedURLs,
-          SchemaGen.languageCode
+          SchemaGen,
+          currentQuestion
         );
       }
 
@@ -701,7 +702,8 @@ You decided to think out of the box or cut from a completely different angle.
           allKnowledge,
           allURLs,
           visitedURLs,
-          SchemaGen.languageCode
+          SchemaGen,
+          currentQuestion
         );
 
         diaryContext.push(success
