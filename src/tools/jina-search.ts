@@ -13,13 +13,12 @@ export function search(query: string, tracker?: TokenTracker): Promise<{ respons
     const options = {
       hostname: 's.jina.ai',
       port: 443,
-      path: `/${encodeURIComponent(query)}?count=10`,
+      path: `/?q=${encodeURIComponent(query)}`,
       method: 'GET',
       headers: {
         'Accept': 'application/json',
         'Authorization': `Bearer ${JINA_API_KEY}`,
         'X-Respond-With': 'no-content',
-        'X-Retain-Images': 'none'
       }
     };
 
