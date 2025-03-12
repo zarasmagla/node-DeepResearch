@@ -1,5 +1,5 @@
 import {BoostedSearchSnippet, KnowledgeItem, SearchResult, SearchSnippet, TrackerContext, VisitAction} from "../types";
-import {smartMergeStrings} from "./text-tools";
+import {getI18nText, smartMergeStrings} from "./text-tools";
 import {rerankDocuments} from "../tools/jina-rerank";
 import {readUrl} from "../tools/read";
 import {Schemas} from "./schemas";
@@ -401,7 +401,12 @@ export async function processURLs(
   }
 
   // Track the reading action
-  context.actionTracker.trackThink('read_for', schemaGen.languageCode, {urls: urls.join(', ')});
+  const thisStep: VisitAction = {
+    action: 'visit',
+    think: getI18nText('read_for', schemaGen.languageCode, {urls: urls.join(', ')}),
+    URLTargets: urls
+  }
+  context.actionTracker.trackAction({thisStep})
 
   // Process each URL in parallel
   const urlResults = await Promise.all(
@@ -423,7 +428,7 @@ export async function processURLs(
         // Add to knowledge base
         allKnowledge.push({
           question: `What do expert say about "${data.title}"?`,
-          answer: await cherryPick(question, data.content, {}, context, schemaGen),
+          answer: await cherryPick(question, data.content, {}, context, schemaGen, url),
           references: [data.url],
           type: 'url',
           updated: guessedTime

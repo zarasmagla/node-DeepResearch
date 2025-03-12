@@ -3,7 +3,7 @@ import axios from 'axios';
 import {JINA_API_KEY} from "../config";
 import {Schemas} from "../utils/schemas";
 
-export async function cherryPick(question: string, longContext: string, options: any = {}, trackers: TrackerContext, schemaGen: Schemas) {
+export async function cherryPick(question: string, longContext: string, options: any = {}, trackers: TrackerContext, schemaGen: Schemas, url: string) {
 
   const {
     snippetLength = 3000,
@@ -27,7 +27,7 @@ export async function cherryPick(question: string, longContext: string, options:
 
   console.log('late chunking enabled! num chunks:', chunks.length);
 
-  trackers.actionTracker.trackThink('late_chunk', schemaGen.languageCode);
+  trackers.actionTracker.trackThink('late_chunk', schemaGen.languageCode, {url});
 
   try {
     // Estimate the number of tokens per chunk
@@ -61,7 +61,8 @@ export async function cherryPick(question: string, longContext: string, options:
           late_chunking: true,
           dimensions: 1024,
           embedding_type: "float",
-          input: batch
+          input: batch,
+          truncate: true
         },
         {
           headers: {
@@ -97,7 +98,8 @@ export async function cherryPick(question: string, longContext: string, options:
         task: "retrieval.query",
         dimensions: 1024,
         embedding_type: "float",
-        input: [question]
+        input: [question],
+        truncate: true
       },
       {
         headers: {

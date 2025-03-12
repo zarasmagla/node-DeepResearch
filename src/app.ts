@@ -500,6 +500,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     const actionListener = async (step: StepAction) => {
       // Add content to queue for both thinking steps and final answer
       if (step.action === 'visit') {
+        // emit every url in the visit action in url field
         (step as VisitAction).URLTargets.forEach((url) => {
           const chunk: ChatCompletionChunk = {
           id: requestId,
