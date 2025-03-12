@@ -6,15 +6,15 @@ import {Schemas} from "../utils/schemas";
 export async function cherryPick(question: string, longContext: string, options: any = {}, trackers: TrackerContext, schemaGen: Schemas) {
 
   const {
-    snippetLength = 2000,
-    numSnippets = 2,
+    snippetLength = 3000,
+    numSnippets = Math.max(2, Math.min(5, Math.floor(longContext.length / snippetLength))),
     chunkSize = 200,
     maxTokensPerRequest = 8192, // Maximum tokens per embedding request
     // Rough estimate of tokens per character (can be adjusted based on your text)
     tokensPerCharacter = 0.5
   } = options;
 
-  if (longContext.length < snippetLength * numSnippets) {
+  if (longContext.length < snippetLength * 2) {
     // If the context is shorter than the snippet length, return the whole context
     return longContext;
   }
