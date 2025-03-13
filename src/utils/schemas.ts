@@ -4,7 +4,7 @@ import {EvaluationType, PromptPair} from "../types";
 
 export const MAX_URLS_PER_STEP = 4
 export const MAX_QUERIES_PER_STEP = 7
-export const MAX_REFLECT_PER_STEP = 3
+export const MAX_REFLECT_PER_STEP = 1
 
 function getLanguagePrompt(question: string): PromptPair {
   return {
@@ -112,11 +112,7 @@ export class Schemas {
     return z.object({
       recap: z.string().describe('Recap of the actions taken and the steps conducted in first person narrative.').max(500),
       blame: z.string().describe(`Which action or the step was the root cause of the answer rejection. ${this.getLanguagePrompt()}`).max(500),
-      improvement: z.string().describe(`Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe. ${this.getLanguagePrompt()}`).max(500),
-      questionsToAnswer: z.array(
-        z.string().describe("each question must be a single line, concise and clear. not composite or compound, less than 20 words.")
-      ).max(MAX_REFLECT_PER_STEP)
-        .describe(`List of most important reflect questions to fill the knowledge gaps. Maximum provide ${MAX_REFLECT_PER_STEP} reflect questions.`)
+      improvement: z.string().describe(`Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe. ${this.getLanguagePrompt()}`).max(500)
     });
   }
 
@@ -200,7 +196,7 @@ export class Schemas {
   }
 
   getAgentSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean,
-                 finalAnswerPIP?: string, currentQuestion?: string): z.ZodObject<any> {
+                 currentQuestion?: string): z.ZodObject<any> {
     const actionSchemas: Record<string, z.ZodOptional<any>> = {};
 
     if (allowSearch) {
@@ -227,14 +223,13 @@ export class Schemas {
         references: z.array(
           z.object({
             exactQuote: z.string().describe("Exact relevant quote from the document, must be a soundbite, short and to the point, no fluff").max(30),
-            url: z.string().describe("source URL; must be copy directly from existing knowledge's <url>, avoid example.com or any placeholder fake URLs").max(100),
-            dateTime: z.string().describe("Use original knowledge's <dateime> if available.").max(16),
+            url: z.string().describe("source URL; must be copy directly from previous message's <url>, avoid example.com or any placeholder fake URLs").max(100),
+            dateTime: z.string().describe("Use original message's <answer-dateime> if available.").max(16),
           }).required()
         ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote, URL and datetime"),
         answer: z.string()
           .describe(`Required when action='answer'. 
           
-          ${finalAnswerPIP}
           Use all your knowledge you have collected, cover multiple aspects if needed. 
           Must be definitive, no ambiguity, no uncertainty, no disclaimers. Must in ${this.languageStyle} and confident. 
           Use markdown footnote syntax like [^1], [^2] to refer the corresponding reference item. 
@@ -249,13 +244,13 @@ export class Schemas {
         questionsToAnswer: z.array(
           z.string().describe(`
 Ensure each reflection question:
- - Cuts to core emotional truths while staying anchored to the original question
- - Transforms surface-level problems into deeper psychological insights
+ - Cuts to core emotional truths while staying anchored to <og-question>
+ - Transforms surface-level problems into deeper psychological insights, helps answer <og-question>
  - Makes the unconscious conscious
- - NEVER pose general questions like: "How can I verify the accuracy of information before including it in my answer?", "What information was actually contained in the URLs I found?"         
+ - NEVER pose general questions like: "How can I verify the accuracy of information before including it in my answer?", "What information was actually contained in the URLs I found?", "How can i tell if a source is reliable?".         
           `)
         ).max(MAX_REFLECT_PER_STEP)
-          .describe(`Required when action='reflect'. Reflection and planing, generate a list of most important questions to fill the knowledge gaps to the original question ${currentQuestion}. Maximum provide ${MAX_REFLECT_PER_STEP} reflect questions.`)
+          .describe(`Required when action='reflect'. Reflection and planing, generate a list of most important questions to fill the knowledge gaps to <og-question> ${currentQuestion} </og-question>. Maximum provide ${MAX_REFLECT_PER_STEP} reflect questions.`)
       }).optional()
     }
 

@@ -173,7 +173,6 @@ export type ErrorAnalysisResponse = {
   recap: string;
   blame: string;
   improvement: string;
-  questionsToAnswer: string[];
 };
 
 

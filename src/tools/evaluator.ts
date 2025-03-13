@@ -1,9 +1,7 @@
 import {GenerateObjectResult} from 'ai';
 import {AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, PromptPair, TrackerContext} from '../types';
-import {readUrl} from "./read";
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
-import {removeAllLineBreaks} from "../utils/text-tools";
 
 const TOOL_NAME = 'evaluator';
 

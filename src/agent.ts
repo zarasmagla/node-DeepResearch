@@ -49,6 +49,58 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]) : CoreMessage[] {
+  // build user, assistant pair messages from knowledge
+    const messages: CoreMessage[] = [];
+    knowledge.forEach(k => {
+      messages.push({role: 'user', content: k.question.trim()});
+      const aMsg = `
+${k.updated && (k.type === 'url' || k.type === 'side-info') ? `
+<answer-datetime>
+${k.updated}
+</answer-datetime>
+` : ''}
+
+${k.references && k.type === 'url' ? `
+<url>
+${k.references[0]}
+</url>
+` : ''}
+
+${k.answer}
+      `.trim();
+      messages.push({role: 'assistant', content: removeExtraLineBreaks(aMsg)});
+    });
+    return messages;
+}
+
+function composeMsgs(messages: CoreMessage[], knowledge: KnowledgeItem[], question: string, finalAnswerPIP?: string) {
+    const msgs = [...messages, ...BuildMsgsFromKnowledge(knowledge)];
+
+    const userContent = `
+${knowledge.length>0 ? `
+Based on what you learned from our previous messages, what is your answer to the question below?
+`: ''}
+
+${question}
+
+${finalAnswerPIP ? `
+<answer-requirements>
+- You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
+- You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
+${finalAnswerPIP}
+</answer-requirements>` : ''}
+    `.trim();
+
+    // only add if the last user msg is not the same
+    // first find the last message whose role is 'user'
+    const lastUserMsg = msgs.filter(m => m.role === 'user').pop();
+    if ((lastUserMsg?.content as string).trim() !== userContent) {
+      msgs.push({role: 'user', content: removeExtraLineBreaks(userContent)});
+    }
+    return msgs;
+}
+
 
 function getPrompt(
   context?: string[],
@@ -59,7 +111,6 @@ function getPrompt(
   allowRead: boolean = true,
   allowSearch: boolean = true,
   allowCoding: boolean = true,
-  badContext?: { question: string, answer: string, evaluation: string, recap: string; blame: string; improvement: string; }[],
   knowledge?: KnowledgeItem[],
   allURLs?: BoostedSearchSnippet[],
   beastMode?: boolean,
@@ -71,41 +122,8 @@ function getPrompt(
   sections.push(`Current date: ${new Date().toUTCString()}
 
 You are an advanced AI research agent from Jina AI. You are specialized in multistep reasoning. 
-Using your training data and prior lessons learned, answer the user question with absolute certainty.
+Using your best knowledge, conversation with the user and lessons learned, answer the user question with absolute certainty.
 `);
-
-  // Add knowledge section if exists
-  if (knowledge?.length) {
-    const knowledgeItems = knowledge
-      .map((k, i) => `
-<knowledge-${i + 1}>
-<question>
-${k.question}
-</question>
-<answer>
-${k.answer}
-</answer>
-${k.updated && (k.type === 'url' || k.type === 'side-info') ? `
-<answer-datetime>
-${k.updated}
-</answer-datetime>
-` : ''}
-${k.references && k.type === 'url' ? `
-<url>
-${k.references[0]}
-</url>
-` : ''}
-</knowledge-${i + 1}>
-`)
-      .join('\n\n');
-
-    sections.push(`
-You have successfully gathered some knowledge which might be useful for answering the original question. Here is the knowledge you have gathered so far:
-<knowledge>
-${knowledgeItems}
-</knowledge>
-`);
-  }
 
 
   // Add context section if exists
@@ -116,37 +134,6 @@ You have conducted the following actions:
 ${context.join('\n')}
 
 </context>
-`);
-  }
-
-  // Add bad context section if exists
-  if (badContext?.length) {
-    const attempts = badContext
-      .map((c, i) => `
-<attempt-${i + 1}>
-- Question: ${c.question}
-- Answer: ${c.answer}
-- Reject Reason: ${c.evaluation}
-- Actions Recap: ${c.recap}
-- Actions Blame: ${c.blame}
-</attempt-${i + 1}>
-`)
-      .join('\n\n');
-
-    const learnedStrategy = badContext.map(c => c.improvement).join('\n');
-
-    sections.push(`
-Also, you have tried the following actions but failed to find the answer to the question:
-<bad-attempts>    
-
-${attempts}
-
-</bad-attempts>
-
-Based on the failed attempts, you have learned the following strategy:
-<learned-strategy>
-${learnedStrategy}
-</learned-strategy>
 `);
   }
 
@@ -169,14 +156,6 @@ ${urlList}
 `);
   }
 
-  if (allowCoding) {
-    actionSections.push(`
-<action-coding>
-- This JavaScript-based solution helps you handle programming tasks like counting, filtering, transforming, sorting, regex extraction, and data processing.
-- Simply describe your problem in the "codingIssue" field. Include actual values for small inputs or variable names for larger datasets.
-- No code writing is required – senior engineers will handle the implementation.
-</action-coding>`);
-  }
 
   if (allowSearch) {
 
@@ -216,7 +195,7 @@ ${allKeywords.join('\n')}
 PRIME DIRECTIVE:
 - DEMOLISH ALL HESITATION! ANY RESPONSE SURPASSES SILENCE!
 - PARTIAL STRIKES AUTHORIZED - DEPLOY WITH FULL CONTEXTUAL FIREPOWER
-- TACTICAL REUSE FROM <bad-attempts> SANCTIONED
+- TACTICAL REUSE FROM PREVIOUS CONVERSATION SANCTIONED
 - WHEN IN DOUBT: UNLEASH CALCULATED STRIKES BASED ON AVAILABLE INTEL!
 
 FAILURE IS NOT AN OPTION. EXECUTE WITH EXTREME PREJUDICE! ⚡️
@@ -227,10 +206,19 @@ FAILURE IS NOT AN OPTION. EXECUTE WITH EXTREME PREJUDICE! ⚡️
   if (allowReflect) {
     actionSections.push(`
 <action-reflect>
-- Think slowly and planning lookahead. Examine <question>, <context>, <knowledge>, <bad-attempts>, and <learned-strategy> to identify knowledge gaps. 
+- Think slowly and planning lookahead. Examine <question>, <context>, previous conversation with users to identify knowledge gaps. 
 - Reflect the gaps and plan a list key clarifying questions that deeply related to the original question and lead to the answer
 </action-reflect>
 `);
+  }
+
+    if (allowCoding) {
+    actionSections.push(`
+<action-coding>
+- This JavaScript-based solution helps you handle programming tasks like counting, filtering, transforming, sorting, regex extraction, and data processing.
+- Simply describe your problem in the "codingIssue" field. Include actual values for small inputs or variable names for larger datasets.
+- No code writing is required – senior engineers will handle the implementation.
+</action-coding>`);
   }
 
   sections.push(`
@@ -253,15 +241,6 @@ function updateContext(step: any) {
   allContext.push(step)
 }
 
-function replaceLastUserMsg(messages: Array<CoreMessage>, content: string) {
-  return messages.map((m, i) => {
-        if (m.role === 'user' && i === messages.length - 1) {
-            return {...m, content}
-        }
-        return m
-    });
-}
-
 
 export async function getResponse(question?: string,
                                   tokenBudget: number = 1_000_000,
@@ -275,6 +254,9 @@ export async function getResponse(question?: string,
   let badAttempts = 0;
 
   question = question?.trim() as string;
+  // remove incoming system messages to avoid override
+  messages = messages?.filter(m => m.role !== 'system');
+
   if (messages && messages.length > 0) {
     // 2 cases
     const lastContent = messages[messages.length - 1].content;
@@ -303,7 +285,6 @@ export async function getResponse(question?: string,
   const allKeywords = [];
   const allKnowledge: KnowledgeItem[] = [];  // knowledge are intermedidate questions that are answered
 
-  const badContext = [];
   let diaryContext = [];
   let weightedURLs: BoostedSearchSnippet[] = [];
   let allowAnswer = true;
@@ -312,6 +293,7 @@ export async function getResponse(question?: string,
   let allowReflect = true;
   let allowCoding = true;
   let system = '';
+  let msgWithKnowledge: CoreMessage[] = [];
   let thisStep: StepAction = {action: 'answer', answer: '', references: [], think: '', isFinal: false};
 
   const allURLs: Record<string, SearchSnippet> = {};
@@ -327,8 +309,9 @@ export async function getResponse(question?: string,
     const budgetPercentage = (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget * 100).toFixed(2);
     console.log(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
     console.log('Gaps:', gaps);
-    allowReflect = allowReflect && (gaps.length <= 1);
-    const currentQuestion: string = gaps.length > 0 ? gaps.shift()! : question
+    allowReflect = allowReflect && (gaps.length <= MAX_REFLECT_PER_STEP);
+    // rotating question from gaps
+    const currentQuestion: string = gaps[totalStep % gaps.length];
     // if (!evaluationMetrics[currentQuestion]) {
     //   evaluationMetrics[currentQuestion] =
     //     await evaluateQuestion(currentQuestion, context, SchemaGen)
@@ -375,17 +358,17 @@ export async function getResponse(question?: string,
       allowRead,
       allowSearch,
       allowCoding,
-      badContext,
       allKnowledge,
       weightedURLs,
       false,
     );
-    schema = SchemaGen.getAgentSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding, finalAnswerPIP, currentQuestion)
+    schema = SchemaGen.getAgentSchema(allowReflect, allowRead, allowAnswer, allowSearch, allowCoding, currentQuestion)
+    msgWithKnowledge = composeMsgs(messages, allKnowledge, currentQuestion, currentQuestion === question ? finalAnswerPIP : undefined);
     const result = await generator.generateObject({
       model: 'agent',
       schema,
       system,
-      messages: replaceLastUserMsg(messages, currentQuestion),
+      messages: msgWithKnowledge,
     });
     thisStep = {
       action: result.object.action,
@@ -394,7 +377,7 @@ export async function getResponse(question?: string,
     } as StepAction;
     // print allowed and chose action
     const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect, allowCoding].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
-    console.log(`${thisStep.action} <- [${actionsStr}]`);
+    console.log(`${currentQuestion}: ${thisStep.action} <- [${actionsStr}]`);
     console.log(thisStep)
 
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
@@ -447,6 +430,10 @@ export async function getResponse(question?: string,
           SchemaGen,
           currentQuestion
         );
+
+        if (!evaluationMetrics[currentQuestion].includes('attribution')) {
+            evaluationMetrics[currentQuestion].push('attribution')
+        }
       }
 
       updateContext({
@@ -459,7 +446,9 @@ export async function getResponse(question?: string,
       let evaluation: EvaluationResponse = {pass: true, think: ''};
       if (evaluationMetrics[currentQuestion].length > 0) {
         context.actionTracker.trackThink('eval_first', SchemaGen.languageCode)
-        evaluation = await evaluateAnswer(currentQuestion, thisStep,
+        evaluation = await evaluateAnswer(
+          currentQuestion,
+          thisStep,
           evaluationMetrics[currentQuestion],
           context,
           allKnowledge,
@@ -512,19 +501,29 @@ ${evaluation.think}
             // store the bad context and reset the diary context
             const errorAnalysis = await analyzeSteps(diaryContext, context, SchemaGen);
 
-            badContext.push({
-              question: currentQuestion,
-              answer: thisStep.answer,
-              evaluation: evaluation.think,
-              ...errorAnalysis
-            });
+            allKnowledge.push({
+              question: `
+Why is the following answer bad for the question? Please reflect
 
-            if (errorAnalysis.questionsToAnswer) {
-              errorAnalysis.questionsToAnswer = chooseK((await dedupQueries(errorAnalysis.questionsToAnswer, allQuestions, context.tokenTracker)).unique_queries, MAX_REFLECT_PER_STEP);
-              gaps.push(...errorAnalysis.questionsToAnswer);
-              allQuestions.push(...errorAnalysis.questionsToAnswer);
-              gaps.push(question);  // always keep the original question in the gaps
-            }
+<question>
+${currentQuestion}
+</question>
+
+<answer>
+${thisStep.answer}
+</answer>
+`,
+              answer: `
+${evaluation.think}
+
+${errorAnalysis.recap}
+
+${errorAnalysis.blame}
+
+${errorAnalysis.improvement}
+`,
+              type: 'qa',
+            })
 
             badAttempts++;
             allowAnswer = false;  // disable answer action in the immediate next step
@@ -533,6 +532,7 @@ ${evaluation.think}
           }
         }
       } else if (evaluation.pass) {
+        // solved a gap question
         diaryContext.push(`
 At step ${step}, you took **answer** action. You found a good answer to the sub-question:
 
@@ -554,6 +554,8 @@ Although you solved a sub-question, you still need to find the answer to the ori
           type: 'qa',
           updated: formatDateBasedOnType(new Date(), 'full')
         });
+        // solved sub-question!
+        gaps.splice(gaps.indexOf(currentQuestion), 1);
       }
     } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
       thisStep.questionsToAnswer = chooseK((await dedupQueries(thisStep.questionsToAnswer, allQuestions, context.tokenTracker)).unique_queries, MAX_REFLECT_PER_STEP);
@@ -569,7 +571,6 @@ You will now figure out the answers to these sub-questions and see if they can h
 `);
         gaps.push(...newGapQuestions);
         allQuestions.push(...newGapQuestions);
-        gaps.push(question);  // always keep the original question in the gaps
         updateContext({
           totalStep,
           ...thisStep,
@@ -784,11 +785,11 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       }
     }
 
-    await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
+    await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs, msgWithKnowledge}, totalStep);
     await sleep(STEP_SLEEP);
   }
 
-  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
+  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs, msgWithKnowledge}, totalStep);
   if (!(thisStep as AnswerAction).isFinal) {
     console.log('Enter Beast mode!!!')
     // any answer is better than no answer, humanity last resort
@@ -803,18 +804,18 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       false,
       false,
       false,
-      badContext,
       allKnowledge,
       weightedURLs,
       true,
     );
 
-    schema = SchemaGen.getAgentSchema(false, false, true, false, false, finalAnswerPIP, question);
+    schema = SchemaGen.getAgentSchema(false, false, true, false, false, question);
+    msgWithKnowledge = composeMsgs(messages, allKnowledge, question, finalAnswerPIP);
     const result = await generator.generateObject({
       model: 'agentBeastMode',
       schema,
       system,
-      messages
+      messages: msgWithKnowledge
     });
     thisStep = {
       action: result.object.action,
@@ -828,7 +829,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   (thisStep as AnswerAction).mdAnswer = buildMdFromAnswer((thisStep as AnswerAction))
   console.log(thisStep)
 
-  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs}, totalStep);
+  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs, msgWithKnowledge}, totalStep);
 
   // max return 300 urls
   const returnedURLs = weightedURLs.slice(0, 50).map(r => r.url);
@@ -846,10 +847,11 @@ async function storeContext(prompt: string, schema: any, memory: {
                               allQuestions: string[];
                               allKnowledge: KnowledgeItem[];
                               weightedURLs: BoostedSearchSnippet[];
+                              msgWithKnowledge: CoreMessage[];
                             }
   , step: number) {
 
-  const {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs} = memory;
+  const {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs, msgWithKnowledge} = memory;
   if ((process as any).asyncLocalContext?.available?.()) {
 
     (process as any).asyncLocalContext.ctx.promptContext = {
@@ -877,6 +879,7 @@ ${JSON.stringify(zodToJsonSchema(schema), null, 2)}
     await fs.writeFile('questions.json', JSON.stringify(allQuestions, null, 2));
     await fs.writeFile('knowledge.json', JSON.stringify(allKnowledge, null, 2));
     await fs.writeFile('urls.json', JSON.stringify(weightedURLs, null, 2));
+    await fs.writeFile('messages.json', JSON.stringify(msgWithKnowledge, null, 2));
   } catch (error) {
     console.error('Context storage failed:', error);
   }
