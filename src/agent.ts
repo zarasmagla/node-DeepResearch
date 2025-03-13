@@ -508,7 +508,7 @@ ${evaluation.think}
             });
 
             if (errorAnalysis.questionsToAnswer) {
-              errorAnalysis.questionsToAnswer = chooseK(errorAnalysis.questionsToAnswer, MAX_REFLECT_PER_STEP);
+              errorAnalysis.questionsToAnswer = chooseK((await dedupQueries(errorAnalysis.questionsToAnswer, allQuestions, context.tokenTracker)).unique_queries, MAX_REFLECT_PER_STEP);
               gaps.push(...errorAnalysis.questionsToAnswer);
               allQuestions.push(...errorAnalysis.questionsToAnswer);
               gaps.push(question);  // always keep the original question in the gaps
@@ -656,7 +656,7 @@ But then you realized you have asked them before. You decided to to think out of
 
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
-In particular, you tried to search for the following keywords: "${keywordsQueries.join(', ')}".
+In particular, you tried to search for the following keywords: "${keywordsQueries.map(q => q.q).join(', ')}".
 You found quite some information and add them to your URL list and **visit** them later when needed. 
 `);
 
@@ -671,7 +671,7 @@ You found quite some information and add them to your URL list and **visit** the
       if (!anyResult || !keywordsQueries?.length) {
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
-In particular, you tried to search for the following keywords: ${keywordsQueries.join(', ')}. 
+In particular, you tried to search for the following keywords:  "${keywordsQueries.map(q => q.q).join(', ')}".
 But then you realized you have already searched for these keywords before, no new information is returned.
 You decided to think out of the box or cut from a completely different angle.
 `);
