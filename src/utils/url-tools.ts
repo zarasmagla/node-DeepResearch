@@ -4,6 +4,7 @@ import {rerankDocuments} from "../tools/jina-rerank";
 import {readUrl} from "../tools/read";
 import {Schemas} from "./schemas";
 import {cherryPick} from "../tools/jina-latechunk";
+import {formatDateBasedOnType} from "./date-tools";
 
 export function normalizeUrl(urlString: string, debug = false, options = {
   removeAnchors: true,
@@ -427,11 +428,11 @@ export async function processURLs(
 
         // Add to knowledge base
         allKnowledge.push({
-          question: `What do expert say about "${data.title}"?`,
+          question: `What do expert say about "${question}"?`,
           answer: await cherryPick(question, data.content, {}, context, schemaGen, url),
           references: [data.url],
           type: 'url',
-          updated: guessedTime
+          updated: guessedTime? formatDateBasedOnType(new Date(guessedTime), 'full'): undefined
         });
 
         // Process page links

@@ -41,6 +41,7 @@ import {
   removeHTMLtags
 } from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
+import {formatDateBasedOnType, formatDateRange} from "./utils/date-tools";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -84,7 +85,7 @@ ${k.question}
 <answer>
 ${k.answer}
 </answer>
-${k.updated && k.type === 'url' ? `
+${k.updated && (k.type === 'url' || k.type === 'side-info') ? `
 <answer-datetime>
 ${k.updated}
 </answer-datetime>
@@ -252,6 +253,15 @@ function updateContext(step: any) {
   allContext.push(step)
 }
 
+function replaceLastUserMsg(messages: Array<CoreMessage>, content: string) {
+  return messages.map((m, i) => {
+        if (m.role === 'user' && i === messages.length - 1) {
+            return {...m, content}
+        }
+        return m
+    });
+}
+
 
 export async function getResponse(question?: string,
                                   tokenBudget: number = 1_000_000,
@@ -375,7 +385,7 @@ export async function getResponse(question?: string,
       model: 'agent',
       schema,
       system,
-      messages,
+      messages: replaceLastUserMsg(messages, currentQuestion),
     });
     thisStep = {
       action: result.object.action,
@@ -475,7 +485,8 @@ Your journey ends here. You have successfully answered the original question. Co
 `);
           thisStep.isFinal = true;
           break
-        } else {
+        }
+        else {
           if (evaluation.type === 'strict') {
             finalAnswerPIP = evaluation.improvement_plan || '';
             // remove 'strict' from the evaluation metrics
@@ -484,7 +495,8 @@ Your journey ends here. You have successfully answered the original question. Co
           if (badAttempts >= maxBadAttempts) {
             thisStep.isFinal = false;
             break
-          } else {
+          }
+          else {
             diaryContext.push(`
 At step ${step}, you took **answer** action but evaluator thinks it is not a good answer:
 
@@ -540,7 +552,7 @@ Although you solved a sub-question, you still need to find the answer to the ori
           answer: thisStep.answer,
           references: thisStep.references,
           type: 'qa',
-          updated: new Date().toISOString()
+          updated: formatDateBasedOnType(new Date(), 'full')
         });
       }
     } else if (thisStep.action === 'reflect' && thisStep.questionsToAnswer) {
@@ -650,7 +662,7 @@ But then you realized you have asked them before. You decided to to think out of
             question: `What do Internet say about "${oldQuery}"?`,
             answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
             type: 'side-info',
-            updated: new Date().toISOString()
+            updated: query.tbs? formatDateRange(query): undefined
           });
         }
 
@@ -745,7 +757,7 @@ You decided to think out of the box or cut from a completely different angle.`);
           answer: result.solution.output,
           sourceCode: result.solution.code,
           type: 'coding',
-          updated: new Date().toISOString()
+          updated: formatDateBasedOnType(new Date(), 'full')
         });
         diaryContext.push(`
 At step ${step}, you took the **coding** action and try to solve the coding issue: ${thisStep.codingIssue}.
