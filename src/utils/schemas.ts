@@ -4,7 +4,7 @@ import {EvaluationType, PromptPair} from "../types";
 
 export const MAX_URLS_PER_STEP = 4
 export const MAX_QUERIES_PER_STEP = 7
-export const MAX_REFLECT_PER_STEP = 1
+export const MAX_REFLECT_PER_STEP = 2
 
 function getLanguagePrompt(question: string): PromptPair {
   return {
