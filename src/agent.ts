@@ -78,10 +78,6 @@ function composeMsgs(messages: CoreMessage[], knowledge: KnowledgeItem[], questi
     const msgs = [...messages, ...BuildMsgsFromKnowledge(knowledge)];
 
     const userContent = `
-${knowledge.length>0 ? `
-Based on what you learned from our previous messages, what is your answer to the question below?
-`: ''}
-
 ${question}
 
 ${finalAnswerPIP ? `
