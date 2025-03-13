@@ -89,12 +89,7 @@ ${finalAnswerPIP}
 </answer-requirements>` : ''}
     `.trim();
 
-  // only add if the last user msg is not the same
-  // first find the last message whose role is 'user'
-  const lastUserMsg = msgs.filter(m => m.role === 'user').pop();
-  if ((lastUserMsg?.content as string).trim() !== userContent) {
-    msgs.push({role: 'user', content: removeExtraLineBreaks(userContent)});
-  }
+  msgs.push({role: 'user', content: removeExtraLineBreaks(userContent)});
   return msgs;
 }
 
