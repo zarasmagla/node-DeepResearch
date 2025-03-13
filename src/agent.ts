@@ -49,12 +49,12 @@ async function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]) : CoreMessage[] {
+function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
   // build user, assistant pair messages from knowledge
-    const messages: CoreMessage[] = [];
-    knowledge.forEach(k => {
-      messages.push({role: 'user', content: k.question.trim()});
-      const aMsg = `
+  const messages: CoreMessage[] = [];
+  knowledge.forEach(k => {
+    messages.push({role: 'user', content: k.question.trim()});
+    const aMsg = `
 ${k.updated && (k.type === 'url' || k.type === 'side-info') ? `
 <answer-datetime>
 ${k.updated}
@@ -69,15 +69,16 @@ ${k.references[0]}
 
 ${k.answer}
       `.trim();
-      messages.push({role: 'assistant', content: removeExtraLineBreaks(aMsg)});
-    });
-    return messages;
+    messages.push({role: 'assistant', content: removeExtraLineBreaks(aMsg)});
+  });
+  return messages;
 }
 
 function composeMsgs(messages: CoreMessage[], knowledge: KnowledgeItem[], question: string, finalAnswerPIP?: string) {
-    const msgs = [...messages, ...BuildMsgsFromKnowledge(knowledge)];
+  // knowledge always put to front, followed by real u-a interaction
+  const msgs = [...BuildMsgsFromKnowledge(knowledge), ...messages];
 
-    const userContent = `
+  const userContent = `
 ${question}
 
 ${finalAnswerPIP ? `
@@ -88,13 +89,13 @@ ${finalAnswerPIP}
 </answer-requirements>` : ''}
     `.trim();
 
-    // only add if the last user msg is not the same
-    // first find the last message whose role is 'user'
-    const lastUserMsg = msgs.filter(m => m.role === 'user').pop();
-    if ((lastUserMsg?.content as string).trim() !== userContent) {
-      msgs.push({role: 'user', content: removeExtraLineBreaks(userContent)});
-    }
-    return msgs;
+  // only add if the last user msg is not the same
+  // first find the last message whose role is 'user'
+  const lastUserMsg = msgs.filter(m => m.role === 'user').pop();
+  if ((lastUserMsg?.content as string).trim() !== userContent) {
+    msgs.push({role: 'user', content: removeExtraLineBreaks(userContent)});
+  }
+  return msgs;
 }
 
 
@@ -208,7 +209,7 @@ FAILURE IS NOT AN OPTION. EXECUTE WITH EXTREME PREJUDICE! ⚡️
 `);
   }
 
-    if (allowCoding) {
+  if (allowCoding) {
     actionSections.push(`
 <action-coding>
 - This JavaScript-based solution helps you handle programming tasks like counting, filtering, transforming, sorting, regex extraction, and data processing.
@@ -428,7 +429,7 @@ export async function getResponse(question?: string,
         );
 
         if (!evaluationMetrics[currentQuestion].includes('attribution')) {
-            evaluationMetrics[currentQuestion].push('attribution')
+          evaluationMetrics[currentQuestion].push('attribution')
         }
       }
 
@@ -470,8 +471,7 @@ Your journey ends here. You have successfully answered the original question. Co
 `);
           thisStep.isFinal = true;
           break
-        }
-        else {
+        } else {
           if (evaluation.type === 'strict') {
             finalAnswerPIP = evaluation.improvement_plan || '';
             // remove 'strict' from the evaluation metrics
@@ -480,8 +480,7 @@ Your journey ends here. You have successfully answered the original question. Co
           if (badAttempts >= maxBadAttempts) {
             thisStep.isFinal = false;
             break
-          }
-          else {
+          } else {
             diaryContext.push(`
 At step ${step}, you took **answer** action but evaluator thinks it is not a good answer:
 
@@ -659,7 +658,7 @@ But then you realized you have asked them before. You decided to to think out of
             question: `What do Internet say about "${oldQuery}"?`,
             answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
             type: 'side-info',
-            updated: query.tbs? formatDateRange(query): undefined
+            updated: query.tbs ? formatDateRange(query) : undefined
           });
         }
 
@@ -781,11 +780,25 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       }
     }
 
-    await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs, msgWithKnowledge}, totalStep);
+    await storeContext(system, schema, {
+      allContext,
+      allKeywords,
+      allQuestions,
+      allKnowledge,
+      weightedURLs,
+      msgWithKnowledge
+    }, totalStep);
     await sleep(STEP_SLEEP);
   }
 
-  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs, msgWithKnowledge}, totalStep);
+  await storeContext(system, schema, {
+    allContext,
+    allKeywords,
+    allQuestions,
+    allKnowledge,
+    weightedURLs,
+    msgWithKnowledge
+  }, totalStep);
   if (!(thisStep as AnswerAction).isFinal) {
     console.log('Enter Beast mode!!!')
     // any answer is better than no answer, humanity last resort
@@ -825,7 +838,14 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   (thisStep as AnswerAction).mdAnswer = buildMdFromAnswer((thisStep as AnswerAction))
   console.log(thisStep)
 
-  await storeContext(system, schema, {allContext, allKeywords, allQuestions, allKnowledge, weightedURLs, msgWithKnowledge}, totalStep);
+  await storeContext(system, schema, {
+    allContext,
+    allKeywords,
+    allQuestions,
+    allKnowledge,
+    weightedURLs,
+    msgWithKnowledge
+  }, totalStep);
 
   // max return 300 urls
   const returnedURLs = weightedURLs.slice(0, 50).map(r => r.url);
