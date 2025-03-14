@@ -215,8 +215,8 @@ export interface ChatCompletionRequest {
   max_attempts?: number;
 
   response_format?: ResponseFormat;
-  numReturnedURLs?: number;
-  noDirectAnswer?: boolean;
+  no_direct_answer?: boolean;
+  max_returned_urls?: number;
 }
 
 export interface URLAnnotation {
