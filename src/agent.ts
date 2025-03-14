@@ -238,7 +238,8 @@ export async function getResponse(question?: string,
                                   tokenBudget: number = 1_000_000,
                                   maxBadAttempts: number = 3,
                                   existingContext?: Partial<TrackerContext>,
-                                  messages?: Array<CoreMessage>
+                                  messages?: Array<CoreMessage>,
+                                  numReturnedURLs: number = 100
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
   let step = 0;
@@ -845,7 +846,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   }, totalStep);
 
   // max return 300 urls
-  const returnedURLs = weightedURLs.slice(0, 50).map(r => r.url);
+  const returnedURLs = weightedURLs.slice(0, numReturnedURLs).map(r => r.url);
   return {
     result: thisStep,
     context,
