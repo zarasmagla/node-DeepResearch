@@ -308,17 +308,17 @@ export async function getResponse(question?: string,
     //   evaluationMetrics[currentQuestion] =
     //     await evaluateQuestion(currentQuestion, context, SchemaGen)
     // }
-    if (currentQuestion.trim() === question && step === 1) {
+    if (currentQuestion.trim() === question && totalStep === 1) {
       // only add evaluation for initial question, once at step 1
       evaluationMetrics[currentQuestion] =
         await evaluateQuestion(currentQuestion, context, SchemaGen)
-      // force strict eval for the original question, only once.
+      // force strict eval for the original question, at last, only once.
       evaluationMetrics[currentQuestion].push('strict')
     } else if (currentQuestion.trim() !== question) {
       evaluationMetrics[currentQuestion] = []
     }
 
-    if (step === 1 && evaluationMetrics[currentQuestion].includes('freshness')) {
+    if (totalStep === 1 && evaluationMetrics[currentQuestion].includes('freshness')) {
       // if it detects freshness, avoid direct answer at step 1
       allowAnswer = false;
       allowReflect = false;
@@ -403,7 +403,7 @@ export async function getResponse(question?: string,
 
       console.log('Updated references:', thisStep.references)
 
-      if (step === 1 && thisStep.references.length === 0) {
+      if (totalStep === 1 && thisStep.references.length === 0) {
         // LLM is so confident and answer immediately, skip all evaluations
         // however, if it does give any reference, it must be evaluated, case study: "How to configure a timeout when loading a huggingface dataset with python?"
         thisStep.isFinal = true;
@@ -423,9 +423,10 @@ export async function getResponse(question?: string,
           currentQuestion
         );
 
-        if (!evaluationMetrics[currentQuestion].includes('attribution')) {
-          evaluationMetrics[currentQuestion].push('attribution')
-        }
+        // is this really required???
+        // if (!evaluationMetrics[currentQuestion].includes('attribution')) {
+        //   evaluationMetrics[currentQuestion].push('attribution')
+        // }
       }
 
       updateContext({
@@ -470,6 +471,7 @@ Your journey ends here. You have successfully answered the original question. Co
           if (evaluation.type === 'strict') {
             finalAnswerPIP = evaluation.improvement_plan || '';
             // remove 'strict' from the evaluation metrics
+            console.log('Remove `strict` from evaluation metrics')
             evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e !== 'strict');
           }
           if (badAttempts >= maxBadAttempts) {

@@ -47,7 +47,7 @@
         "queryRewriter": {"maxTokens": 2000},
         "agent": { },
         "agentBeastMode": { },
-        "fallback": {"maxTokens": 4000}
+        "fallback": {"maxTokens": 8000, "model": "gemini-2.0-flash-lite"}
       }
     },
     "openai": {

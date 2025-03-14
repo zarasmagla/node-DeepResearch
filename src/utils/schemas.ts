@@ -187,7 +187,7 @@ export class Schemas {
         return z.object({
           type: z.literal('strict'),
           ...baseSchemaBefore,
-          improvement_plan: z.string().describe('Short explain how a perfect answer should look like and what revisions are needed to improve the current answer.').max(500),
+          improvement_plan: z.string().describe('Explain how a perfect answer should look like and what are needed to improve the current answer. Starts with "For the best answer, you must..."').max(500),
           ...baseSchemaAfter
         });
       default:

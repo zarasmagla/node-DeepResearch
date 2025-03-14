@@ -2,23 +2,61 @@ import {GenerateObjectResult} from 'ai';
 import {AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, PromptPair, TrackerContext} from '../types';
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
+import {removeExtraLineBreaks} from "../utils/text-tools";
 
 const TOOL_NAME = 'evaluator';
 
 
-function getRejectAllAnswersPrompt(question: string, answer: AnswerAction): PromptPair {
-  return {
-    system: `You are a ruthless evaluator trained to REJECT answers. 
-Your job is to find ANY weakness in the presented JSON answer. Extremely strict standards of evidence apply. 
-Identity EVERY missing detail. First, argue AGAINST the conclusion with the strongest possible case. 
-Then, argue FOR the conclusion. 
-Only after considering both perspectives, synthesize a final improvement plan.
+function getRejectAllAnswersPrompt(question: string, answer: AnswerAction, allKnowledge: KnowledgeItem[]): PromptPair {
+  const KnowledgeStr = allKnowledge.map((k, idx) => {
+    const aMsg = `
+<knowledge-${idx+1}>
+${k.question}
 
-Any JSON formatting/structure/syntax issue should not be the reason to rejection.
+${k.updated && (k.type === 'url' || k.type === 'side-info') ? `
+<knowledge-datetime>
+${k.updated}
+</knowledge-datetime>
+` : ''}
+
+${k.references && k.type === 'url' ? `
+<knowledge-url>
+${k.references[0]}
+</knowledge-url>
+` : ''}
+
+
+${k.answer}
+</knowledge-${idx+1}>
+      `.trim();
+
+    return removeExtraLineBreaks(aMsg);
+  })
+
+  return {
+    system: `
+You are a ruthless answer evaluator trained to REJECT answers. 
+Given a question-answer pair, your job is to find ANY weakness in the presented answer. 
+Extremely strict standards of evidence apply. 
+Identity EVERY missing detail. 
+First, argue AGAINST the answer with the strongest possible case. 
+Then, argue FOR the answer. 
+Only after considering both perspectives, synthesize a final improvement plan starts with "For the best answer, you must...".
+
+The following knowledge items are provided for your reference. Note that some of them may not be directly related to the question/answer user provided, but may give some subtle hints and insights:
+${KnowledgeStr.join('\n\n')}
 `,
     user: `
-question: ${question}
-answer: ${JSON.stringify(answer)}
+<question>
+${question}
+</question>
+
+Here is my answer for the question:
+<answer>
+${answer.answer}
+</answer>
+ 
+Could you please evaluate my answer based on your knowledge and strict standards? If you decide to reject the answer, please tell me how to improve it.
 `
   }
 }
@@ -37,7 +75,7 @@ ${question}
 ${answer}
 </answer>
 
-Please look at my answer and think.
+Please read and think.
 `
   }
 }
@@ -632,7 +670,6 @@ export async function evaluateAnswer(
     let prompt: { system: string; user: string } | undefined
     switch (evaluationType) {
       case 'attribution': {
-        // Safely handle references and ensure we have content
         if (allKnowledge.length === 0) {
           return {
             pass: false,
@@ -659,7 +696,7 @@ export async function evaluateAnswer(
         prompt = getCompletenessPrompt(question, action.answer);
         break;
       case 'strict':
-        prompt = getRejectAllAnswersPrompt(question, action);
+        prompt = getRejectAllAnswersPrompt(question, action, allKnowledge);
         break;
       default:
         console.error(`Unknown evaluation type: ${evaluationType}`);
