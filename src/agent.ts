@@ -74,18 +74,23 @@ ${k.answer}
   return messages;
 }
 
-function composeMsgs(messages: CoreMessage[], knowledge: KnowledgeItem[], question: string, finalAnswerPIP?: string) {
+function composeMsgs(messages: CoreMessage[], knowledge: KnowledgeItem[], question: string, finalAnswerPIP?: string[]) {
   // knowledge always put to front, followed by real u-a interaction
   const msgs = [...BuildMsgsFromKnowledge(knowledge), ...messages];
 
   const userContent = `
 ${question}
 
-${finalAnswerPIP ? `
+${finalAnswerPIP?.length ? `
 <answer-requirements>
 - You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
 - You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
-${finalAnswerPIP}
+- Follow reviewer's feedback and improve your answer quality.
+${finalAnswerPIP.map((p, idx) => `
+<reviewer-${idx + 1}>
+${p}
+</reviewer-${idx + 1}>
+`).join('\n')}
 </answer-requirements>` : ''}
     `.trim();
 
@@ -233,6 +238,91 @@ function updateContext(step: any) {
   allContext.push(step)
 }
 
+async function executeSearchQueries(
+  keywordsQueries: any[],
+  context: TrackerContext,
+  allURLs: Record<string, SearchSnippet>,
+  SchemaGen: any
+): Promise<{
+  newKnowledge: KnowledgeItem[],
+  searchedQueries: string[]
+}> {
+  const uniqQOnly = keywordsQueries.map(q => q.q);
+  const newKnowledge: KnowledgeItem[] = [];
+  const searchedQueries: string[] = [];
+  context.actionTracker.trackThink('search_for', SchemaGen.languageCode, {keywords: uniqQOnly.join(', ')});
+
+  for (const query of keywordsQueries) {
+    let results: SearchResult[] = [];
+    const oldQuery = query.q;
+
+    try {
+      let siteQuery = query.q;
+
+      const topHosts = Object.entries(countUrlParts(
+        Object.entries(allURLs).map(([, result]) => result)
+      ).hostnameCount).sort((a, b) => b[1] - a[1]);
+
+      if (topHosts.length > 0 && Math.random() < 0.2 && !query.q.includes('site:')) {
+        // explore-exploit
+        siteQuery = query.q + ' site:' + sampleMultinomial(topHosts);
+        query.q = siteQuery;
+      }
+
+      console.log('Search query:', query);
+      switch (SEARCH_PROVIDER) {
+        case 'jina':
+          results = (await search(siteQuery, context.tokenTracker)).response?.data || [];
+          break;
+        case 'duck':
+          results = (await duckSearch(siteQuery, {safeSearch: SafeSearchType.STRICT})).results;
+          break;
+        case 'brave':
+          results = (await braveSearch(siteQuery)).response.web?.results || [];
+          break;
+        case 'serper':
+          results = (await serperSearch(query)).response.organic || [];
+          break;
+        default:
+          results = [];
+      }
+
+      if (results.length === 0) {
+        throw new Error('No results found');
+      }
+    } catch (error) {
+      console.error(`${SEARCH_PROVIDER} search failed for query:`, query, error);
+      continue;
+    } finally {
+      await sleep(STEP_SLEEP);
+    }
+
+    const minResults: SearchSnippet[] = (results).map(r => ({
+      title: r.title,
+      url: normalizeUrl('url' in r ? r.url : r.link),
+      description: 'description' in r ? r.description : r.snippet,
+      weight: 1
+    }));
+
+    minResults.forEach(r => {
+      addToAllURLs(r, allURLs);
+    });
+
+    searchedQueries.push(query.q)
+
+    newKnowledge.push({
+      question: `What do Internet say about "${oldQuery}"?`,
+      answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
+      type: 'side-info',
+      updated: query.tbs ? formatDateRange(query) : undefined
+    });
+  }
+  return {
+    newKnowledge,
+    searchedQueries
+  };
+}
+
 
 export async function getResponse(question?: string,
                                   tokenBudget: number = 1_000_000,
@@ -275,7 +365,7 @@ export async function getResponse(question?: string,
   let schema: ZodObject<any> = SchemaGen.getAgentSchema(true, true, true, true, true)
   const gaps: string[] = [question];  // All questions to be answered including the orginal question
   const allQuestions = [question];
-  const allKeywords = [];
+  const allKeywords: string[] = [];
   const allKnowledge: KnowledgeItem[] = [];  // knowledge are intermedidate questions that are answered
 
   let diaryContext = [];
@@ -286,6 +376,7 @@ export async function getResponse(question?: string,
   let allowReflect = true;
   let allowCoding = true;
   let system = '';
+  let maxStrictEvals = 2;
   let msgWithKnowledge: CoreMessage[] = [];
   let thisStep: StepAction = {action: 'answer', answer: '', references: [], think: '', isFinal: false};
 
@@ -294,7 +385,7 @@ export async function getResponse(question?: string,
   const evaluationMetrics: Record<string, EvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
   const regularBudget = tokenBudget * 0.9;
-  let finalAnswerPIP: string = '';
+  const finalAnswerPIP: string[] = [];
   while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
     step++;
@@ -469,11 +560,14 @@ Your journey ends here. You have successfully answered the original question. Co
           thisStep.isFinal = true;
           break
         } else {
-          if (evaluation.type === 'strict') {
-            finalAnswerPIP = evaluation.improvement_plan || '';
-            // remove 'strict' from the evaluation metrics
-            console.log('Remove `strict` from evaluation metrics')
-            evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e !== 'strict');
+          if (evaluation.type === 'strict' && evaluation.improvement_plan) {
+            finalAnswerPIP.push(evaluation.improvement_plan);
+            maxStrictEvals--;
+            if (maxStrictEvals <= 0) {
+              // remove 'strict' from the evaluation metrics
+              console.log('Remove `strict` from evaluation metrics')
+              evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e !== 'strict');
+            }
           }
           if (badAttempts >= maxBadAttempts) {
             thisStep.isFinal = false;
@@ -585,8 +679,21 @@ But then you realized you have asked them before. You decided to to think out of
       // dedup search requests
       thisStep.searchRequests = chooseK((await dedupQueries(thisStep.searchRequests, [], context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
 
-      // rewrite queries
-      let keywordsQueries = await rewriteQuery(thisStep, context, SchemaGen);
+      // do first search
+      const {searchedQueries, newKnowledge} = await executeSearchQueries(
+        thisStep.searchRequests.map(q => ({q})),
+        context,
+        allURLs,
+        SchemaGen
+      );
+
+      allKeywords.push(...searchedQueries);
+      allKnowledge.push(...newKnowledge);
+
+      const soundBites = newKnowledge.map(k => k.answer).join(' ');
+
+      // rewrite queries with initial soundbites
+      let keywordsQueries = await rewriteQuery(thisStep, soundBites, context, SchemaGen);
       const qOnly = keywordsQueries.filter(q => q.q).map(q => q.q)
       // avoid exisitng searched queries
       const uniqQOnly = chooseK((await dedupQueries(qOnly, allKeywords, context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
@@ -595,70 +702,16 @@ But then you realized you have asked them before. You decided to to think out of
       let anyResult = false;
 
       if (keywordsQueries.length > 0) {
-        context.actionTracker.trackThink('search_for', SchemaGen.languageCode, {keywords: uniqQOnly.join(', ')});
-        for (const query of keywordsQueries) {
+        const {searchedQueries, newKnowledge} =
+          await executeSearchQueries(
+            keywordsQueries,
+            context,
+            allURLs,
+            SchemaGen
+          );
 
-          let results: SearchResult[] = []
-          const oldQuery = query.q;
-
-          try {
-            let siteQuery = query.q;
-
-            const topHosts = Object.entries(countUrlParts(
-              Object.entries(allURLs).map(([, result]) => result)
-            ).hostnameCount).sort((a, b) => b[1] - a[1]);
-            if (topHosts.length > 0 && Math.random() < 0.2 && !query.q.includes('site:')) {
-              // explore-exploit
-              siteQuery = query.q + ' site:' + sampleMultinomial(topHosts);
-              query.q = siteQuery;
-            }
-
-            console.log('Search query:', query);
-            switch (SEARCH_PROVIDER) {
-              case 'jina':
-                results = (await search(siteQuery, context.tokenTracker)).response?.data || [];
-                break;
-              case 'duck':
-                results = (await duckSearch(siteQuery, {safeSearch: SafeSearchType.STRICT})).results;
-                break;
-              case 'brave':
-                results = (await braveSearch(siteQuery)).response.web?.results || [];
-                break;
-              case 'serper':
-                results = (await serperSearch(query)).response.organic || [];
-                break;
-              default:
-                results = [];
-            }
-            if (results.length === 0) {
-              throw new Error('No results found');
-            }
-          } catch (error) {
-            console.error(`${SEARCH_PROVIDER} search failed for query:`, query, error);
-            continue
-          } finally {
-            await sleep(STEP_SLEEP)
-          }
-
-          const minResults: SearchSnippet[] = (results).map(r => ({
-            title: r.title,
-            url: normalizeUrl('url' in r ? r.url : r.link),
-            description: 'description' in r ? r.description : r.snippet,
-            weight: 1
-          }));
-
-          minResults.forEach(r => {
-            addToAllURLs(r, allURLs);
-          });
-          allKeywords.push(query.q);
-
-          allKnowledge.push({
-            question: `What do Internet say about "${oldQuery}"?`,
-            answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
-            type: 'side-info',
-            updated: query.tbs ? formatDateRange(query) : undefined
-          });
-        }
+        allKeywords.push(...searchedQueries);
+        allKnowledge.push(...newKnowledge);
 
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".

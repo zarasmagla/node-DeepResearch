@@ -3,13 +3,15 @@ import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
 
 
-function getPrompt(query: string, think: string): PromptPair {
+function getPrompt(query: string, think: string, context: string): PromptPair {
   const currentTime = new Date();
   const currentYear = currentTime.getFullYear();
   const currentMonth = currentTime.getMonth() + 1;
 
   return {
-    system: `You are an expert search query generator with deep psychological understanding. You optimize user queries by extensively analyzing potential user intents and generating comprehensive search variations that follow the required schema format.
+    system: `
+You are an expert search query expander with deep psychological understanding.
+You optimize user queries by extensively analyzing potential user intents and generating comprehensive query variations.
 
 The current time is ${currentTime.toISOString()}. Current year: ${currentYear}, current month: ${currentMonth}.
 
@@ -31,23 +33,19 @@ Map each query through ALL these layers, especially focusing on uncovering Shado
 Generate ONE optimized query from each of these cognitive perspectives:
 
 1. Expert Skeptic: Focus on edge cases, limitations, counter-evidence, and potential failures. Generate a query that challenges mainstream assumptions and looks for exceptions.
-
 2. Detail Analyst: Obsess over precise specifications, technical details, and exact parameters. Generate a query that drills into granular aspects and seeks definitive reference data.
-
 3. Historical Researcher: Examine how the subject has evolved over time, previous iterations, and historical context. Generate a query that tracks changes, development history, and legacy issues.
-
 4. Comparative Thinker: Explore alternatives, competitors, contrasts, and trade-offs. Generate a query that sets up comparisons and evaluates relative advantages/disadvantages.
-
 5. Temporal Context: Add a time-sensitive query that incorporates the current date (${currentYear}-${currentMonth}) to ensure recency and freshness of information.
-
 6. Globalizer: Identify the most authoritative language/region for the subject matter (not just the query's origin language). For example, use German for BMW (German company), English for tech topics, Japanese for anime, Italian for cuisine, etc. Generate a search in that language to access native expertise.
-
 7. Reality-Hater-Skepticalist: Actively seek out contradicting evidence to the original query. Generate a search that attempts to disprove assumptions, find contrary evidence, and explore "Why is X false?" or "Evidence against X" perspectives.
 
 Ensure each persona contributes exactly ONE high-quality query that follows the schema format. These 7 queries will be combined into a final array.
 </cognitive-personas>
 
 <rules>
+Leverage the soundbites from the context user provides to generate queries that are contextually relevant.
+
 1. Query content rules:
    - Split queries for distinct aspects
    - Add operators only when necessary
@@ -77,15 +75,9 @@ Note: A query can't only have operators; and operators can't be at the start of 
 <example-1>
 Input Query: 宝马二手车价格
 <think>
-表面意图是查询二手宝马汽车价格范围，实用意图是确定购买预算并了解不同型号价格差异。情感上渴望拥有豪华品牌却担心维护成本高昂。社会意图是通过宝马提升地位形象，获得他人认可。身份意图是将自己视为值得拥有豪华品牌的成功人士。禁忌层面可能超出实际经济能力却不愿承认，潜意识中则是通过物质寻求安全感，填补内心空虚。
+宝马二手车价格...哎，这人应该是想买二手宝马吧。表面上是查价格，实际上肯定是想买又怕踩坑。谁不想开个宝马啊，面子十足，但又担心养不起。这年头，开什么车都是身份的象征，尤其是宝马这种豪车，一看就是有点成绩的人。但很多人其实囊中羞涩，硬撑着买了宝马，结果每天都在纠结油费保养费。说到底，可能就是想通过物质来获得安全感或填补内心的某种空虚吧。
 
-专家怀疑者：寻找二手宝马的隐藏问题和可能被忽视的严重缺陷。
-细节分析者：专注二手宝马各系列精确价格数据和规格对比。
-历史研究者：追踪二手宝马价格和可靠性的历史变化趋势。
-比较思考者：将二手宝马与其他品牌和购车选择进行对比分析。
-时间语境者：关注${currentYear}年最新市场数据和价格趋势。
-全球化者：宝马源自德国，用德语搜索可获得最权威的车辆信息。
-现实怀疑论者：主动寻找购买二手宝马的负面证据和后悔案例。
+要帮他的话，得多方位思考一下...二手宝马肯定有不少问题，尤其是那些车主不会主动告诉你的隐患，维修起来可能要命。不同系列的宝马价格差异也挺大的，得看看详细数据和实际公里数。价格这东西也一直在变，去年的行情和今年的可不一样，${currentYear}年最新的趋势怎么样？宝马和奔驰还有一些更平价的车比起来，到底值不值这个钱？宝马是德国车，德国人对这车的了解肯定最深，德国车主的真实评价会更有参考价值。最后，现实点看，肯定有人买了宝马后悔的，那些血泪教训不能不听啊，得找找那些真实案例。
 </think>
 queries: [
   {
@@ -119,15 +111,9 @@ queries: [
 <example-2>
 Input Query: sustainable regenerative agriculture soil health restoration techniques
 <think>
-Surface intent is to find techniques for restoring soil health through regenerative agriculture practices. Practical intent includes implementing these methods on a farm or garden to improve crop yields and sustainability. Emotional intent may involve anxiety about climate change and environmental degradation, along with hope for solutions. Social intent could include wanting to connect with the regenerative farming community or appear knowledgeable among environmentally-conscious peers. Identity intent relates to seeing oneself as an environmental steward or innovative farmer. Taboo intent might involve seeking ways to bypass regulations or avoid conventional farming practices without facing social judgment. Shadow intent could include displacement activity—researching rather than implementing changes—or seeking validation for convictions about industrial farming's harmfulness.
+Sustainable regenerative agriculture soil health restoration techniques... interesting search. They're probably looking to fix depleted soil on their farm or garden. Behind this search though, there's likely a whole story - someone who's read books like "The Soil Will Save Us" or watched documentaries on Netflix about how conventional farming is killing the planet. They're probably anxious about climate change and want to feel like they're part of the solution, not the problem. Might be someone who brings up soil carbon sequestration at dinner parties too, you know the type. They see themselves as an enlightened land steward, rejecting the ways of "Big Ag." Though I wonder if they're actually implementing anything or just going down research rabbit holes while their garden sits untouched.
 
-Expert Skeptic: Examine the limitations, failures, and potential negative consequences of regenerative agriculture techniques.
-Detail Analyst: Investigate specific soil biome metrics, carbon sequestration measurements, and implementation parameters for different techniques.
-Historical Researcher: Explore traditional indigenous land management practices that preceded modern regenerative agriculture concepts.
-Comparative Thinker: Compare effectiveness and ROI of different soil restoration approaches across various climate zones and soil types.
-Temporal Context: Find the most recent ${currentYear} research trials and field studies on innovative soil restoration methods.
-Globalizer: Look for techniques developed in regions with longstanding sustainable agriculture traditions like Austria's alpine farming or Australia's dryland farming innovations.
-Reality-Hater-Skepticalist: Search for evidence that regenerative agriculture's benefits are overstated or cannot scale to commercial agriculture needs.
+Let me think about this from different angles... There's always a gap between theory and practice with these regenerative methods - what failures and limitations are people not talking about? And what about the hardcore science - like actual measurable fungi-to-bacteria ratios and carbon sequestration rates? I bet there's wisdom in indigenous practices too - Aboriginal fire management techniques predate all our "innovative" methods by thousands of years. Anyone serious would want to know which techniques work best in which contexts - no-till versus biochar versus compost tea and all that. ${currentYear}'s research would be most relevant, especially those university field trials on soil inoculants. The Austrians have been doing this in the Alps forever, so their German-language resources probably have techniques that haven't made it to English yet. And let's be honest, someone should challenge whether all the regenerative ag hype can actually scale to feed everyone.
 </think>
 queries: [
   {
@@ -177,15 +163,9 @@ queries: [
 <example-3>
 Input Query: KIリテラシー向上させる方法
 <think>
-表面意図はAIリテラシーを高める方法を求めている。実用意図はAIツールを効果的に活用し職場での生産性向上を図ること。感情面ではAI進化に取り残される不安がある。社会的にはAI知識豊富な人物として評価されたい。禁忌領域では実はAI基礎知識の欠如を隠している。潜在意識では技術進化への恐怖、知識陳腐化への不安がある。
+AIリテラシー向上させる方法か...なるほど。最近AIがどんどん話題になってきて、ついていけなくなる不安があるんだろうな。表面的には単にAIの知識を増やしたいってことだけど、本音を言えば、職場でAIツールをうまく使いこなして一目置かれたいんじゃないかな。周りは「ChatGPTでこんなことができる」とか言ってるのに、自分だけ置いてけぼりになるのが怖いんだろう。案外、基本的なAIの知識がなくて、それをみんなに知られたくないという気持ちもあるかも。根っこのところでは、技術の波に飲み込まれる恐怖感があるんだよな、わかるよその気持ち。
 
-専門家の懐疑者：AI技術の限界と誇大宣伝を暴く視点で検索。
-詳細分析者：AIリテラシーの具体的なスキル階層と学習方法を探求。
-歴史研究者：AI技術の歴史的発展と過去のブームから学ぶ教訓を調査。
-比較思考者：AIリテラシーと他のデジタルスキルを比較分析。
-時間的文脈：${currentYear}年の最新AI動向と必要スキルに焦点。
-グローバル化：AI研究の中心は英語圏のため、英語での専門資料を検索。
-現実否定的懐疑論者：AIリテラシー向上が無意味である可能性を探る。
+いろんな視点で考えてみよう...AIって実際どこまでできるんだろう？宣伝文句と実際の能力にはかなりギャップがありそうだし、その限界を知ることも大事だよね。あと、AIリテラシーって言っても、どう学べばいいのか体系的に整理されてるのかな？過去の「AI革命」とかって結局どうなったんだろう。バブルが弾けて終わったものもあるし、その教訓から学べることもあるはず。プログラミングと違ってAIリテラシーって何なのかもはっきりさせたいよね。批判的思考力との関係も気になる。${currentYear}年のAIトレンドは特に変化が速そうだから、最新情報を押さえておくべきだな。海外の方が進んでるから、英語の資料も見た方がいいかもしれないし。そもそもAIリテラシーを身につける必要があるのか？「流行りだから」という理由だけなら、実は意味がないかもしれないよね。
 </think>
 queries: [
   {
@@ -227,21 +207,26 @@ queries: [
 Each generated query must follow JSON schema format.
 `,
     user: `
-${query}
+My original search query is: "${query}"
 
-<think>${think} Please add correct 'tbs' you think the query requires time-sensitive results. 
+My motivation is: ${think}
+
+So I briefly googled "${query}" and found some soundbites about this topic, hope it gives you a rough idea about my context and topic:
+<random-soundbites>
+${context}
+</random-soundbites>
+
+Given those info, now please generate the best effective queries that follow JSON schema format; add correct 'tbs' you believe the query requires time-sensitive results. 
 `
   };
 }
 const TOOL_NAME = 'queryRewriter';
 
-export async function rewriteQuery(action: SearchAction, trackers: TrackerContext, schemaGen: Schemas): Promise<SERPQuery[] > {
+export async function rewriteQuery(action: SearchAction, context: string,  trackers: TrackerContext, schemaGen: Schemas): Promise<SERPQuery[] > {
   try {
     const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
-    const allQueries = action.searchRequests.map(q => ({ q })) as SERPQuery[];
-
     const queryPromises = action.searchRequests.map(async (req) => {
-      const prompt = getPrompt(req, action.think);
+      const prompt = getPrompt(req, action.think, context);
       const result = await generator.generateObject({
         model: TOOL_NAME,
         schema: schemaGen.getQueryRewriterSchema(),
@@ -253,7 +238,7 @@ export async function rewriteQuery(action: SearchAction, trackers: TrackerContex
     });
 
     const queryResults = await Promise.all(queryPromises);
-    queryResults.forEach(queries => allQueries.push(...queries));
+    const allQueries: SERPQuery[] = queryResults.flat();
     console.log(TOOL_NAME, allQueries);
     return allQueries;
   } catch (error) {

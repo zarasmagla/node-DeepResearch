@@ -452,7 +452,7 @@ export async function processURLs(
 
         return {url, result: response};
       } catch (error) {
-        console.error('Error reading URL:', error);
+        console.error('Error reading URL:', url, error);
         return null;
       } finally {
         visitedURLs.push(url);
