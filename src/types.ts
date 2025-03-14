@@ -19,14 +19,17 @@ export type SearchAction = BaseAction & {
   searchRequests: string[];
 };
 
+export type Reference = {
+    exactQuote: string;
+    url: string;
+    title: string;
+    dateTime?: string;
+  }
+
 export type AnswerAction = BaseAction & {
   action: "answer";
   answer: string;
-  references: Array<{
-    exactQuote: string;
-    url: string;
-    dateTime?: string;
-  }>;
+  references: Array<Reference>;
   isFinal?: boolean;
   mdAnswer?: string;
 };
@@ -35,11 +38,7 @@ export type AnswerAction = BaseAction & {
 export type KnowledgeItem = {
   question: string,
   answer: string,
-  references?: Array<{
-    exactQuote: string;
-    url: string;
-    dateTime?: string;
-  }> | Array<any>;
+  references?: Array<Reference> | Array<any>;
   type: 'qa' | 'side-info' | 'chat-history' | 'url' | 'coding',
   updated?: string,
   sourceCode?: string,
@@ -218,6 +217,11 @@ export interface ChatCompletionRequest {
   response_format?: ResponseFormat;
 }
 
+export interface URLAnnotation {
+  type: 'url_citation',
+  url_citation: Reference
+}
+
 export interface ChatCompletionResponse {
   id: string;
   object: 'chat.completion';
@@ -230,6 +234,7 @@ export interface ChatCompletionResponse {
       role: 'assistant';
       content: string;
       type: 'text' | 'think' | 'json' | 'error';
+      annotations?: Array<URLAnnotation>;
     };
     logprobs: null;
     finish_reason: 'stop' | 'error';
@@ -241,6 +246,7 @@ export interface ChatCompletionResponse {
   };
   visitedURLs?: string[];
   readURLs?: string[];
+  numURLs?: number;
 }
 
 export interface ChatCompletionChunk {
@@ -256,6 +262,7 @@ export interface ChatCompletionChunk {
       content?: string;
       type?: 'text' | 'think' | 'json' | 'error';
       url?: string;
+      annotations?: Array<URLAnnotation>;
     };
     logprobs: null;
     finish_reason: null | 'stop' | 'thinking_end' | 'error';
@@ -263,6 +270,7 @@ export interface ChatCompletionChunk {
   usage?: any;
   visitedURLs?: string[];
   readURLs?: string[];
+  numURLs?: number;
 }
 
 // Tracker Types

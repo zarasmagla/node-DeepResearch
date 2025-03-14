@@ -164,16 +164,17 @@ export class ObjectGeneratorSafe {
         const fallbackModel = getModel('fallback');
         if (NoObjectGeneratedError.isInstance(parseError)) {
           const failedOutput = (parseError as any).text;
-          console.error(`${model} failed on object generation ${failedOutput} -> manual parsing failed again -> trying fallback model`, fallbackModel);
+          console.error(`${model} failed on object generation ${failedOutput} -> manual parsing failed again -> trying fallback model`);
           try {
             // Create a distilled version of the schema without descriptions
             const distilledSchema = this.createDistilledSchema(schema);
-            console.log('Distilled schema', distilledSchema)
+            // find last `"url":` appear in the string, which is the source of the problem
+            const tailoredOutput = failedOutput.slice(0, Math.max(failedOutput.lastIndexOf('"url":'), 1500));
 
             const fallbackResult = await generateObject({
               model: fallbackModel,
               schema: distilledSchema,
-              prompt: `Following the given JSON schema, extract the field from below: \n\n ${failedOutput}`,
+              prompt: `Following the given JSON schema, extract the field from below: \n\n ${tailoredOutput}`,
               maxTokens: getToolConfig('fallback').maxTokens,
               temperature: getToolConfig('fallback').temperature,
             });

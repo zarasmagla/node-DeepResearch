@@ -136,9 +136,9 @@ export function normalizeUrl(urlString: string, debug = false, options = {
   }
 }
 
-export function removeBFromA(allURLs: Record<string, SearchSnippet>, visitedURLs: string[]): SearchSnippet[] {
+export function filterURLs(allURLs: Record<string, SearchSnippet>, visitedURLs: string[]): SearchSnippet[] {
   return Object.entries(allURLs)
-    .filter(([url]) => !visitedURLs.includes(url))
+    .filter(([url, ]) => !visitedURLs.includes(url))
     .map(([, result]) => result);
 }
 
@@ -269,13 +269,14 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
 };
 
 export const addToAllURLs = (r: SearchSnippet, allURLs: Record<string, SearchSnippet>, weightDelta = 1) => {
-  if (!allURLs[r.url]) {
-    allURLs[r.url] = r;
-    allURLs[r.url].weight = weightDelta;
+  const nURL = normalizeUrl(r.url);
+  if (!allURLs[nURL]) {
+    allURLs[nURL] = r;
+    allURLs[nURL].weight = weightDelta;
   } else {
-    (allURLs[r.url].weight as number)+= weightDelta;
-    const curDesc = allURLs[r.url].description;
-    allURLs[r.url].description = smartMergeStrings(curDesc, r.description);
+    (allURLs[nURL].weight as number)+= weightDelta;
+    const curDesc = allURLs[nURL].description;
+    allURLs[nURL].description = smartMergeStrings(curDesc, r.description);
   }
 }
 
@@ -413,6 +414,7 @@ export async function processURLs(
   const urlResults = await Promise.all(
     urls.map(async url => {
       try {
+        url = normalizeUrl(url);
         const {response} = await readUrl(url, true, context.tokenTracker);
         const {data} = response;
         const guessedTime = await getLastModified(url);

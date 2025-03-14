@@ -30,7 +30,7 @@ import {
   addToAllURLs,
   rankURLs,
   countUrlParts,
-  removeBFromA,
+  filterURLs,
   normalizeUrl, sampleMultinomial,
   weightedURLToString, getLastModified, keepKPerHostname, processURLs
 } from "./utils/url-tools";
@@ -239,7 +239,7 @@ export async function getResponse(question?: string,
                                   maxBadAttempts: number = 3,
                                   existingContext?: Partial<TrackerContext>,
                                   messages?: Array<CoreMessage>
-): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[] }> {
+): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
   let step = 0;
   let totalStep = 0;
@@ -329,7 +329,7 @@ export async function getResponse(question?: string,
     if (allURLs && Object.keys(allURLs).length > 0) {
       // rerank urls
       weightedURLs = rankURLs(
-        removeBFromA(allURLs, visitedURLs),
+        filterURLs(allURLs, visitedURLs),
         {
           question: currentQuestion
         }, context);
@@ -851,6 +851,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     context,
     visitedURLs: returnedURLs,
     readURLs: visitedURLs,
+    allURLs: weightedURLs.map(r => r.url)
   };
 }
 

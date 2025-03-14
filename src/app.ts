@@ -393,7 +393,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   // clean <think> from all assistant messages
   body.messages = body.messages?.filter(message => {
     if (message.role === 'assistant') {
-       // 2 cases message.content can be a string or an array
+      // 2 cases message.content can be a string or an array
       if (typeof message.content === 'string') {
         message.content = (message.content as string).replace(/<think>[\s\S]*?<\/think>/g, '').trim();
         // Filter out the message if the content is empty after <think> removal
@@ -406,7 +406,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           }
         });
         //Filter out any content objects in the array that now have null/undefined/empty text.
-        message.content = message.content.filter((content:any) => 
+        message.content = message.content.filter((content: any) =>
           !(content.type === 'text' && content.text === '')
         );
 
@@ -417,17 +417,17 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     } else if (message.role === 'user' && Array.isArray(message.content)) {
       message.content = message.content.map((content: any) => {
         if (content.type === 'image_url') {
-            return {
-                type: 'image',
-                image: content.image_url?.url || '',
-            }
+          return {
+            type: 'image',
+            image: content.image_url?.url || '',
+          }
         }
         return content;
       });
       return true;
     } else if (message.role === 'system') {
       if (Array.isArray(message.content)) {
-          message.content = message.content.map((content: any) => `${content.text || content}`).join(' ');
+        message.content = message.content.map((content: any) => `${content.text || content}`).join(' ');
       }
       return true;
     }
@@ -503,19 +503,19 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         // emit every url in the visit action in url field
         (step as VisitAction).URLTargets.forEach((url) => {
           const chunk: ChatCompletionChunk = {
-          id: requestId,
-          object: 'chat.completion.chunk',
-          created,
-          model: body.model,
-          system_fingerprint: 'fp_' + requestId,
-          choices: [{
-            index: 0,
-            delta: {type: 'think', url},
-            logprobs: null,
-            finish_reason: null,
-          }]
-        };
-        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+            id: requestId,
+            object: 'chat.completion.chunk',
+            created,
+            model: body.model,
+            system_fingerprint: 'fp_' + requestId,
+            choices: [{
+              index: 0,
+              delta: {type: 'think', url},
+              logprobs: null,
+              finish_reason: null,
+            }]
+          };
+          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
         });
       }
       if (step.think) {
@@ -545,10 +545,22 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   try {
     const {
       result: finalStep,
-      visitedURLs: visitedURLs,
-      readURLs: readURLs
+      visitedURLs,
+      readURLs,
+      allURLs
     } = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages)
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
+
+    const annotations = (finalStep as AnswerAction).references?.map(ref => ({
+      type: 'url_citation' as const,
+      url_citation: {
+        title: ref.title,
+        exactQuote: ref.exactQuote,
+        url: ref.url,
+        dateTime: ref.dateTime,
+      }
+    }))
+
 
     if (responseSchema) {
       try {
@@ -597,13 +609,18 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: finalAnswer, type: responseSchema? 'json': 'text'},
+          delta: {
+            content: finalAnswer,
+            type: responseSchema ? 'json' : 'text',
+            annotations,
+          },
           logprobs: null,
           finish_reason: 'stop'
         }],
         usage,
         visitedURLs,
-        readURLs
+        readURLs,
+        numURLs: allURLs.length
       };
       res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
       res.end();
@@ -620,14 +637,16 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           message: {
             role: 'assistant',
             content: finalStep.action === 'answer' ? (finalAnswer || '') : finalStep.think,
-            type: responseSchema? 'json': 'text'
+            type: responseSchema ? 'json' : 'text',
+            annotations,
           },
           logprobs: null,
           finish_reason: 'stop'
         }],
         usage,
         visitedURLs,
-        readURLs
+        readURLs,
+        numURLs: allURLs.length
       };
 
       // Log final response (excluding full content for brevity)
@@ -637,7 +656,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         contentLength: response.choices[0].message.content.length,
         usage: response.usage,
         visitedURLs: response.visitedURLs,
-        readURLs: response.readURLs
+        readURLs: response.readURLs,
+        numURLs: allURLs.length
       });
 
       res.json(response);
