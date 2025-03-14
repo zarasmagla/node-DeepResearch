@@ -36,7 +36,7 @@ import {
 } from "./utils/url-tools";
 import {
   buildMdFromAnswer,
-  chooseK,
+  chooseK, fixCodeBlockIndentation,
   removeExtraLineBreaks,
   removeHTMLtags
 } from "./utils/text-tools";
@@ -887,7 +887,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
   }
 
-  (thisStep as AnswerAction).mdAnswer = buildMdFromAnswer((thisStep as AnswerAction))
+  (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(buildMdFromAnswer((thisStep as AnswerAction)));
   console.log(thisStep)
 
   await storeContext(system, schema, {

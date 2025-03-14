@@ -222,3 +222,49 @@ export function smartMergeStrings(str1: string, str2: string): string {
     return str1 + str2;
   }
 }
+
+
+export function fixCodeBlockIndentation(markdownText: string): string {
+  // Track the state of code blocks and their indentation
+  const lines = markdownText.split('\n');
+  const result: string[] = [];
+
+  // Track open code blocks and their indentation
+  const codeBlockStack: { indent: string; language: string }[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Check if the line potentially contains a code fence marker
+    if (line.trimStart().startsWith('```')) {
+      const indent = line.substring(0, line.indexOf('```'));
+      const restOfLine = line.trimStart().substring(3).trim();
+
+      if (codeBlockStack.length === 0) {
+        // This is an opening code fence
+        codeBlockStack.push({ indent, language: restOfLine });
+        result.push(line);
+      } else {
+        // This is a closing code fence
+        const openingBlock = codeBlockStack.pop();
+
+        if (openingBlock) {
+          // Replace the indentation with the one from the opening fence
+          result.push(`${openingBlock.indent}\`\`\``);
+        } else {
+          // Something went wrong, just keep the line as is
+          result.push(line);
+        }
+      }
+    } else {
+      // Not a code fence line, just add it as is
+      result.push(line);
+    }
+  }
+
+  // If there are unclosed code blocks, we leave the text as is
+  // as it might be malformed markdown
+
+  return result.join('\n');
+}
+
