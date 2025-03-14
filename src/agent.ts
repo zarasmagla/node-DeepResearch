@@ -329,7 +329,8 @@ export async function getResponse(question?: string,
                                   maxBadAttempts: number = 3,
                                   existingContext?: Partial<TrackerContext>,
                                   messages?: Array<CoreMessage>,
-                                  numReturnedURLs: number = 100
+                                  numReturnedURLs: number = 100,
+                                  noDirectAnswer: boolean = false,
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
   let step = 0;
@@ -495,7 +496,7 @@ export async function getResponse(question?: string,
 
       console.log('Updated references:', thisStep.references)
 
-      if (totalStep === 1 && thisStep.references.length === 0) {
+      if (totalStep === 1 && thisStep.references.length === 0 && !noDirectAnswer) {
         // LLM is so confident and answer immediately, skip all evaluations
         // however, if it does give any reference, it must be evaluated, case study: "How to configure a timeout when loading a huggingface dataset with python?"
         thisStep.isFinal = true;

@@ -216,6 +216,7 @@ export interface ChatCompletionRequest {
 
   response_format?: ResponseFormat;
   numReturnedURLs?: number;
+  noDirectAnswer?: boolean;
 }
 
 export interface URLAnnotation {
