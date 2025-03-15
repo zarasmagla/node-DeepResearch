@@ -17,7 +17,7 @@ export function buildMdFromAnswer(answer: AnswerAction) {
 
       const citation = `[^${i + 1}]: ${cleanQuote}`;
 
-      if (!ref.url?.startsWith('http')) return citation;
+      if (!ref.url) return citation;
 
       const domainName = new URL(ref.url).hostname.replace('www.', '');
       return `${citation} [${domainName}](${ref.url})`;

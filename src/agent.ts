@@ -17,7 +17,7 @@ import {
   SearchResult,
   EvaluationType,
   BoostedSearchSnippet,
-  SearchSnippet, EvaluationResponse
+  SearchSnippet, EvaluationResponse, Reference
 } from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
@@ -238,6 +238,31 @@ function updateContext(step: any) {
   allContext.push(step)
 }
 
+async function updateReferences(thisStep: AnswerAction, allURLs: Record<string, SearchSnippet>) {
+  thisStep.references = thisStep.references
+    ?.filter(ref => ref?.url)
+    .map(ref => {
+      const normalizedUrl = normalizeUrl(ref.url);
+      if (!normalizedUrl) return null; // This causes the type error
+
+      return {
+        exactQuote: ref?.exactQuote || '',
+        title: allURLs[normalizedUrl]?.title || '',
+        url: normalizedUrl,
+        dateTime: ref?.dateTime || ''
+      };
+    })
+    .filter(Boolean) as Reference[]; // Add type assertion here
+
+  // parallel process guess all url datetime
+  await Promise.all((thisStep.references || []).filter(ref => !ref.dateTime)
+    .map(async ref => {
+      ref.dateTime = await getLastModified(ref.url) || '';
+    }));
+
+  console.log('Updated references:', thisStep.references);
+}
+
 async function executeSearchQueries(
   keywordsQueries: any[],
   context: TrackerContext,
@@ -297,12 +322,19 @@ async function executeSearchQueries(
       await sleep(STEP_SLEEP);
     }
 
-    const minResults: SearchSnippet[] = (results).map(r => ({
-      title: r.title,
-      url: normalizeUrl('url' in r ? r.url : r.link),
-      description: 'description' in r ? r.description : r.snippet,
-      weight: 1
-    }));
+    const minResults: SearchSnippet[] = results
+      .map(r => {
+        const url = normalizeUrl('url' in r ? r.url : r.link);
+        if (!url) return null; // Skip invalid URLs
+
+        return {
+          title: r.title,
+          url,
+          description: 'description' in r ? r.description : r.snippet,
+          weight: 1
+        };
+      })
+      .filter(Boolean) as SearchSnippet[]; // Filter out null entries and assert type
 
     minResults.forEach(r => {
       addToAllURLs(r, allURLs);
@@ -477,24 +509,7 @@ export async function getResponse(question?: string,
     // execute the step and action
     if (thisStep.action === 'answer' && thisStep.answer) {
       // normalize all references urls, add title to it
-      thisStep.references = thisStep.references?.filter(ref => ref?.url && typeof ref.url === 'string' && ref.url.startsWith('http'))
-        .map(ref => {
-          const normalizedUrl = ref?.url ? normalizeUrl(ref.url) : '';
-          return {
-            exactQuote: ref?.exactQuote || '',
-            title: normalizedUrl ? (allURLs[normalizedUrl]?.title || '') : '',
-            url: normalizedUrl,
-            dateTime: ref?.dateTime || ''
-          }
-        });
-
-      // parallel process guess all url datetime
-      await Promise.all(thisStep.references.filter(ref => !(ref?.dateTime))
-        .map(async ref => {
-          ref.dateTime = await getLastModified(ref.url) || ''
-        }));
-
-      console.log('Updated references:', thisStep.references)
+      await updateReferences(thisStep, allURLs)
 
       if (totalStep === 1 && thisStep.references.length === 0 && !noDirectAnswer) {
         // LLM is so confident and answer immediately, skip all evaluations
@@ -746,9 +761,8 @@ You decided to think out of the box or cut from a completely different angle.
     } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
       // normalize URLs
       thisStep.URLTargets = thisStep.URLTargets
-        .filter(url => url.startsWith('http'))
         .map(url => normalizeUrl(url))
-        .filter(url => !visitedURLs.includes(url));
+        .filter(url => url && !visitedURLs.includes(url)) as string[];
 
       thisStep.URLTargets = [...new Set([...thisStep.URLTargets, ...weightedURLs.map(r => r.url)])].slice(0, MAX_URLS_PER_STEP);
 
@@ -883,6 +897,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       think: result.object.think,
       ...result.object[result.object.action]
     } as AnswerAction;
+    await updateReferences(thisStep, allURLs);
     (thisStep as AnswerAction).isFinal = true;
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
   }

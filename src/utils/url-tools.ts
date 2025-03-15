@@ -11,18 +11,19 @@ export function normalizeUrl(urlString: string, debug = false, options = {
   removeSessionIDs: true,
   removeUTMParams: true,
   removeTrackingParams: true
-}): string {
-  if (!urlString?.trim()) {
-    throw new Error('Empty URL');
-  }
-
-  urlString = urlString.trim();
-
-  if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(urlString)) {
-    urlString = 'https://' + urlString;
-  }
-
+}) {
   try {
+    urlString = urlString.replace(/\s+/g, '').trim();
+
+    if (!urlString?.trim()) {
+      throw new Error('Empty URL');
+    }
+
+
+    if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(urlString)) {
+      urlString = 'https://' + urlString;
+    }
+
     const url = new URL(urlString);
 
     url.hostname = url.hostname.toLowerCase();
@@ -71,7 +72,7 @@ export function normalizeUrl(urlString: string, debug = false, options = {
 
         // Remove session IDs
         if (options.removeSessionIDs &&
-            /^(s|session|sid|sessionid|phpsessid|jsessionid|aspsessionid|asp\.net_sessionid)$/i.test(key)) {
+          /^(s|session|sid|sessionid|phpsessid|jsessionid|aspsessionid|asp\.net_sessionid)$/i.test(key)) {
           return false;
         }
 
@@ -82,7 +83,7 @@ export function normalizeUrl(urlString: string, debug = false, options = {
 
         // Remove common tracking parameters
         if (options.removeTrackingParams &&
-            /^(ref|referrer|fbclid|gclid|cid|mcid|source|medium|campaign|term|content|sc_rid|mc_[a-z]+)$/i.test(key)) {
+          /^(ref|referrer|fbclid|gclid|cid|mcid|source|medium|campaign|term|content|sc_rid|mc_[a-z]+)$/i.test(key)) {
           return false;
         }
 
@@ -132,13 +133,14 @@ export function normalizeUrl(urlString: string, debug = false, options = {
     return normalizedUrl;
   } catch (error) {
     // Main URL parsing error - this one we should throw
-    throw new Error(`Invalid URL "${urlString}": ${error}`);
+    console.error(`Invalid URL "${urlString}": ${error}`);
+    return;
   }
 }
 
 export function filterURLs(allURLs: Record<string, SearchSnippet>, visitedURLs: string[]): SearchSnippet[] {
   return Object.entries(allURLs)
-    .filter(([url, ]) => !visitedURLs.includes(url))
+    .filter(([url,]) => !visitedURLs.includes(url))
     .map(([, result]) => result);
 }
 
@@ -270,11 +272,12 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
 
 export const addToAllURLs = (r: SearchSnippet, allURLs: Record<string, SearchSnippet>, weightDelta = 1) => {
   const nURL = normalizeUrl(r.url);
+  if (!nURL) return;
   if (!allURLs[nURL]) {
     allURLs[nURL] = r;
     allURLs[nURL].weight = weightDelta;
   } else {
-    (allURLs[nURL].weight as number)+= weightDelta;
+    (allURLs[nURL].weight as number) += weightDelta;
     const curDesc = allURLs[nURL].description;
     allURLs[nURL].description = smartMergeStrings(curDesc, r.description);
   }
@@ -337,8 +340,6 @@ export function sampleMultinomial<T>(items: [T, number][]): T | null {
 }
 
 
-
-
 /**
  * Fetches the last modified date for a URL using the datetime detection API
  * @param url The URL to check for last modified date
@@ -370,22 +371,22 @@ export async function getLastModified(url: string): Promise<string | undefined> 
 
 
 export const keepKPerHostname = (results: BoostedSearchSnippet[], k: number) => {
-    const hostnameMap: Record<string, number> = {};
-    const filteredResults: BoostedSearchSnippet[] = [];
+  const hostnameMap: Record<string, number> = {};
+  const filteredResults: BoostedSearchSnippet[] = [];
 
-    results.forEach((result) => {
-        const hostname = extractUrlParts(result.url).hostname;
-        if (hostnameMap[hostname] === undefined) {
-        hostnameMap[hostname] = 0;
-        }
+  results.forEach((result) => {
+    const hostname = extractUrlParts(result.url).hostname;
+    if (hostnameMap[hostname] === undefined) {
+      hostnameMap[hostname] = 0;
+    }
 
-        if (hostnameMap[hostname] < k) {
-        filteredResults.push(result);
-        hostnameMap[hostname]++;
-        }
-    });
+    if (hostnameMap[hostname] < k) {
+      filteredResults.push(result);
+      hostnameMap[hostname]++;
+    }
+  });
 
-    return filteredResults;
+  return filteredResults;
 }
 
 export async function processURLs(
@@ -396,10 +397,10 @@ export async function processURLs(
   visitedURLs: string[],
   schemaGen: Schemas,
   question: string
-): Promise<{urlResults: any[], success: boolean}> {
+): Promise<{ urlResults: any[], success: boolean }> {
   // Skip if no URLs to process
   if (urls.length === 0) {
-    return { urlResults: [], success: false };
+    return {urlResults: [], success: false};
   }
 
   // Track the reading action
@@ -414,14 +415,20 @@ export async function processURLs(
   const urlResults = await Promise.all(
     urls.map(async url => {
       try {
-        url = normalizeUrl(url);
+        const normalizedUrl = normalizeUrl(url);
+        if (!normalizedUrl) {
+          return null;
+        }
+
+        // Store normalized URL for consistent reference
+        url = normalizedUrl;
+
         const {response} = await readUrl(url, true, context.tokenTracker);
         const {data} = response;
         const guessedTime = await getLastModified(url);
         if (guessedTime) {
           console.log('Guessed time for', url, guessedTime);
         }
-
 
         // Early return if no valid data
         if (!data?.url || !data?.content) {
@@ -434,18 +441,20 @@ export async function processURLs(
           answer: await cherryPick(question, data.content, {}, context, schemaGen, url),
           references: [data.url],
           type: 'url',
-          updated: guessedTime? formatDateBasedOnType(new Date(guessedTime), 'full'): undefined
+          updated: guessedTime ? formatDateBasedOnType(new Date(guessedTime), 'full') : undefined
         });
 
         // Process page links
         data.links?.forEach(link => {
+          const nnUrl = normalizeUrl(link[1]);
+          if (!nnUrl) return;
           const r: SearchSnippet = {
             title: link[0],
-            url: normalizeUrl(link[1]),
+            url: nnUrl,
             description: link[0],
           }
           // in-page link has lower initial weight comparing to search links
-          if (r.url && r.url.startsWith('http')) {
+          if (r.url) {
             addToAllURLs(r, allURLs, 0.1);
           }
         });
@@ -455,13 +464,19 @@ export async function processURLs(
         console.error('Error reading URL:', url, error);
         return null;
       } finally {
-        visitedURLs.push(url);
+        // Only add valid URLs to visitedURLs list
+        if (url && typeof url === 'string') {
+          visitedURLs.push(url);
+        }
       }
     })
-  ).then(results => results.filter(Boolean));
+  );
+
+  // Filter out null results without changing the original array
+  const validResults = urlResults.filter(Boolean);
 
   return {
-    urlResults,
-    success: urlResults.length > 0
+    urlResults: validResults,
+    success: validResults.length > 0
   };
 }
