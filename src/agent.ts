@@ -29,9 +29,8 @@ import {serperSearch} from './tools/serper-search';
 import {
   addToAllURLs,
   rankURLs,
-  countUrlParts,
   filterURLs,
-  normalizeUrl, sampleMultinomial,
+  normalizeUrl,
   weightedURLToString, getLastModified, keepKPerHostname, processURLs
 } from "./utils/url-tools";
 import {
