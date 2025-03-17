@@ -223,7 +223,7 @@ export class Schemas {
         references: z.array(
           z.object({
             exactQuote: z.string().describe("Exact relevant quote from the document, must be a soundbite, short and to the point, no fluff").max(30),
-            url: z.string().describe("source URL; must be copy directly from previous message's <url>, avoid example.com or any placeholder fake URLs").max(100),
+            url: z.string().describe("source URL of the document; must copy from previous URL, avoid example.com or any placeholder fake URLs").max(100),
             dateTime: z.string().describe("Use original message's <answer-dateime> if available.").max(16),
           }).required()
         ).describe("Required when action='answer'. Must be an array of references that support the answer, each reference must contain an exact quote, URL and datetime"),
