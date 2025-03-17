@@ -223,6 +223,7 @@ export function smartMergeStrings(str1: string, str2: string): string {
   }
 }
 
+
 export function fixCodeBlockIndentation(markdownText: string): string {
   // Track the state of code blocks and their indentation
   const lines = markdownText.split('\n');
@@ -255,21 +256,8 @@ export function fixCodeBlockIndentation(markdownText: string): string {
           result.push(line);
         }
       }
-    } else if (codeBlockStack.length > 0) {
-      // Inside a code block - adjust indentation to match opening fence
-      const openingBlock = codeBlockStack[codeBlockStack.length - 1];
-
-      // Only adjust non-empty lines
-      if (line.trim().length > 0) {
-        // Remove any existing indentation and apply the opening fence indentation
-        const trimmedLine = line.trimStart();
-        result.push(`${openingBlock.indent}${trimmedLine}`);
-      } else {
-        // For empty lines, just keep them as is
-        result.push(line);
-      }
     } else {
-      // Not in a code block, just add it as is
+      // Not a code fence line, just add it as is
       result.push(line);
     }
   }
