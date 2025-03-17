@@ -230,7 +230,7 @@ export function fixCodeBlockIndentation(markdownText: string): string {
   const result: string[] = [];
 
   // Track open code blocks and their indentation
-  const codeBlockStack: { indent: string; language: string }[] = [];
+  const codeBlockStack: { indent: string; language: string; listIndent: string }[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -242,7 +242,26 @@ export function fixCodeBlockIndentation(markdownText: string): string {
 
       if (codeBlockStack.length === 0) {
         // This is an opening code fence
-        codeBlockStack.push({ indent, language: restOfLine });
+
+        // Determine if we're in a list context by looking at previous lines
+        let listIndent = "";
+        if (i > 0) {
+          // Look back up to 3 lines to find list markers
+          for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
+            const prevLine = lines[j];
+            // Check for list markers like *, -, 1., etc.
+            if (/^\s*(?:[*\-+]|\d+\.)\s/.test(prevLine)) {
+              // Extract the list's base indentation
+              const match = prevLine.match(/^(\s*)/);
+              if (match) {
+                listIndent = match[1];
+                break;
+              }
+            }
+          }
+        }
+
+        codeBlockStack.push({ indent, language: restOfLine, listIndent });
         result.push(line);
       } else {
         // This is a closing code fence
@@ -256,14 +275,36 @@ export function fixCodeBlockIndentation(markdownText: string): string {
           result.push(line);
         }
       }
+    } else if (codeBlockStack.length > 0) {
+      // Inside a code block - handle indentation
+      const openingBlock = codeBlockStack[codeBlockStack.length - 1];
+
+      if (line.trim().length > 0) {
+        // For non-empty lines
+        const trimmedLine = line.trimStart();
+
+        // If we're in a list context, maintain proper indentation
+        if (openingBlock.listIndent) {
+          // For code blocks in lists, we need to preserve the list indentation plus the code fence indentation
+          // The total indentation should be at least listIndent + some standard indentation (usually 4 spaces)
+          const codeIndent = openingBlock.indent.length > openingBlock.listIndent.length ?
+                             openingBlock.indent :
+                             openingBlock.listIndent + "    ";
+
+          result.push(`${codeIndent}${trimmedLine}`);
+        } else {
+          // Not in a list, use the opening fence indentation
+          result.push(`${openingBlock.indent}${trimmedLine}`);
+        }
+      } else {
+        // For empty lines, just keep them as is
+        result.push(line);
+      }
     } else {
-      // Not a code fence line, just add it as is
+      // Not in a code block, just add it as is
       result.push(line);
     }
   }
-
-  // If there are unclosed code blocks, we leave the text as is
-  // as it might be malformed markdown
 
   return result.join('\n');
 }
