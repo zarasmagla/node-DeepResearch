@@ -245,7 +245,11 @@ async function updateReferences(thisStep: AnswerAction, allURLs: Record<string, 
       if (!normalizedUrl) return null; // This causes the type error
 
       return {
-        exactQuote: ref?.exactQuote || '',
+        exactQuote: (ref?.exactQuote ||
+          allURLs[normalizedUrl]?.description ||
+          allURLs[normalizedUrl]?.title || '')
+          .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+          .replace(/\s+/g, ' '),
         title: allURLs[normalizedUrl]?.title || '',
         url: normalizedUrl,
         dateTime: ref?.dateTime || ''
