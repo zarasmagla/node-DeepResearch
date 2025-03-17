@@ -21,7 +21,6 @@ export function readUrl(url: string, withAllLinks?: boolean, tracker?: TokenTrac
       'Content-Type': 'application/json',
       'X-Retain-Images': 'none',
       'X-Md-Link-Style': 'discarded',
-      'X-Timeout': '20'
     };
     if (withAllLinks) {
       headers['X-With-Links-Summary'] = 'all'
