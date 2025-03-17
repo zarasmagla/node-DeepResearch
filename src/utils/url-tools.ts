@@ -466,7 +466,9 @@ export async function processURLs(
           (error?.name === 'ParamValidationError' && error.message?.includes('Domain')) ||
           (error?.name === 'AssertionFailureError' && error.message?.includes('resolve host name')) ||
           error?.message?.includes("Couldn't resolve host name") ||
-          error?.message?.includes("could not be resolved")
+          error?.message?.includes("could not be resolved") ||
+          error?.message?.includes("ERR_CERT_COMMON_NAME_INVALID") ||
+          error?.message?.includes("ERR_CONNECTION_REFUSED")
         ) {
           let hostname = '';
           try {
