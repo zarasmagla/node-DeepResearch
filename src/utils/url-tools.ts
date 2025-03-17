@@ -24,6 +24,9 @@ export function normalizeUrl(urlString: string, debug = false, options = {
     }
 
     const url = new URL(urlString);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new Error('Unsupported protocol');
+    }
 
     url.hostname = url.hostname.toLowerCase();
     if (url.hostname.startsWith('www.')) {
