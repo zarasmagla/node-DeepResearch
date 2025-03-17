@@ -19,6 +19,10 @@ export function normalizeUrl(urlString: string, debug = false, options = {
       throw new Error('Empty URL');
     }
 
+    if (urlString.startsWith('https://google.com') || urlString.startsWith('https://www.google.com')) {
+      throw new Error('Google search link');
+    }
+
     const url = new URL(urlString);
 
     url.hostname = url.hostname.toLowerCase();
