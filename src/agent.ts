@@ -282,28 +282,16 @@ async function executeSearchQueries(
     const oldQuery = query.q;
 
     try {
-      let siteQuery = query.q;
-
-      const topHosts = Object.entries(countUrlParts(
-        Object.entries(allURLs).map(([, result]) => result)
-      ).hostnameCount).sort((a, b) => b[1] - a[1]);
-
-      if (topHosts.length > 0 && Math.random() < 0.2 && !query.q.includes('site:')) {
-        // explore-exploit
-        siteQuery = query.q + ' site:' + sampleMultinomial(topHosts);
-        query.q = siteQuery;
-      }
-
       console.log('Search query:', query);
       switch (SEARCH_PROVIDER) {
         case 'jina':
-          results = (await search(siteQuery, context.tokenTracker)).response?.data || [];
+          results = (await search(query.q, context.tokenTracker)).response?.data || [];
           break;
         case 'duck':
-          results = (await duckSearch(siteQuery, {safeSearch: SafeSearchType.STRICT})).results;
+          results = (await duckSearch(query.q, {safeSearch: SafeSearchType.STRICT})).results;
           break;
         case 'brave':
-          results = (await braveSearch(siteQuery)).response.web?.results || [];
+          results = (await braveSearch(query.q)).response.web?.results || [];
           break;
         case 'serper':
           results = (await serperSearch(query)).response.organic || [];
