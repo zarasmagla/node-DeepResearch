@@ -19,11 +19,6 @@ export function normalizeUrl(urlString: string, debug = false, options = {
       throw new Error('Empty URL');
     }
 
-
-    if (!/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(urlString)) {
-      urlString = 'https://' + urlString;
-    }
-
     const url = new URL(urlString);
 
     url.hostname = url.hostname.toLowerCase();
