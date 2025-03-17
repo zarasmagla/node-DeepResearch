@@ -403,6 +403,7 @@ export async function getResponse(question?: string,
 
   const allURLs: Record<string, SearchSnippet> = {};
   const visitedURLs: string[] = [];
+  const badURLs: string[] = [];
   const evaluationMetrics: Record<string, EvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
   const regularBudget = tokenBudget * 0.9;
@@ -515,14 +516,13 @@ export async function getResponse(question?: string,
           allKnowledge,
           allURLs,
           visitedURLs,
+          badURLs,
           SchemaGen,
           currentQuestion
         );
 
-        // is this really required???
-        // if (!evaluationMetrics[currentQuestion].includes('attribution')) {
-        //   evaluationMetrics[currentQuestion].push('attribution')
-        // }
+        // remove references whose urls are in badURLs
+        thisStep.references = thisStep.references.filter(ref => !badURLs.includes(ref.url));
       }
 
       updateContext({
@@ -764,6 +764,7 @@ You decided to think out of the box or cut from a completely different angle.
           allKnowledge,
           allURLs,
           visitedURLs,
+          badURLs,
           SchemaGen,
           currentQuestion
         );
@@ -908,7 +909,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     result: thisStep,
     context,
     visitedURLs: returnedURLs,
-    readURLs: visitedURLs,
+    readURLs: visitedURLs.filter(url => !badURLs.includes(url)),
     allURLs: weightedURLs.map(r => r.url)
   };
 }

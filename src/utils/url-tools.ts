@@ -390,13 +390,16 @@ export async function processURLs(
   allKnowledge: KnowledgeItem[],
   allURLs: Record<string, SearchSnippet>,
   visitedURLs: string[],
+  badURLs: string[],
   schemaGen: Schemas,
   question: string
-): Promise<{ urlResults: any[], success: boolean }> {
+): Promise<{ urlResults: any[], success: boolean, badURLs: string[] }> {
   // Skip if no URLs to process
   if (urls.length === 0) {
-    return {urlResults: [], success: false};
+    return {urlResults: [], success: false, badURLs: []};
   }
+
+  const badHostnames: string[] = [];
 
   // Track the reading action
   const thisStep: VisitAction = {
@@ -455,12 +458,29 @@ export async function processURLs(
         });
 
         return {url, result: response};
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error reading URL:', url, error);
+        badURLs.push(url);
+        // Extract hostname from the URL
+        if (
+          (error?.name === 'ParamValidationError' && error.message?.includes('Domain')) ||
+          (error?.name === 'AssertionFailureError' && error.message?.includes('resolve host name')) ||
+          error?.message?.includes("Couldn't resolve host name") ||
+          error?.message?.includes("could not be resolved")
+        ) {
+          let hostname = '';
+          try {
+            hostname = extractUrlParts(url).hostname;
+          } catch (e) {
+            console.error('Error parsing URL for hostname:', url, e);
+          }
+          badHostnames.push(hostname);
+          console.log(`Added ${hostname} to bad hostnames list`);
+        }
         return null;
       } finally {
         // Only add valid URLs to visitedURLs list
-        if (url && typeof url === 'string') {
+        if (url) {
           visitedURLs.push(url);
         }
       }
@@ -470,8 +490,20 @@ export async function processURLs(
   // Filter out null results without changing the original array
   const validResults = urlResults.filter(Boolean);
 
+  // remove any URL with bad hostnames from allURLs
+  if (badHostnames.length > 0) {
+    Object.keys(allURLs).forEach(url => {
+        if (badHostnames.includes(extractUrlParts(url).hostname)) {
+          delete allURLs[url];
+          console.log(`Removed ${url} from allURLs`);
+        }
+      }
+    )
+  }
+
   return {
     urlResults: validResults,
-    success: validResults.length > 0
+    success: validResults.length > 0,
+    badURLs
   };
 }
