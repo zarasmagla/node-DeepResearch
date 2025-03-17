@@ -9,6 +9,10 @@ export function readUrl(url: string, withAllLinks?: boolean, tracker?: TokenTrac
       reject(new Error('URL cannot be empty'));
       return;
     }
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      reject(new Error('Invalid URL, only http and https URLs are supported'));
+      return;
+    }
 
     const data = JSON.stringify({url});
     const headers: Record<string, any> = {
@@ -87,7 +91,7 @@ export function readUrl(url: string, withAllLinks?: boolean, tracker?: TokenTrac
     });
 
     // Add timeout handling
-    req.setTimeout(30000, () => {
+    req.setTimeout(60000, () => {
       req.destroy();
       reject(new Error('Request timed out'));
     });
