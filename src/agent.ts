@@ -342,6 +342,9 @@ async function executeSearchQueries(
   }
 
   console.log(`Utility/Queries: ${utilityScore}/${searchedQueries.length}`);
+  if (searchedQueries.length > MAX_QUERIES_PER_STEP) {
+    console.log(`So many queries??? ${searchedQueries.map(q => `"${q}"`).join(', ')}`)
+  }
   return {
     newKnowledge,
     searchedQueries
