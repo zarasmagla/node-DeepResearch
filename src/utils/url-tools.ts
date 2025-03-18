@@ -213,13 +213,36 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
   const {hostnameCount, pathPrefixCount, totalUrls} = counts;
 
   if (question.trim().length > 0) {
-    // get from jina rerank
-    rerankDocuments(question, urlItems.map(item => smartMergeStrings(item.title, item.description)), trackers.tokenTracker)
+    // Step 1: Create a record to track unique content with their original indices
+    const uniqueContentMap: Record<string, number[]> = {};
+
+    urlItems.forEach((item, originalIndex) => {
+      const mergedContent = smartMergeStrings(item.title, item.description);
+
+      if (!uniqueContentMap[mergedContent]) {
+        uniqueContentMap[mergedContent] = [originalIndex];
+      } else {
+        uniqueContentMap[mergedContent].push(originalIndex);
+      }
+    });
+
+    // Step 2: Rerank only the unique contents
+    const uniqueContents = Object.keys(uniqueContentMap);
+    const uniqueIndicesMap = Object.values(uniqueContentMap);
+    console.log(`rerank URLs: ${urlItems.length}->${uniqueContents.length}`)
+    rerankDocuments(question, uniqueContents, trackers.tokenTracker)
       .then(({results}) => {
+        // Step 3: Map the scores back to all original items
         results.forEach(({index, relevance_score}) => {
-          (urlItems[index] as BoostedSearchSnippet).jinaRerankBoost = relevance_score * jinaRerankFactor;
+          const originalIndices = uniqueIndicesMap[index];
+          const boost = relevance_score * jinaRerankFactor;
+
+          // Apply the same boost to all items with identical content
+          originalIndices.forEach((originalIndex: number) => {
+            (urlItems[originalIndex] as BoostedSearchSnippet).jinaRerankBoost = boost;
+          });
         });
-      })
+      });
   }
 
 
