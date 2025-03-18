@@ -816,7 +816,7 @@ You decided to think out of the box or cut from a completely different angle.`);
       }
       allowRead = false;
     } else if (thisStep.action === 'coding' && thisStep.codingIssue) {
-      const sandbox = new CodeSandbox({allContext, visitedURLs, allURLs, allKnowledge}, context, SchemaGen);
+      const sandbox = new CodeSandbox({allContext, URLs: weightedURLs.slice(0, 20), allKnowledge}, context, SchemaGen);
       try {
         const result = await sandbox.solve(thisStep.codingIssue);
         allKnowledge.push({
