@@ -17,7 +17,7 @@ import {
   SearchResult,
   EvaluationType,
   BoostedSearchSnippet,
-  SearchSnippet, EvaluationResponse, Reference
+  SearchSnippet, EvaluationResponse, Reference, SERPQuery
 } from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
@@ -712,7 +712,7 @@ But then you realized you have asked them before. You decided to to think out of
       const qOnly = keywordsQueries.filter(q => q.q).map(q => q.q)
       // avoid exisitng searched queries
       const uniqQOnly = chooseK((await dedupQueries(qOnly, allKeywords, context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
-      keywordsQueries = keywordsQueries.filter(q => q.q).filter(q => uniqQOnly.includes(q.q));
+      keywordsQueries = uniqQOnly.map(q => keywordsQueries.find(kq => kq.q === q)) as SERPQuery[];
 
       let anyResult = false;
 
