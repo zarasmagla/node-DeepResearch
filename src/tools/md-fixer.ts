@@ -15,16 +15,17 @@ function getPrompt(mdContent: string, allKnowledge: KnowledgeItem[]): PromptPair
 Your task is to repair the provided markdown content while preserving its original content.
 
 <rules>
-1. Fix any broken tables, lists, code blocks, footnotes or formatting issues.
-2. Make sure code block are properly closed languages are correctly specified.
-3. Make sure nested lists are correctly indented, especially those code blocks in the nested structure.
-4. Use available knowledge to restore incomplete content
-5. Add missing references and citations based on provided knowledge, only when you are 100% sure. 
+1. Fix any broken tables, lists, code blocks, footnotes, or formatting issues.
+2. Make sure code blocks are properly closed and languages are correctly specified.
+3. Make sure nested lists are correctly indented, especially code blocks within the nested structure.
+4. Use available knowledge to restore incomplete content.
+5. Add missing references and citations based on provided knowledge, only when you are 100% sure.
 6. Repair misaligned and duplicated references and citations.
-7. Flatten deeply nested structure into natural language sections/paragraphs to make the content more readable.
-8. Pay attention to the original's content's ending, if you find very obvious incomplete/broken/interrupted ending, continue the content with a proper ending.
-9. Repair any �� symbols or other broken characters in the original content by decoding them to the correct content.
-10. Replace any obvious placeholders, Lorem Ipsum values such as "example.com" with the actual content derived from the knowledge.
+7. When using multiple references in a row, use [^1][^2][^3] format, do not use [^1,2,3] or [^1-3].
+8. Flatten deeply nested structure into natural language sections/paragraphs to make the content more readable.
+9. Pay attention to the original content's ending. If you find a very obvious incomplete/broken/interrupted ending, continue the content with a proper ending.
+10. Repair any �� symbols or other broken characters in the original content by decoding them to the correct content.
+11. Replace any obvious placeholders or Lorem Ipsum values such as "example.com" with the actual content derived from the knowledge.
 </rules>
 
 The following knowledge items are provided for your reference. Note that some of them may not be directly related to the content user provided, but may give some subtle hints and insights:
