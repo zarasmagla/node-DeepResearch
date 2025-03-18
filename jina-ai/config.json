@@ -42,7 +42,7 @@
         "coder": { "maxTokens": 2000 },
         "searchGrounding": { },
         "dedup": { },
-        "evaluator": {"maxTokens": 500},
+        "evaluator": {"maxTokens": 2000, "model": "gemini-2.0-flash-lite"},
         "errorAnalyzer": {"maxTokens": 500},
         "queryRewriter": {"maxTokens": 2000},
         "agent": { },
