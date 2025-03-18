@@ -2,36 +2,13 @@ import {GenerateObjectResult} from 'ai';
 import {AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, PromptPair, TrackerContext} from '../types';
 import {ObjectGeneratorSafe} from "../utils/safe-generator";
 import {Schemas} from "../utils/schemas";
-import {removeExtraLineBreaks} from "../utils/text-tools";
+import {getKnowledgeStr} from "../utils/text-tools";
 
 const TOOL_NAME = 'evaluator';
 
 
 function getRejectAllAnswersPrompt(question: string, answer: AnswerAction, allKnowledge: KnowledgeItem[]): PromptPair {
-  const KnowledgeStr = allKnowledge.map((k, idx) => {
-    const aMsg = `
-<knowledge-${idx+1}>
-${k.question}
-
-${k.updated && (k.type === 'url' || k.type === 'side-info') ? `
-<knowledge-datetime>
-${k.updated}
-</knowledge-datetime>
-` : ''}
-
-${k.references && k.type === 'url' ? `
-<knowledge-url>
-${k.references[0]}
-</knowledge-url>
-` : ''}
-
-
-${k.answer}
-</knowledge-${idx+1}>
-      `.trim();
-
-    return removeExtraLineBreaks(aMsg);
-  })
+  const KnowledgeStr = getKnowledgeStr(allKnowledge);
 
   return {
     system: `

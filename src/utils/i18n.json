@@ -4,77 +4,88 @@
     "search_for": "Let me search for ${keywords} to gather more information.",
     "read_for": "Let me read ${urls} to gather more information.",
     "read_for_verify": "Let me fetch the source content to verify the answer.",
-    "late_chunk": "Content of ${url} is too long, let me cherry-pick the relevant parts."
+    "late_chunk": "Content of ${url} is too long, let me cherry-pick the relevant parts.",
+    "final_answer": "Let me finalize the answer."
   },
   "zh-CN": {
     "eval_first": "等等，让我先自己评估一下答案。",
     "search_for": "让我搜索${keywords}来获取更多信息。",
     "read_for": "让我读取网页 ${urls} 来获取更多信息。",
     "read_for_verify": "让我读取源网页内容来验证答案。",
-    "late_chunk": "网页 ${url} 内容太长，我正在筛选精华部分。"
+    "late_chunk": "网页 ${url} 内容太长，我正在筛选精华部分。",
+    "final_answer": "我来整理一下答案。"
   },
   "zh-TW": {
     "eval_first": "等等，讓我先評估一下答案。",
     "search_for": "讓我搜索${keywords}來獲取更多信息。",
     "read_for": "讓我閱讀 ${urls} 來獲取更多信息。",
     "read_for_verify": "讓我獲取源內容來驗證答案。",
-    "late_chunk": "網頁 ${url} 內容太長，我正在挑選相關部分。"
+    "late_chunk": "網頁 ${url} 內容太長，我正在挑選相關部分。",
+    "final_answer": "我來整理一下答案。"
   },
   "ja": {
     "eval_first": "ちょっと待って、まず答えを評価します。",
     "search_for": "キーワード${keywords}で検索して、情報を集めます。",
     "read_for": "${urls} を読んで、情報を集めます。",
     "read_for_verify": "答えを確認するために、ソースコンテンツを取得します。",
-    "late_chunk": "${url} のコンテンツが長すぎるため、関連部分を選択します。"
+    "late_chunk": "${url} のコンテンツが長すぎるため、関連部分を選択します。",
+    "final_answer": "答えをまとめます。"
   },
   "ko": {
     "eval_first": "잠시만요, 먼저 답변을 평가해 보겠습니다.",
     "search_for": "키워드 ${keywords}로 검색하여 더 많은 정보를 수집하겠습니다.",
     "read_for": "${urls} 을 읽어 더 많은 정보를 수집하겠습니다.",
     "read_for_verify": "답변을 확인하기 위해 소스 콘텐츠를 가져오겠습니다.",
-    "late_chunk": "${url} 의 콘텐츠가 너무 길어, 관련 부분을 선택하겠습니다."
+    "late_chunk": "${url} 의 콘텐츠가 너무 길어, 관련 부분을 선택하겠습니다.",
+    "final_answer": "답변을 마무리하겠습니다."
   },
   "fr": {
     "eval_first": "Un instant, je vais d'abord évaluer la réponse.",
     "search_for": "Je vais rechercher ${keywords} pour obtenir plus d'informations.",
     "read_for": "Je vais lire ${urls} pour obtenir plus d'informations.",
     "read_for_verify": "Je vais récupérer le contenu source pour vérifier la réponse.",
-    "late_chunk": "Le contenu de ${url} est trop long, je vais sélectionner les parties pertinentes."
+    "late_chunk": "Le contenu de ${url} est trop long, je vais sélectionner les parties pertinentes.",
+    "final_answer": "Je vais finaliser la réponse."
   },
   "de": {
     "eval_first": "Einen Moment, ich werde die Antwort zuerst evaluieren.",
     "search_for": "Ich werde nach ${keywords} suchen, um weitere Informationen zu sammeln.",
     "read_for": "Ich werde ${urls} lesen, um weitere Informationen zu sammeln.",
     "read_for_verify": "Ich werde den Quellinhalt abrufen, um die Antwort zu überprüfen.",
-    "late_chunk": "Der Inhalt von ${url} ist zu lang, ich werde die relevanten Teile auswählen."
+    "late_chunk": "Der Inhalt von ${url} ist zu lang, ich werde die relevanten Teile auswählen.",
+    "final_answer": "Ich werde die Antwort abschließen."
   },
   "es": {
     "eval_first": "Un momento, voy a evaluar la respuesta primero.",
     "search_for": "Voy a buscar ${keywords} para recopilar más información.",
     "read_for": "Voy a leer ${urls} para recopilar más información.",
     "read_for_verify": "Voy a obtener el contenido fuente para verificar la respuesta.",
-    "late_chunk": "El contenido de ${url} es demasiado largo, voy a seleccionar las partes relevantes."
+    "late_chunk": "El contenido de ${url} es demasiado largo, voy a seleccionar las partes relevantes.",
+    "final_answer": "Voy a finalizar la respuesta."
   },
   "it": {
     "eval_first": "Un attimo, valuterò prima la risposta.",
     "search_for": "Cercherò ${keywords} per raccogliere ulteriori informazioni.",
     "read_for": "Leggerò ${urls} per raccogliere ulteriori informazioni.",
     "read_for_verify": "Recupererò il contenuto sorgente per verificare la risposta.",
-    "late_chunk": "Il contenuto di ${url} è troppo lungo, selezionerò le parti rilevanti."
+    "late_chunk": "Il contenuto di ${url} è troppo lungo, selezionerò le parti rilevanti.",
+    "final_answer": "Finalizzerò la risposta."
   },
   "pt": {
     "eval_first": "Um momento, vou avaliar a resposta primeiro.",
     "search_for": "Vou pesquisar ${keywords} para reunir mais informações.",
     "read_for": "Vou ler ${urls} para reunir mais informações.",
     "read_for_verify": "Vou buscar o conteúdo da fonte para verificar a resposta.",
-    "late_chunk": "O conteúdo de ${url} é muito longo, vou selecionar as partes relevantes."
+    "late_chunk": "O conteúdo de ${url} é muito longo, vou selecionar as partes relevantes.",
+    "final_answer": "Vou finalizar a resposta."
   },
   "ru": {
     "eval_first": "Подождите, я сначала оценю ответ.",
     "search_for": "Дайте мне поискать ${keywords} для сбора дополнительной информации.",
     "read_for": "Дайте мне прочитать ${urls} для сбора дополнительной информации.",
     "read_for_verify": "Дайте мне получить исходный контент для проверки ответа.",
-    "late_chunk": "Содержимое ${url} слишком длинное, я выберу только значимые части."
+    "late_chunk": "Содержимое ${url} слишком длинное, я выберу только значимые части.",
+    "final_answer": "Дайте мне завершить ответ."
   },
   "ar": {
     "eval_first": "لكن انتظر، دعني أقوم بتقييم الإجابة أولاً.",
@@ -88,13 +99,15 @@
     "search_for": "Ik zal zoeken naar ${keywords} om meer informatie te verzamelen.",
     "read_for": "Ik zal ${urls} lezen om meer informatie te verzamelen.",
     "read_for_verify": "Ik zal de broninhoud ophalen om het antwoord te verifiëren.",
-    "late_chunk": "De inhoud van ${url} is te lang, ik zal de relevante delen selecteren."
+    "late_chunk": "De inhoud van ${url} is te lang, ik zal de relevante delen selecteren.",
+    "final_answer": "Ik zal het antwoord afronden."
   },
   "zh": {
     "eval_first": "等等，让我先评估一下答案。",
     "search_for": "让我搜索${keywords}来获取更多信息。",
     "read_for": "让我阅读 ${urls} 来获取更多信息。",
     "read_for_verify": "让我获取源内容来验证答案。",
-    "late_chunk": "网页 ${url} 内容太长，我正在筛选精华部分。"
+    "late_chunk": "网页 ${url} 内容太长，我正在筛选精华部分。",
+    "final_answer": "我来整理一下答案。"
   }
 }

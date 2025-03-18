@@ -1,4 +1,4 @@
-import {AnswerAction} from "../types";
+import {AnswerAction, KnowledgeItem} from "../types";
 import i18nJSON from './i18n.json';
 
 export function buildMdFromAnswer(answer: AnswerAction) {
@@ -261,7 +261,7 @@ export function fixCodeBlockIndentation(markdownText: string): string {
           }
         }
 
-        codeBlockStack.push({ indent, language: restOfLine, listIndent });
+        codeBlockStack.push({indent, language: restOfLine, listIndent});
         result.push(line);
       } else {
         // This is a closing code fence
@@ -288,8 +288,8 @@ export function fixCodeBlockIndentation(markdownText: string): string {
           // For code blocks in lists, we need to preserve the list indentation plus the code fence indentation
           // The total indentation should be at least listIndent + some standard indentation (usually 4 spaces)
           const codeIndent = openingBlock.indent.length > openingBlock.listIndent.length ?
-                             openingBlock.indent :
-                             openingBlock.listIndent + "    ";
+            openingBlock.indent :
+            openingBlock.listIndent + "    ";
 
           result.push(`${codeIndent}${trimmedLine}`);
         } else {
@@ -307,5 +307,32 @@ export function fixCodeBlockIndentation(markdownText: string): string {
   }
 
   return result.join('\n');
+}
+
+export function getKnowledgeStr(allKnowledge: KnowledgeItem[]) {
+  return allKnowledge.map((k, idx) => {
+    const aMsg = `
+<knowledge-${idx + 1}>
+${k.question}
+
+${k.updated && (k.type === 'url' || k.type === 'side-info') ? `
+<knowledge-datetime>
+${k.updated}
+</knowledge-datetime>
+` : ''}
+
+${k.references && k.type === 'url' ? `
+<knowledge-url>
+${k.references[0]}
+</knowledge-url>
+` : ''}
+
+
+${k.answer}
+</knowledge-${idx + 1}>
+      `.trim();
+
+    return removeExtraLineBreaks(aMsg);
+  })
 }
 

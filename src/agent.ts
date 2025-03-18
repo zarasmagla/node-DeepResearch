@@ -41,6 +41,7 @@ import {
 } from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 import {formatDateBasedOnType, formatDateRange} from "./utils/date-tools";
+import {fixMarkdown} from "./tools/md-fixer";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -906,7 +907,13 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
   }
 
-  (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(buildMdFromAnswer((thisStep as AnswerAction)));
+  (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(await fixMarkdown(
+      buildMdFromAnswer((thisStep as AnswerAction)),
+      allKnowledge,
+      context,
+      SchemaGen
+    )
+  );
   console.log(thisStep)
 
   await storeContext(system, schema, {
