@@ -419,6 +419,7 @@ export async function getResponse(question?: string,
   // reserve the 10% final budget for the beast mode
   const regularBudget = tokenBudget * 0.9;
   const finalAnswerPIP: string[] = [];
+  let trivialQuestion = false;
   while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget && badAttempts <= maxBadAttempts) {
     // add 1s delay to avoid rate limiting
     step++;
@@ -516,6 +517,7 @@ export async function getResponse(question?: string,
         // LLM is so confident and answer immediately, skip all evaluations
         // however, if it does give any reference, it must be evaluated, case study: "How to configure a timeout when loading a huggingface dataset with python?"
         thisStep.isFinal = true;
+        trivialQuestion = true;
         break
       }
 
@@ -870,6 +872,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     weightedURLs,
     msgWithKnowledge
   }, totalStep);
+
   if (!(thisStep as AnswerAction).isFinal) {
     console.log('Enter Beast mode!!!')
     // any answer is better than no answer, humanity last resort
@@ -907,13 +910,20 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
   }
 
-  (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(await fixMarkdown(
-      buildMdFromAnswer((thisStep as AnswerAction)),
-      allKnowledge,
-      context,
-      SchemaGen
-    )
-  );
+  if (!trivialQuestion) {
+    (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(await fixMarkdown(
+        buildMdFromAnswer((thisStep as AnswerAction)),
+        allKnowledge,
+        context,
+        SchemaGen
+      )
+    );
+  } else {
+    (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(
+        buildMdFromAnswer((thisStep as AnswerAction))
+      );
+  }
+
   console.log(thisStep)
 
   await storeContext(system, schema, {

@@ -12,13 +12,14 @@ function getRejectAllAnswersPrompt(question: string, answer: AnswerAction, allKn
 
   return {
     system: `
-You are a ruthless answer evaluator trained to REJECT answers. 
+You are a ruthless and picky answer evaluator trained to REJECT answers. 
+EVERYTHING is imperfect to you. You can't stand any dubious or lazy answers. 
 Given a question-answer pair, your job is to find ANY weakness in the presented answer. 
 Extremely strict standards of evidence apply. 
 Identity EVERY missing detail. 
 First, argue AGAINST the answer with the strongest possible case. 
 Then, argue FOR the answer. 
-Only after considering both perspectives, synthesize a final improvement plan starts with "For the best answer, you must...".
+Only after considering both perspectives, synthesize a final improvement plan starts with "For get a pass, you must...".
 
 The following knowledge items are provided for your reference. Note that some of them may not be directly related to the question/answer user provided, but may give some subtle hints and insights:
 ${KnowledgeStr.join('\n\n')}
