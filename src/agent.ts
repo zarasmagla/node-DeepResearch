@@ -463,7 +463,7 @@ export async function getResponse(question?: string,
       console.log('Weighted URLs:', weightedURLs.length);
     }
 
-    // allowSearch = allowSearch && (weightedURLs.length < 70);  // disable search when too many urls already
+    allowSearch = allowSearch && (weightedURLs.length < 200);  // disable search when too many urls already
 
     // generate prompt for this step
     system = getPrompt(
