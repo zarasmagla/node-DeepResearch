@@ -712,7 +712,11 @@ But then you realized you have asked them before. You decided to to think out of
       const qOnly = keywordsQueries.filter(q => q.q).map(q => q.q)
       // avoid exisitng searched queries
       const uniqQOnly = chooseK((await dedupQueries(qOnly, allKeywords, context.tokenTracker)).unique_queries, MAX_QUERIES_PER_STEP);
-      keywordsQueries = uniqQOnly.map(q => keywordsQueries.find(kq => kq.q === q)) as SERPQuery[];
+      keywordsQueries = keywordsQueries = uniqQOnly.map(q => {
+        const matches = keywordsQueries.filter(kq => kq.q === q);
+        // if there are multiple matches, keep the original query as the wider search
+        return matches.length > 1 ? {q} : matches[0];
+      }) as SERPQuery[];
 
       let anyResult = false;
 
