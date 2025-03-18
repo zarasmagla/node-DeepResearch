@@ -275,14 +275,16 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
 
 export const addToAllURLs = (r: SearchSnippet, allURLs: Record<string, SearchSnippet>, weightDelta = 1) => {
   const nURL = normalizeUrl(r.url);
-  if (!nURL) return;
+  if (!nURL) return 0;
   if (!allURLs[nURL]) {
     allURLs[nURL] = r;
     allURLs[nURL].weight = weightDelta;
+    return 1;
   } else {
     (allURLs[nURL].weight as number) += weightDelta;
     const curDesc = allURLs[nURL].description;
     allURLs[nURL].description = smartMergeStrings(curDesc, r.description);
+    return 0;
   }
 }
 

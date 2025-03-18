@@ -36,11 +36,19 @@ Whether you like this implementation or not, I highly recommend you to read Deep
 - [中文微信公众号 第一讲](https://mp.weixin.qq.com/s/-pPhHDi2nz8hp5R3Lm_mww), [第二讲](https://mp.weixin.qq.com/s/apnorBj4TZs3-Mo23xUReQ)
 - [日本語: DeepSearch/DeepResearch 実装の実践ガイド](https://jina.ai/ja/news/a-practical-guide-to-implementing-deepsearch-deepresearch)
 
-## Test it Yourself
+## Try it Yourself
 
 We host an online deployment of this **exact** codebase, which allows you to do a vibe-check; or use it as daily productivity tools.
 
 https://search.jina.ai
+
+The official API is also available for you to use:
+
+```
+https://deepsearch.jina.ai/v1/chat/completions
+```
+
+Learn more about the API at https://jina.ai/deepsearch
 
 
 
@@ -323,31 +331,3 @@ flowchart TD
 
     BeastMode --> FinalAnswer[Generate final answer] --> End
 ```
-
-## Evaluation
-
-I kept the evaluation simple, LLM-as-a-judge and collect some [ego questions](./src/evals/ego-questions.json) for evaluation. These are the questions about Jina AI that I know 100% the answer but LLMs do not.
-
-I mainly look at 3 things: total steps, total tokens, and the correctness of the final answer.
-
-```bash
-npm run eval ./src/evals/questions.json
-```
-
-Here's the table comparing plain `gemini-2.0-flash` and `gemini-2.0-flash + node-deepresearch` on the ego set.
-
-Plain `gemini-2.0-flash` can be run by setting `tokenBudget` to zero, skipping the while-loop and directly answering the question. 
-
-It should not be surprised that plain `gemini-2.0-flash` has a 0% pass rate, as I intentionally filtered out the questions that LLMs can answer.
-
-| Metric | gemini-2.0-flash | #188f1bb |
-|--------|------------------|----------|
-| Pass Rate | 0% | 75%      |
-| Average Steps | 1 | 4        |
-| Maximum Steps | 1 | 13       |
-| Minimum Steps | 1 | 2        |
-| Median Steps | 1 | 3        |
-| Average Tokens | 428 | 68,574   |
-| Median Tokens | 434 | 31,541   |
-| Maximum Tokens | 463 | 363,655  |
-| Minimum Tokens | 374 | 7,963    |

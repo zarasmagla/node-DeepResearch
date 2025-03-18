@@ -279,7 +279,7 @@ async function executeSearchQueries(
   const newKnowledge: KnowledgeItem[] = [];
   const searchedQueries: string[] = [];
   context.actionTracker.trackThink('search_for', SchemaGen.languageCode, {keywords: uniqQOnly.join(', ')});
-
+  let utilityScore = 0;
   for (const query of keywordsQueries) {
     let results: SearchResult[] = [];
     const oldQuery = query.q;
@@ -328,7 +328,7 @@ async function executeSearchQueries(
       .filter(Boolean) as SearchSnippet[]; // Filter out null entries and assert type
 
     minResults.forEach(r => {
-      addToAllURLs(r, allURLs);
+      utilityScore = utilityScore + addToAllURLs(r, allURLs);
     });
 
     searchedQueries.push(query.q)
@@ -340,6 +340,8 @@ async function executeSearchQueries(
       updated: query.tbs ? formatDateRange(query) : undefined
     });
   }
+
+  console.log(`Utility/Queries: ${utilityScore}/${searchedQueries.length}`);
   return {
     newKnowledge,
     searchedQueries
