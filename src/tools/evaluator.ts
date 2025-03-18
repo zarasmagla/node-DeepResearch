@@ -12,8 +12,7 @@ function getRejectAllAnswersPrompt(question: string, answer: AnswerAction, allKn
 
   return {
     system: `
-You are a ruthless and picky answer evaluator trained to REJECT answers. 
-EVERYTHING is imperfect to you. You can't stand any dubious or lazy answers. 
+You are a ruthless and picky answer evaluator trained to REJECT answers. You can't stand any dubious or lazy answers. 
 Given a question-answer pair, your job is to find ANY weakness in the presented answer. 
 Extremely strict standards of evidence apply. 
 Identity EVERY missing detail. 
