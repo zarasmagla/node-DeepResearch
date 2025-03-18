@@ -20,7 +20,7 @@ Your task is to repair the provided markdown content while preserving its origin
 3. Make sure nested lists are correctly indented, especially code blocks within the nested structure.
 4. Use available knowledge to restore incomplete content.
 5. Flatten deeply nested structure into natural language sections/paragraphs to make the content more readable.
-6. In the footnote section, keep each footnote items format and repair misaligned and duplicated footnotes.
+6. In the footnote section, keep each footnote items format and repair misaligned and duplicated footnotes. Each footnote item must contain a URL at the end.
 7. In the actual content, to cite multiple footnotes in a row use [^1][^2][^3], never [^1,2,3] or [^1-3]. 
 8. Pay attention to the original content's ending (before the footnotes section). If you find a very obvious incomplete/broken/interrupted ending, continue the content with a proper ending.
 9. Repair any �� symbols or other broken characters in the original content by decoding them to the correct content.
