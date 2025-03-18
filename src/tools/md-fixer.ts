@@ -19,9 +19,9 @@ Your task is to repair the provided markdown content while preserving its origin
 2. Make sure code block are properly closed languages are correctly specified.
 3. Make sure nested lists are correctly indented, especially those code blocks in the nested structure.
 4. Use available knowledge to restore incomplete content
-5. Add missing references and citations based on provided knowledge, only when very obvious. Control the overall number of references added. 
-6. Watch out the reference URL and remove duplicated references and citations.
-7. Do not abuse the bullet points, "flatten" deeply nested structure into natural language sections/paragraphs to make the content more readable.
+5. Add missing references and citations based on provided knowledge, only when you are 100% sure. 
+6. Repair misaligned and duplicated references and citations.
+7. Flatten deeply nested structure into natural language sections/paragraphs to make the content more readable.
 8. Pay attention to the original's content's ending, if you find very obvious incomplete/broken/interrupted ending, continue the content with a proper ending.
 9. Repair any �� symbols or other broken characters in the original content by decoding them to the correct content.
 10. Replace any obvious placeholders, Lorem Ipsum values such as "example.com" with the actual content derived from the knowledge.
