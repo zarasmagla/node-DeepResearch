@@ -140,9 +140,9 @@ export function normalizeUrl(urlString: string, debug = false, options = {
   }
 }
 
-export function filterURLs(allURLs: Record<string, SearchSnippet>, visitedURLs: string[]): SearchSnippet[] {
+export function filterURLs(allURLs: Record<string, SearchSnippet>, visitedURLs: string[], badHostnames: string[]): SearchSnippet[] {
   return Object.entries(allURLs)
-    .filter(([url,]) => !visitedURLs.includes(url))
+    .filter(([url,]) => !visitedURLs.includes(url) && !badHostnames.includes(extractUrlParts(url).hostname))
     .map(([, result]) => result);
 }
 
@@ -205,6 +205,7 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
     minBoost = 0,               // Minimum boost score
     maxBoost = 5,                // Maximum boost score cap
     question = '',              // Optional question for Jina reranking
+    boostHostnames = [],        // Optional hostnames to boost
   } = options;
 
   // Count URL parts first
@@ -235,7 +236,7 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
 
     // Hostname boost (normalized by total URLs)
     const hostnameFreq = normalizeCount(hostnameCount[hostname] || 0, totalUrls);
-    const hostnameBoost = hostnameFreq * hostnameBoostFactor;
+    const hostnameBoost = hostnameFreq * hostnameBoostFactor * (boostHostnames.includes(hostname) ? 2 : 1);
 
     // Path boost (consider all path prefixes with decay for longer paths)
     let pathBoost = 0;

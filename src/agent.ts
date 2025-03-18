@@ -354,6 +354,8 @@ export async function getResponse(question?: string,
                                   messages?: Array<CoreMessage>,
                                   numReturnedURLs: number = 100,
                                   noDirectAnswer: boolean = false,
+                                  boostHostnames: string[] = [],
+                                  badHostnames: string[] = [],
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
   let step = 0;
@@ -446,9 +448,10 @@ export async function getResponse(question?: string,
     if (allURLs && Object.keys(allURLs).length > 0) {
       // rerank urls
       weightedURLs = rankURLs(
-        filterURLs(allURLs, visitedURLs),
+        filterURLs(allURLs, visitedURLs, badHostnames),
         {
-          question: currentQuestion
+          question: currentQuestion,
+          boostHostnames
         }, context);
       // improve diversity by keep top 2 urls of each hostname
       weightedURLs = keepKPerHostname(weightedURLs, 2);

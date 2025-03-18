@@ -217,6 +217,9 @@ export interface ChatCompletionRequest {
   response_format?: ResponseFormat;
   no_direct_answer?: boolean;
   max_returned_urls?: number;
+
+  boostHostnames?: string[];
+  badHostnames?: string[];
 }
 
 export interface URLAnnotation {

@@ -548,7 +548,16 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       visitedURLs,
       readURLs,
       allURLs
-    } = await getResponse(undefined, tokenBudget, maxBadAttempts, context, body.messages, body.max_returned_urls, body.no_direct_answer)
+    } = await getResponse(undefined,
+      tokenBudget,
+      maxBadAttempts,
+      context,
+      body.messages,
+      body.max_returned_urls,
+      body.no_direct_answer,
+      body.boostHostnames,
+      body.badHostnames,
+      )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
 
     const annotations = (finalStep as AnswerAction).references?.map(ref => ({
