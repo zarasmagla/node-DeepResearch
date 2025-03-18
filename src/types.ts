@@ -218,8 +218,8 @@ export interface ChatCompletionRequest {
   no_direct_answer?: boolean;
   max_returned_urls?: number;
 
-  boostHostnames?: string[];
-  badHostnames?: string[];
+  boost_hostnames?: string[];
+  bad_hostnames?: string[];
 }
 
 export interface URLAnnotation {
