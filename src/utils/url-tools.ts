@@ -19,8 +19,12 @@ export function normalizeUrl(urlString: string, debug = false, options = {
       throw new Error('Empty URL');
     }
 
-    if (urlString.startsWith('https://google.com') || urlString.startsWith('https://www.google.com')) {
+    if (urlString.startsWith('https://google.com/') || urlString.startsWith('https://www.google.com')) {
       throw new Error('Google search link');
+    }
+
+    if (urlString.includes('example.com')) {
+      throw new Error('Example URL');
     }
 
     const url = new URL(urlString);
