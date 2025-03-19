@@ -15,6 +15,9 @@ export function repairMarkdownFootnotes(
   // Regex to catch grouped footnotes like [^1, ^2, ^3] or [^1,^2,^3]
   const groupedFootnoteRegex = /\[\^(\d+)(?:,\s*\^(\d+))+]/g;
 
+  // New regex to catch partially marked footnotes like [^10, 11]
+  const partialGroupedFootnoteRegex = /\[\^(\d+)(?:,\s*(\d+))+]/g;
+
   // Helper function to format references
   const formatReferences = (refs: Array<Reference>) => {
     return refs.map((ref, i) => {
@@ -34,6 +37,11 @@ export function repairMarkdownFootnotes(
   // First case: no references - remove any footnote citations
   if (!references?.length) {
     return markdownString
+      .replace(partialGroupedFootnoteRegex, (match) => {
+        // Extract all numbers from the partially marked grouped footnote
+        const numbers = match.match(/\d+/g) || [];
+        return numbers.map(num => `[^${num}]`).join(', ');
+      })
       .replace(groupedFootnoteRegex, (match) => {
         // Extract all numbers from the grouped footnote
         const numbers = match.match(/\d+/g) || [];
@@ -47,12 +55,16 @@ export function repairMarkdownFootnotes(
     .replace(/\[(\d+)\^]/g, (_, num) => `[^${num}]`)
     .replace(/\[(\d+)]/g, (_, num) => `[^${num}]`);
 
-  // Fix grouped footnotes
-  processedMarkdown = processedMarkdown.replace(groupedFootnoteRegex, (match) => {
-    // Extract all numbers from the grouped footnote
-    const numbers = match.match(/\d+/g) || [];
-    return numbers.map(num => `[^${num}]`).join(', ');
-  });
+  // Fix grouped footnotes - both fully marked and partially marked types
+  processedMarkdown = processedMarkdown
+    .replace(groupedFootnoteRegex, (match) => {
+      const numbers = match.match(/\d+/g) || [];
+      return numbers.map(num => `[^${num}]`).join(', ');
+    })
+    .replace(partialGroupedFootnoteRegex, (match) => {
+      const numbers = match.match(/\d+/g) || [];
+      return numbers.map(num => `[^${num}]`).join(', ');
+    });
 
   // Now extract all footnotes from the processed answer
   const footnotes: string[] = [];
