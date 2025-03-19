@@ -159,7 +159,7 @@ ${formatReferences(references)}
  * A variant of the function that only takes a markdown string
  * It extracts existing footnote definitions and uses them as references
  */
-export function repairMarkdownFootnotesSimple(markdownString: string): string {
+export function repairMarkdownFootnotesOuter(markdownString: string): string {
   // Remove outer code fence if it exists
   // First trim the string to handle any extra whitespace
   markdownString = markdownString.trim();
