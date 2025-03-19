@@ -6,16 +6,19 @@ import {Schemas} from "../utils/schemas";
 export async function cherryPick(question: string, longContext: string, options: any = {}, trackers: TrackerContext, schemaGen: Schemas, url: string) {
 
   const {
-    snippetLength = 3000,
+    snippetLength = 3000,  // char length of each snippet
     numSnippets = Math.max(2, Math.min(5, Math.floor(longContext.length / snippetLength))),
-    chunkSize = 300,
-    maxTokensPerRequest = 8192, // Maximum tokens per embedding request
-    // Rough estimate of tokens per character (can be adjusted based on your text)
-    tokensPerCharacter = 0.4
+    chunkSize = 300,  // char length of each chunk
   } = options;
+
+  const maxTokensPerRequest = 8192 // Maximum tokens per embedding request
+
+  // Rough estimate of tokens per character (can be adjusted based on your text)
+  const tokensPerCharacter = 0.4
 
   if (longContext.length < snippetLength * 2) {
     // If the context is shorter than the snippet length, return the whole context
+    console.log('content is too short, dont bother')
     return longContext;
   }
 
@@ -30,6 +33,10 @@ export async function cherryPick(question: string, longContext: string, options:
   trackers.actionTracker.trackThink('late_chunk', schemaGen.languageCode, {url});
 
   try {
+    if (question.trim().length === 0) {
+      throw new Error('Empty question, returning full context');
+    }
+
     // Estimate the number of tokens per chunk
     const estimatedTokensPerChunk = Math.ceil(chunkSize * tokensPerCharacter);
 
@@ -180,11 +187,11 @@ export async function cherryPick(question: string, longContext: string, options:
 
     // wrap with <snippet-index> tag
     return snippets.map((snippet, index) => `
-<snippet-${index+1}>
+<snippet-${index + 1}>
 
 ${snippet}
 
-</snippet-${index+1}>`.trim()).join("\n\n");
+</snippet-${index + 1}>`.trim()).join("\n\n");
 
   } catch (error) {
     console.error('Error in late chunking:', error);

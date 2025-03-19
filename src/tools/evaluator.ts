@@ -38,24 +38,6 @@ Could you please evaluate my answer based on your knowledge and strict standards
   }
 }
 
-function getAttributionPrompt(question: string, answer: string, allKnowledge: KnowledgeItem[]): PromptPair {
-  return {
-    system: `You are an evaluator that verifies if answer content is properly attributed to and supported by the provided context.`,
-    user: `
-<context>
-${JSON.stringify(allKnowledge)}
-</context>    
-<question>
-${question}
-</question>
-<answer>
-${answer}
-</answer>
-
-Please read and think.
-`
-  }
-}
 
 function getDefinitivePrompt(question: string, answer: string): PromptPair {
   return {
