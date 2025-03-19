@@ -617,7 +617,7 @@ ${currentQuestion}
 </question>
 
 <answer>
-${buildMdFromAnswer(thisStep)}
+${thisStep.answer}
 </answer>
 `,
               answer: `
