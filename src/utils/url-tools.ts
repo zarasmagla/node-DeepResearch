@@ -477,7 +477,6 @@ export async function processURLs(
         const isGoodContent = data.content.length > spamDetectLength || await classifyText(data.content);
         if (!isGoodContent) {
           console.error(`Blocked content ${data.content.length}:`, url, data.content.slice(0, spamDetectLength));
-          context.actionTracker.trackThink('blocked_content', schemaGen.languageCode, {url});
           throw new Error(`Blocked content ${url}`);
         }
 
