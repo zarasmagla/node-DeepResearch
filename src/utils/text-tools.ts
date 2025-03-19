@@ -1,32 +1,39 @@
-import {AnswerAction, KnowledgeItem} from "../types";
+import {AnswerAction, KnowledgeItem, Reference} from "../types";
 import i18nJSON from './i18n.json';
 
 export function buildMdFromAnswer(answer: AnswerAction) {
-  // Standard footnote regex - updated to handle [^1], [1^], and [1] formats
+  return repairMarkdownFootnotes(answer.answer, answer.references);
+}
+
+export function repairMarkdownFootnotes(
+  markdownString: string,
+  references?: Array<Reference>
+): string {
+  // Standard footnote regex - handles [^1], [1^], and [1] formats
   const footnoteRegex = /\[(\^(\d+)|(\d+)\^|(\d+))]/g;
 
-  // New regex to catch grouped footnotes like [^1, ^2, ^3] or [^1,^2,^3]
+  // Regex to catch grouped footnotes like [^1, ^2, ^3] or [^1,^2,^3]
   const groupedFootnoteRegex = /\[\^(\d+)(?:,\s*\^(\d+))+]/g;
 
   // Helper function to format references
-  const formatReferences = (refs: typeof answer.references) => {
+  const formatReferences = (refs: Array<Reference>) => {
     return refs.map((ref, i) => {
       const cleanQuote = ref.exactQuote
         .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-        .replace(/\s+/g, ' ');
+        .replace(/\s+/g, ' ').trim();
 
       const citation = `[^${i + 1}]: ${cleanQuote}`;
 
       if (!ref.url) return citation;
 
       const domainName = new URL(ref.url).hostname.replace('www.', '');
-      return `${citation} [${domainName}](${ref.url})`;
+      return `${citation} [${ref.title || domainName}](${ref.url})`;
     }).join('\n\n');
   };
 
   // First case: no references - remove any footnote citations
-  if (!answer.references?.length) {
-    return answer.answer
+  if (!references?.length) {
+    return markdownString
       .replace(groupedFootnoteRegex, (match) => {
         // Extract all numbers from the grouped footnote
         const numbers = match.match(/\d+/g) || [];
@@ -36,12 +43,12 @@ export function buildMdFromAnswer(answer: AnswerAction) {
   }
 
   // Normalize footnotes first (convert [1^] to [^1] format and [1] to [^1] format)
-  let processedAnswer = answer.answer
+  let processedMarkdown = markdownString
     .replace(/\[(\d+)\^]/g, (_, num) => `[^${num}]`)
     .replace(/\[(\d+)]/g, (_, num) => `[^${num}]`);
 
   // Fix grouped footnotes
-  processedAnswer = processedAnswer.replace(groupedFootnoteRegex, (match) => {
+  processedMarkdown = processedMarkdown.replace(groupedFootnoteRegex, (match) => {
     // Extract all numbers from the grouped footnote
     const numbers = match.match(/\d+/g) || [];
     return numbers.map(num => `[^${num}]`).join(', ');
@@ -51,89 +58,152 @@ export function buildMdFromAnswer(answer: AnswerAction) {
   const footnotes: string[] = [];
   let match;
   const standardFootnoteRegex = /\[\^(\d+)]/g; // Use standard format after normalization
-  while ((match = standardFootnoteRegex.exec(processedAnswer)) !== null) {
+  while ((match = standardFootnoteRegex.exec(processedMarkdown)) !== null) {
     footnotes.push(match[1]);
   }
 
   // Remove footnote markers that don't have corresponding references
-  let cleanedAnswer = processedAnswer;
+  let cleanedMarkdown = processedMarkdown;
   footnotes.forEach(footnote => {
     const footnoteNumber = parseInt(footnote);
-    if (footnoteNumber > answer.references.length) {
+    if (footnoteNumber > references.length) {
       const footnoteRegexExact = new RegExp(`\\[\\^${footnoteNumber}\\]`, 'g');
-      cleanedAnswer = cleanedAnswer.replace(footnoteRegexExact, '');
+      cleanedMarkdown = cleanedMarkdown.replace(footnoteRegexExact, '');
     }
   });
 
   // Get valid footnotes after cleaning
   const validFootnotes: string[] = [];
-  while ((match = standardFootnoteRegex.exec(cleanedAnswer)) !== null) {
+  while ((match = standardFootnoteRegex.exec(cleanedMarkdown)) !== null) {
     validFootnotes.push(match[1]);
   }
 
   // No footnotes in answer but we have references - append them at the end
   if (validFootnotes.length === 0) {
     const appendedCitations = Array.from(
-      {length: answer.references.length},
+      {length: references.length},
       (_, i) => `[^${i + 1}]`
     ).join('');
 
-    const references = formatReferences(answer.references);
+    const formattedReferences = formatReferences(references);
 
     return `
-${cleanedAnswer}
+${cleanedMarkdown}
 
 ⁜${appendedCitations}
 
-${references}
+${formattedReferences}
 `.trim();
   }
 
   // Check if correction is needed
   const needsCorrection =
-    (validFootnotes.length === answer.references.length && validFootnotes.every(n => n === validFootnotes[0])) ||
-    (validFootnotes.every(n => n === validFootnotes[0]) && parseInt(validFootnotes[0]) > answer.references.length) ||
-    (validFootnotes.length > 0 && validFootnotes.every(n => parseInt(n) > answer.references.length));
+    (validFootnotes.length === references.length && validFootnotes.every(n => n === validFootnotes[0])) ||
+    (validFootnotes.every(n => n === validFootnotes[0]) && parseInt(validFootnotes[0]) > references.length) ||
+    (validFootnotes.length > 0 && validFootnotes.every(n => parseInt(n) > references.length));
 
   // New case: we have more references than footnotes
-  if (answer.references.length > validFootnotes.length && !needsCorrection) {
+  if (references.length > validFootnotes.length && !needsCorrection) {
     // Get the used indices
     const usedIndices = new Set(validFootnotes.map(n => parseInt(n)));
 
     // Create citations for unused references
     const unusedReferences = Array.from(
-      {length: answer.references.length},
+      {length: references.length},
       (_, i) => !usedIndices.has(i + 1) ? `[^${i + 1}]` : ''
     ).join('');
 
     return `
-${cleanedAnswer} 
+${cleanedMarkdown} 
 
 ⁜${unusedReferences}
 
-${formatReferences(answer.references)}
+${formatReferences(references)}
 `.trim();
   }
 
   if (!needsCorrection) {
     return `
-${cleanedAnswer}
+${cleanedMarkdown}
 
-${formatReferences(answer.references)}
+${formatReferences(references)}
 `.trim();
   }
 
   // Apply correction: sequentially number the footnotes
   let currentIndex = 0;
-  const correctedAnswer = cleanedAnswer.replace(standardFootnoteRegex, () =>
+  const correctedMarkdown = cleanedMarkdown.replace(standardFootnoteRegex, () =>
     `[^${++currentIndex}]`
   );
 
   return `
-${correctedAnswer}
+${correctedMarkdown}
 
-${formatReferences(answer.references)}
+${formatReferences(references)}
 `.trim();
+}
+
+/**
+ * A variant of the function that only takes a markdown string
+ * It extracts existing footnote definitions and uses them as references
+ */
+export function repairMarkdownFootnotesSimple(markdownString: string): string {
+  // Extract existing footnote definitions
+  const footnoteDefRegex = /\[\^(\d+)]:\s*(.*?)(?=\n\[\^|$)/gs;
+  const references: Array<Reference> = [];
+
+  // Extract content part (without footnote definitions)
+  let contentPart = markdownString;
+  let footnotesPart = '';
+
+  // Try to find where footnote definitions start
+  const firstFootnoteMatch = markdownString.match(/\[\^(\d+)]:/);
+  if (firstFootnoteMatch) {
+    const footnoteStartIndex = firstFootnoteMatch.index;
+    if (footnoteStartIndex !== undefined) {
+      contentPart = markdownString.substring(0, footnoteStartIndex);
+      footnotesPart = markdownString.substring(footnoteStartIndex);
+    }
+  }
+
+  // Extract all footnote definitions
+  let match;
+  while ((match = footnoteDefRegex.exec(footnotesPart)) !== null) {
+    // The footnote content
+    let content = match[2].trim();
+
+    // Extract URL and title if present
+    // Looking for [domain.com](url) pattern at the end of the content
+    const urlMatch = content.match(/\s*\[([^\]]+)]\(([^)]+)\)\s*$/);
+
+    let url = '';
+    let title = '';
+
+    if (urlMatch) {
+      // Extract the domain name as title
+      title = urlMatch[1];
+      // Extract the URL
+      url = urlMatch[2];
+
+      // Remove the URL part from the content to get clean exactQuote
+      content = content.replace(urlMatch[0], '').trim();
+    }
+
+    // Add to references array
+    references.push({
+      exactQuote: content,
+      url,
+      title
+    });
+  }
+
+  // Only process if we found valid references
+  if (references.length > 0) {
+    return repairMarkdownFootnotes(contentPart, references);
+  }
+
+  // Otherwise, return original markdown unchanged
+  return markdownString;
 }
 
 export const removeExtraLineBreaks = (text: string) => {

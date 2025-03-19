@@ -37,7 +37,7 @@ import {
   buildMdFromAnswer,
   chooseK, fixCodeBlockIndentation,
   removeExtraLineBreaks,
-  removeHTMLtags
+  removeHTMLtags, repairMarkdownFootnotesSimple
 } from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 import {formatDateBasedOnType, formatDateRange} from "./utils/date-tools";
@@ -914,12 +914,13 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     (thisStep as AnswerAction).mdAnswer =
       fixBadURLMdLinks(
         fixCodeBlockIndentation(
-          await fixMarkdown(
-            buildMdFromAnswer((thisStep as AnswerAction)),
-            allKnowledge,
-            context,
-            SchemaGen
-          )
+          repairMarkdownFootnotesSimple(
+            await fixMarkdown(
+              buildMdFromAnswer((thisStep as AnswerAction)),
+              allKnowledge,
+              context,
+              SchemaGen
+            ))
         ),
         allURLs);
   } else {
