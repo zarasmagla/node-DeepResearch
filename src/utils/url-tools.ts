@@ -546,3 +546,48 @@ export async function processURLs(
     badURLs
   };
 }
+
+export function fixBadURLMdLinks(mdContent: string, allURLs: Record<string, SearchSnippet>): string {
+  // Regular expression to find markdown links with the pattern [url](url)
+  const mdLinkRegex = /\[([^\]]+)]\(([^)]+)\)/g;
+
+  // Replace each match with a prettier version
+  return mdContent.replace(mdLinkRegex, (match, text, url) => {
+    // Check if the text and URL are the same
+    if (text === url) {
+      // Look up the URL directly in the record using the url as key
+      const urlInfo = allURLs[url];
+
+      if (urlInfo) {
+        try {
+          // Extract hostname from the URL
+          const hostname = new URL(url).hostname;
+
+          // If title is available, use [title - hostname](url) format
+          if (urlInfo.title) {
+            return `[${urlInfo.title} - ${hostname}](${url})`;
+          }
+          // Otherwise use [hostname](url) format
+          else {
+            return `[${hostname}](${url})`;
+          }
+        } catch (e) {
+          // If URL parsing fails, return the original link
+          return match;
+        }
+      } else {
+        // If URL is not in allURLs, try to extract hostname
+        try {
+          const hostname = new URL(url).hostname;
+          return `[${hostname}](${url})`;
+        } catch (e) {
+          // If URL parsing fails, return the original link
+          return match;
+        }
+      }
+    } else {
+      // If the text and URL are not the same, leave the link as is
+      return match;
+    }
+  });
+}

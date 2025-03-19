@@ -31,7 +31,7 @@ import {
   rankURLs,
   filterURLs,
   normalizeUrl,
-  weightedURLToString, getLastModified, keepKPerHostname, processURLs
+  weightedURLToString, getLastModified, keepKPerHostname, processURLs, fixBadURLMdLinks
 } from "./utils/url-tools";
 import {
   buildMdFromAnswer,
@@ -911,13 +911,17 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   }
 
   if (!trivialQuestion) {
-    (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(await fixMarkdown(
-        buildMdFromAnswer((thisStep as AnswerAction)),
-        allKnowledge,
-        context,
-        SchemaGen
-      )
-    );
+    (thisStep as AnswerAction).mdAnswer =
+      fixBadURLMdLinks(
+        fixCodeBlockIndentation(
+          await fixMarkdown(
+            buildMdFromAnswer((thisStep as AnswerAction)),
+            allKnowledge,
+            context,
+            SchemaGen
+          )
+        ),
+        allURLs);
   } else {
     (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(
       buildMdFromAnswer((thisStep as AnswerAction))
