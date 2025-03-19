@@ -67,7 +67,9 @@ ${k.references[0]}
 </url>
 ` : ''}
 
+<answer>
 ${k.answer}
+</answer>
       `.trim();
     messages.push({role: 'assistant', content: removeExtraLineBreaks(aMsg)});
   });
