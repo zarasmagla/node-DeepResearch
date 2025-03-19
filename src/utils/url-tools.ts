@@ -5,6 +5,7 @@ import {readUrl} from "../tools/read";
 import {Schemas} from "./schemas";
 import {cherryPick} from "../tools/jina-latechunk";
 import {formatDateBasedOnType} from "./date-tools";
+import {classifyText} from "../tools/jina-classify-spam";
 
 export function normalizeUrl(urlString: string, debug = false, options = {
   removeAnchors: true,
@@ -430,10 +431,10 @@ export async function processURLs(
   badURLs: string[],
   schemaGen: Schemas,
   question: string
-): Promise<{ urlResults: any[], success: boolean, badURLs: string[] }> {
+): Promise<{ urlResults: any[], success: boolean }> {
   // Skip if no URLs to process
   if (urls.length === 0) {
-    return {urlResults: [], success: false, badURLs: []};
+    return {urlResults: [], success: false};
   }
 
   const badHostnames: string[] = [];
@@ -468,6 +469,16 @@ export async function processURLs(
         // Early return if no valid data
         if (!data?.url || !data?.content) {
           throw new Error('No content found');
+        }
+
+        // check if content is likely a blocked msg from paywall, bot detection, etc.
+        // only check for <5000 char length content as most blocking msg is short
+        const spamDetectLength = 1000;
+        const isGoodContent = data.content.length > spamDetectLength || await classifyText(data.content);
+        if (!isGoodContent) {
+          console.error(`Blocked content ${data.content.length}:`, url, data.content.slice(0, spamDetectLength));
+          context.actionTracker.trackThink('blocked_content', schemaGen.languageCode, {url});
+          throw new Error(`Blocked content ${url}`);
         }
 
         // Add to knowledge base
@@ -543,7 +554,6 @@ export async function processURLs(
   return {
     urlResults: validResults,
     success: validResults.length > 0,
-    badURLs
   };
 }
 
