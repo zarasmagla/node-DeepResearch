@@ -488,12 +488,12 @@ export async function processURLs(
 
         // check if content is likely a blocked msg from paywall, bot detection, etc.
         // only check for <5000 char length content as most blocking msg is short
-        // const spamDetectLength = 1000;
-        // const isGoodContent = data.content.length > spamDetectLength || await classifyText(data.content);
-        // if (!isGoodContent) {
-        //   console.error(`Blocked content ${data.content.length}:`, url, data.content.slice(0, spamDetectLength));
-        //   throw new Error(`Blocked content ${url}`);
-        // }
+        const spamDetectLength = 300;
+        const isGoodContent = data.content.length > spamDetectLength || await classifyText(data.content);
+        if (!isGoodContent) {
+          console.error(`Blocked content ${data.content.length}:`, url, data.content.slice(0, spamDetectLength));
+          throw new Error(`Blocked content ${url}`);
+        }
 
         // Add to knowledge base
         allKnowledge.push({
