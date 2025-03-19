@@ -160,6 +160,17 @@ ${formatReferences(references)}
  * It extracts existing footnote definitions and uses them as references
  */
 export function repairMarkdownFootnotesSimple(markdownString: string): string {
+  // Remove outer code fence if it exists
+  // First trim the string to handle any extra whitespace
+  markdownString = markdownString.trim();
+
+  // Check if the string starts with ```markdown and ends with ```
+  const codeBlockRegex = /^```markdown\n([\s\S]*)\n```$/;
+  const codeBlockMatch = markdownString.match(codeBlockRegex);
+  if (codeBlockMatch) {
+    markdownString = codeBlockMatch[1];
+  }
+
   // Extract existing footnote definitions
   const footnoteDefRegex = /\[\^(\d+)]:\s*(.*?)(?=\n\[\^|$)/gs;
   const references: Array<Reference> = [];
