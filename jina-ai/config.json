@@ -34,7 +34,7 @@
   "models": {
     "gemini": {
       "default": {
-        "model": "gemini-2.0-flash",
+        "model": "gemini-2.0-flash-lite",
         "temperature": 0.6,
         "maxTokens": 8000
       },
@@ -42,12 +42,12 @@
         "coder": { "maxTokens": 2000 },
         "searchGrounding": { },
         "dedup": { },
-        "evaluator": {"maxTokens": 2000, "model": "gemini-2.0-flash-lite"},
-        "errorAnalyzer": {"maxTokens": 500},
+        "evaluator": {"maxTokens": 2000 },
+        "errorAnalyzer": {"maxTokens": 1000, "model": "gemini-2.0-flash"},
         "queryRewriter": {"maxTokens": 2000},
-        "agent": { },
-        "agentBeastMode": { },
-        "fallback": {"maxTokens": 8000, "model": "gemini-2.0-flash-lite"}
+        "agent": {"model": "gemini-2.0-flash" },
+        "agentBeastMode": {},
+        "fallback": {"maxTokens": 8000}
       }
     },
     "openai": {
