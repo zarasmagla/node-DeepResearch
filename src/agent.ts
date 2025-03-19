@@ -226,7 +226,7 @@ ${actionSections.join('\n\n')}
 `);
 
   // Add footer
-  sections.push(`Think step by step, choose the action, and respond in valid JSON format matching exact JSON schema of that action.`);
+  sections.push(`Think step by step, choose the action, then respond by matching the schema of that action.`);
 
   return removeExtraLineBreaks(sections.join('\n\n'));
 }
@@ -408,7 +408,7 @@ export async function getResponse(question?: string,
   let allowReflect = true;
   let allowCoding = true;
   let system = '';
-  let maxStrictEvals = 2;
+  let maxStrictEvals = Math.max(1, Math.min(3, maxBadAttempts - 1));
   let msgWithKnowledge: CoreMessage[] = [];
   let thisStep: StepAction = {action: 'answer', answer: '', references: [], think: '', isFinal: false};
 
@@ -417,7 +417,7 @@ export async function getResponse(question?: string,
   const badURLs: string[] = [];
   const evaluationMetrics: Record<string, EvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
-  const regularBudget = tokenBudget * 0.9;
+  const regularBudget = tokenBudget * 0.85;
   const finalAnswerPIP: string[] = [];
   let trivialQuestion = false;
   while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget && badAttempts <= maxBadAttempts) {
@@ -920,8 +920,8 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     );
   } else {
     (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(
-        buildMdFromAnswer((thisStep as AnswerAction))
-      );
+      buildMdFromAnswer((thisStep as AnswerAction))
+    );
   }
 
   console.log(thisStep)

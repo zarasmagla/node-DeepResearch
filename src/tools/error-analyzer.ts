@@ -19,8 +19,6 @@ Analyze the steps and provide detailed feedback following these guidelines:
 - In the recap: Summarize key actions chronologically, highlight patterns, and identify where the process started to go wrong
 - In the blame: Point to specific steps or patterns that led to the inadequate answer
 - In the improvement: Provide actionable suggestions that could have led to a better outcome
-
-Generate a JSON response following JSON schema.
 </rules>
 
 <example>
