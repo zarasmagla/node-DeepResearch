@@ -11,7 +11,8 @@ export function normalizeUrl(urlString: string, debug = false, options = {
   removeAnchors: true,
   removeSessionIDs: true,
   removeUTMParams: true,
-  removeTrackingParams: true
+  removeTrackingParams: true,
+  removeXAnalytics: true  // New option to control x.com /analytics removal
 }) {
   try {
     urlString = urlString.replace(/\s+/g, '').trim();
@@ -26,6 +27,20 @@ export function normalizeUrl(urlString: string, debug = false, options = {
 
     if (urlString.includes('example.com')) {
       throw new Error('Example URL');
+    }
+
+    // Handle x.com and twitter.com URLs with /analytics
+    if (options.removeXAnalytics) {
+      // Match with or without query parameters and fragments
+      const xComPattern = /^(https?:\/\/(www\.)?(x\.com|twitter\.com)\/([^/]+)\/status\/(\d+))\/analytics(\/)?(\?.*)?(#.*)?$/i;
+      const xMatch = urlString.match(xComPattern);
+      if (xMatch) {
+        // Preserve query parameters and fragments if present
+        let cleanUrl = xMatch[1]; // Base URL without /analytics
+        if (xMatch[7]) cleanUrl += xMatch[7]; // Add query parameters if present
+        if (xMatch[8]) cleanUrl += xMatch[8]; // Add fragment if present
+        urlString = cleanUrl;
+      }
     }
 
     const url = new URL(urlString);
