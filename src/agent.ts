@@ -67,9 +67,8 @@ ${k.references[0]}
 </url>
 ` : ''}
 
-<answer>
+
 ${k.answer}
-</answer>
       `.trim();
     messages.push({role: 'assistant', content: removeExtraLineBreaks(aMsg)});
   });
@@ -490,6 +489,7 @@ export async function getResponse(question?: string,
       schema,
       system,
       messages: msgWithKnowledge,
+      numRetries: 2,
     });
     thisStep = {
       action: result.object.action,
@@ -617,7 +617,7 @@ ${currentQuestion}
 </question>
 
 <answer>
-${thisStep.answer}
+${buildMdFromAnswer(thisStep)}
 </answer>
 `,
               answer: `
@@ -900,7 +900,8 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       model: 'agentBeastMode',
       schema,
       system,
-      messages: msgWithKnowledge
+      messages: msgWithKnowledge,
+      numRetries: 2
     });
     thisStep = {
       action: result.object.action,
