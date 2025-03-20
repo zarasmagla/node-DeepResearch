@@ -15,7 +15,7 @@ function getPrompt(mdContent: string, allKnowledge: KnowledgeItem[]): PromptPair
 Your task is to repair the provided markdown content while preserving its original content.
 
 <rules>
-1. Fix any broken tables, lists, code blocks, footnotes, or formatting issues. Tables must always in basic HTML table syntax with proper <table> <thead> <tr> <th> <td> without any CSS styling, never use any markdown table syntax.
+1. Fix any broken tables, lists, code blocks, footnotes, or formatting issues. Tables must always in basic HTML table syntax with proper <table> <thead> <tr> <th> <td> without any CSS styling. STRICTLY AVOID any markdown table syntax. 
 2. Make sure code blocks are properly closed and languages are correctly specified.
 3. Make sure nested lists are correctly indented, especially code blocks within the nested structure.
 4. Use available knowledge to restore incomplete content.
@@ -30,7 +30,7 @@ Your task is to repair the provided markdown content while preserving its origin
 The following knowledge items are provided for your reference. Note that some of them may not be directly related to the content user provided, but may give some subtle hints and insights:
 ${KnowledgeStr.join('\n\n')}
 
-Directly output the repaired markdown content. No explain, no summary, no analysis. Just the repaired content.
+Directly output the repaired markdown content, preserving HTML tables when exist. No explain, no summary, no analysis. Just the repaired content.
 `,
     user: mdContent
   }
