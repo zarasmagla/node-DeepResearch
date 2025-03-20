@@ -375,22 +375,38 @@ export function fixCodeBlockIndentation(markdownText: string): string {
       const openingBlock = codeBlockStack[codeBlockStack.length - 1];
 
       if (line.trim().length > 0) {
-        // For non-empty lines
-        const trimmedLine = line.trimStart();
-
-        // If we're in a list context, maintain proper indentation
+        // Calculate proper base indentation for the code block
+        let baseIndent;
         if (openingBlock.listIndent) {
-          // For code blocks in lists, we need to preserve the list indentation plus the code fence indentation
-          // The total indentation should be at least listIndent + some standard indentation (usually 4 spaces)
-          const codeIndent = openingBlock.indent.length > openingBlock.listIndent.length ?
-            openingBlock.indent :
-            openingBlock.listIndent + "    ";
-
-          result.push(`${codeIndent}${trimmedLine}`);
+          // For code blocks in lists
+          baseIndent = openingBlock.listIndent + "    ";
         } else {
-          // Not in a list, use the opening fence indentation
-          result.push(`${openingBlock.indent}${trimmedLine}`);
+          // Not in a list
+          baseIndent = openingBlock.indent;
         }
+
+        // Get the indentation of this specific line
+        const lineIndentMatch = line.match(/^(\s*)/);
+        const lineIndent = lineIndentMatch ? lineIndentMatch[0] : '';
+
+        // Find the common prefix between the line's indent and the opening block's indent
+        // This represents the part of the indentation that's due to the markdown structure
+        let commonPrefix = '';
+        const minLength = Math.min(lineIndent.length, openingBlock.indent.length);
+        for (let i = 0; i < minLength; i++) {
+          if (lineIndent[i] === openingBlock.indent[i]) {
+            commonPrefix += lineIndent[i];
+          } else {
+            break;
+          }
+        }
+
+        // Remove just the common prefix (markdown structure indentation)
+        // and keep the rest (code's own indentation)
+        const contentAfterCommonIndent = line.substring(commonPrefix.length);
+
+        // Add the proper base indentation plus the preserved code indentation
+        result.push(`${baseIndent}${contentAfterCommonIndent}`);
       } else {
         // For empty lines, just keep them as is
         result.push(line);
