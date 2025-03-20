@@ -179,7 +179,6 @@ export class ObjectGeneratorSafe {
           });
         } else {
           // Second fallback: Try with fallback model if provided
-          const fallbackModel = getModel('fallback');
           console.error(`${model} failed on object generation -> manual parsing failed -> trying fallback with distilled schema`);
           try {
             let failedOutput = '';
@@ -194,21 +193,21 @@ export class ObjectGeneratorSafe {
             const distilledSchema = this.createDistilledSchema(schema);
 
             const fallbackResult = await generateObject({
-              model: fallbackModel,
+              model: getModel('fallback'),
               schema: distilledSchema,
               prompt: `Following the given JSON schema, extract the field from below: \n\n ${failedOutput}`,
               maxTokens: getToolConfig('fallback').maxTokens,
               temperature: getToolConfig('fallback').temperature,
             });
 
-            this.tokenTracker.trackUsage(fallbackModel, fallbackResult.usage); // Track against fallback model
+            this.tokenTracker.trackUsage('fallback', fallbackResult.usage); // Track against fallback model
             console.log('Distilled schema parse success!');
             return fallbackResult;
           } catch (fallbackError) {
             // If fallback model also fails, try parsing its error response
             try {
               const lastChanceResult = await this.handleGenerateObjectError<T>(fallbackError);
-              this.tokenTracker.trackUsage(fallbackModel, lastChanceResult.usage);
+              this.tokenTracker.trackUsage('fallback', lastChanceResult.usage);
               return lastChanceResult;
             } catch (finalError) {
               console.error(`All recovery mechanisms failed`);
