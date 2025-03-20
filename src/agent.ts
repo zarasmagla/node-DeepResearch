@@ -508,7 +508,7 @@ export async function getResponse(question?: string,
     allowReflect = true;
     allowRead = true;
     allowSearch = true;
-    // allowCoding = true;
+    allowCoding = true;
 
     // execute the step and action
     if (thisStep.action === 'answer' && thisStep.answer) {
@@ -562,6 +562,9 @@ export async function getResponse(question?: string,
       }
 
       if (currentQuestion.trim() === question) {
+        // disable coding for preventing answer degradation
+        allowCoding = false;
+
         if (evaluation.pass) {
           diaryContext.push(`
 At step ${step}, you took **answer** action and finally found the answer to the original question:
