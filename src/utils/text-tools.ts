@@ -438,24 +438,38 @@ ${k.answer}
  * @returns The markdown string with HTML tables converted to markdown tables, or the original string if no conversions were made
  */
 export function convertHtmlTablesToMd(mdString: string): string {
-  // Check if there are any HTML tables in the string
-  if (!mdString.includes('<table>')) {
-    return mdString;
-  }
-
   try {
-    // Regular expression to find HTML tables
-    const tableRegex = /<table>([\s\S]*?)<\/table>/g;
     let result = mdString;
-    let match;
 
-    // Process each table found
-    while ((match = tableRegex.exec(mdString)) !== null) {
-      const htmlTable = match[0];
-      const convertedTable = convertSingleHtmlTableToMd(htmlTable);
+    // First check for HTML tables
+    if (mdString.includes('<table>')) {
+      // Regular expression to find HTML tables
+      const tableRegex = /<table>([\s\S]*?)<\/table>/g;
+      let match;
 
-      if (convertedTable) {
-        result = result.replace(htmlTable, convertedTable);
+      // Process each table found
+      while ((match = tableRegex.exec(mdString)) !== null) {
+        const htmlTable = match[0];
+        const convertedTable = convertSingleHtmlTableToMd(htmlTable);
+
+        if (convertedTable) {
+          result = result.replace(htmlTable, convertedTable);
+        }
+      }
+    }
+
+    // Then check for markdown tables inside code fences (including with the "html" language specifier)
+    const codeFenceRegex = /```(?:html)?\s*\n(\s*\|\s*[^|]+\s*\|[\s\S]*?)\n\s*```/g;
+    let codeFenceMatch;
+
+    while ((codeFenceMatch = codeFenceRegex.exec(mdString)) !== null) {
+      const entireMatch = codeFenceMatch[0];
+      const tableContent = codeFenceMatch[1];
+
+      // Check if this is actually a markdown table by looking for the separator row
+      if (tableContent.includes('\n| ---') || tableContent.includes('\n|---')) {
+        // It's already a markdown table, so just remove the code fence
+        result = result.replace(entireMatch, tableContent);
       }
     }
 
