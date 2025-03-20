@@ -1,6 +1,6 @@
 import {AnswerAction, KnowledgeItem, Reference} from "../types";
 import i18nJSON from './i18n.json';
-import { JSDOM } from 'jsdom';
+import {JSDOM} from 'jsdom';
 
 
 export function buildMdFromAnswer(answer: AnswerAction) {
@@ -166,11 +166,11 @@ export function repairMarkdownFootnotesOuter(markdownString: string): string {
   // First trim the string to handle any extra whitespace
   markdownString = markdownString.trim();
 
-  // Check if the string starts with ```markdown and ends with ```
-  const codeBlockRegex = /^```markdown\n([\s\S]*)\n```$/;
+// Check if the string starts with ```markdown or ```html and ends with ```
+  const codeBlockRegex = /^```(markdown|html)\n([\s\S]*)\n```$/;
   const codeBlockMatch = markdownString.match(codeBlockRegex);
   if (codeBlockMatch) {
-    markdownString = codeBlockMatch[1];
+    markdownString = codeBlockMatch[2];
   }
 
   // Extract existing footnote definitions
@@ -432,7 +432,6 @@ ${k.answer}
 }
 
 
-
 /**
  * Converts HTML tables in a markdown string to markdown tables
  * @param mdString The markdown string containing potential HTML tables
@@ -636,12 +635,10 @@ function sanitizeCell(content: string): string {
 }
 
 
-
-
 if (typeof window === 'undefined') {
   global.DOMParser = class DOMParser {
     parseFromString(htmlString: string, mimeType: string) {
-      const dom = new JSDOM(htmlString, { contentType: mimeType });
+      const dom = new JSDOM(htmlString, {contentType: mimeType});
       return dom.window.document;
     }
   };
