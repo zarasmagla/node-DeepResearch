@@ -546,6 +546,15 @@ export async function processURLs(
         // Only add valid URLs to visitedURLs list
         if (url) {
           visitedURLs.push(url);
+
+          // acknowledge the visit action is done for this URL
+          context.actionTracker.trackAction({
+            thisStep: {
+              action: 'visit',
+              think: '',
+              URLTargets: [url]
+            } as VisitAction
+          })
         }
       }
     })
