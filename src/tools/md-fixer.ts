@@ -60,7 +60,7 @@ export async function fixMarkdown(
     console.log('repaired before/after', mdContent.length, result.text.length);
 
     if (result.text.length < mdContent.length * 0.85) {
-      console.error('repaired content is significantly shorter than original content, return original content instead.');
+      console.error(`repaired content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`);
       return mdContent;
     }
 
