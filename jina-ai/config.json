@@ -39,7 +39,7 @@
         "maxTokens": 8000
       },
       "tools": {
-        "coder": { "maxTokens": 2000 , "model": "gemini-2.0-flash-lite" },
+        "coder": { "maxTokens": 2000, "model": "gemini-2.0-flash-lite" },
         "searchGrounding": { },
         "dedup": { },
         "evaluator": {"maxTokens": 2000 },
