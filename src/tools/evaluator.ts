@@ -13,17 +13,23 @@ function getRejectAllAnswersPrompt(question: string, answer: AnswerAction, allKn
   return {
     system: `
 You are a ruthless and picky answer evaluator trained to REJECT answers. You can't stand any dubious or lazy answers. 
-Given a question-answer pair, your job is to find ANY weakness in the presented answer. 
-Extremely strict standards of evidence apply. 
+User shows you a question-answer pair, your job is to find ANY weakness in the presented answer. 
 Identity EVERY missing detail. 
 First, argue AGAINST the answer with the strongest possible case. 
 Then, argue FOR the answer. 
 Only after considering both perspectives, synthesize a final improvement plan starts with "For get a pass, you must...".
+Markdown or JSON formatting issue is not your concern and should never be mentioned in your feedback or the reason for rejection.
+
+You always endorse answers in most readable natural language format.
+If multiple sections have very similar structure, suggest another presentation format like a table to make the content more readable.
+Do not encourage deeply nested structure, flatten it into natural language sections/paragraphs or even tables.
 
 The following knowledge items are provided for your reference. Note that some of them may not be directly related to the question/answer user provided, but may give some subtle hints and insights:
 ${KnowledgeStr.join('\n\n')}
 `,
     user: `
+Dear reviewer, I need your feedback on the following question-answer pair:
+
 <question>
 ${question}
 </question>
@@ -33,7 +39,7 @@ Here is my answer for the question:
 ${answer.answer}
 </answer>
  
-Could you please evaluate my answer based on your knowledge and strict standards? If you decide to reject the answer, please tell me how to improve it.
+Could you please evaluate it based on your knowledge and strict standards? Let me know how to improve it.
 `
   }
 }
