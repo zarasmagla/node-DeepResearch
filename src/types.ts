@@ -63,6 +63,10 @@ export type StepAction = SearchAction | AnswerAction | ReflectAction | VisitActi
 
 export type EvaluationType = 'definitive' | 'freshness' | 'plurality' | 'attribution' | 'completeness' | 'strict';
 
+export type RepeatEvaluationType = {
+    type: EvaluationType;
+    numEvalsRequired: number;
+}
 
 // Following Vercel AI SDK's token counting interface
 export interface TokenUsage {

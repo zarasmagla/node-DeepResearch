@@ -17,7 +17,7 @@ import {
   SearchResult,
   EvaluationType,
   BoostedSearchSnippet,
-  SearchSnippet, EvaluationResponse, Reference, SERPQuery
+  SearchSnippet, EvaluationResponse, Reference, SERPQuery, RepeatEvaluationType
 } from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
@@ -353,10 +353,13 @@ async function executeSearchQueries(
   };
 }
 
+function includesEval(allChecks: RepeatEvaluationType[], evalType: EvaluationType): boolean {
+  return allChecks.some(c => c.type === evalType);
+}
 
 export async function getResponse(question?: string,
                                   tokenBudget: number = 1_000_000,
-                                  maxBadAttempts: number = 3,
+                                  maxBadAttempts: number = 2,
                                   existingContext?: Partial<TrackerContext>,
                                   messages?: Array<CoreMessage>,
                                   numReturnedURLs: number = 100,
@@ -367,7 +370,6 @@ export async function getResponse(question?: string,
 
   let step = 0;
   let totalStep = 0;
-  let badAttempts = 0;
 
   question = question?.trim() as string;
   // remove incoming system messages to avoid override
@@ -409,19 +411,18 @@ export async function getResponse(question?: string,
   let allowReflect = true;
   let allowCoding = false;
   let system = '';
-  let maxStrictEvals = Math.max(1, Math.min(3, maxBadAttempts - 1));
   let msgWithKnowledge: CoreMessage[] = [];
   let thisStep: StepAction = {action: 'answer', answer: '', references: [], think: '', isFinal: false};
 
   const allURLs: Record<string, SearchSnippet> = {};
   const visitedURLs: string[] = [];
   const badURLs: string[] = [];
-  const evaluationMetrics: Record<string, EvaluationType[]> = {};
+  const evaluationMetrics: Record<string, RepeatEvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
   const regularBudget = tokenBudget * 0.85;
   const finalAnswerPIP: string[] = [];
   let trivialQuestion = false;
-  while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget && badAttempts <= maxBadAttempts) {
+  while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget) {
     // add 1s delay to avoid rate limiting
     step++;
     totalStep++;
@@ -438,14 +439,19 @@ export async function getResponse(question?: string,
     if (currentQuestion.trim() === question && totalStep === 1) {
       // only add evaluation for initial question, once at step 1
       evaluationMetrics[currentQuestion] =
-        await evaluateQuestion(currentQuestion, context, SchemaGen)
+        (await evaluateQuestion(currentQuestion, context, SchemaGen)).map(e => {
+          return {
+            type: e,
+            numEvalsRequired: maxBadAttempts
+          } as RepeatEvaluationType
+        })
       // force strict eval for the original question, at last, only once.
-      evaluationMetrics[currentQuestion].push('strict')
+      evaluationMetrics[currentQuestion].push({type: 'strict', numEvalsRequired: maxBadAttempts});
     } else if (currentQuestion.trim() !== question) {
       evaluationMetrics[currentQuestion] = []
     }
 
-    if (totalStep === 1 && evaluationMetrics[currentQuestion].includes('freshness')) {
+    if (totalStep === 1 && includesEval(evaluationMetrics[currentQuestion], 'freshness')) {
       // if it detects freshness, avoid direct answer at step 1
       allowAnswer = false;
       allowReflect = false;
@@ -501,7 +507,7 @@ export async function getResponse(question?: string,
     console.log(`${currentQuestion}: ${thisStep.action} <- [${actionsStr}]`);
     console.log(thisStep)
 
-    context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
+    context.actionTracker.trackAction({totalStep, thisStep, gaps});
 
     // reset allow* to true
     allowAnswer = true;
@@ -554,7 +560,7 @@ export async function getResponse(question?: string,
         evaluation = await evaluateAnswer(
           currentQuestion,
           thisStep,
-          evaluationMetrics[currentQuestion],
+          evaluationMetrics[currentQuestion].map(e => e.type),
           context,
           allKnowledge,
           SchemaGen
@@ -583,20 +589,25 @@ Your journey ends here. You have successfully answered the original question. Co
           thisStep.isFinal = true;
           break
         } else {
+          // lower numEvalsRequired for the failed evaluation and if numEvalsRequired is 0, remove it from the evaluation metrics
+          evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].map(e => {
+            if (e.type === evaluation.type) {
+              e.numEvalsRequired--;
+            }
+            return e;
+          }).filter(e => e.numEvalsRequired > 0);
+
           if (evaluation.type === 'strict' && evaluation.improvement_plan) {
             finalAnswerPIP.push(evaluation.improvement_plan);
-            maxStrictEvals--;
-            if (maxStrictEvals <= 0) {
-              // remove 'strict' from the evaluation metrics
-              console.log('Remove `strict` from evaluation metrics')
-              evaluationMetrics[currentQuestion] = evaluationMetrics[currentQuestion].filter(e => e !== 'strict');
-            }
           }
-          if (badAttempts >= maxBadAttempts) {
+
+          if (evaluationMetrics[currentQuestion].length === 0) {
+            // failed so many times, give up, route to beast mode
             thisStep.isFinal = false;
             break
-          } else {
-            diaryContext.push(`
+          }
+
+          diaryContext.push(`
 At step ${step}, you took **answer** action but evaluator thinks it is not a good answer:
 
 Original question: 
@@ -608,11 +619,11 @@ ${thisStep.answer}
 The evaluator thinks your answer is bad because: 
 ${evaluation.think}
 `);
-            // store the bad context and reset the diary context
-            const errorAnalysis = await analyzeSteps(diaryContext, context, SchemaGen);
+          // store the bad context and reset the diary context
+          const errorAnalysis = await analyzeSteps(diaryContext, context, SchemaGen);
 
-            allKnowledge.push({
-              question: `
+          allKnowledge.push({
+            question: `
 Why is the following answer bad for the question? Please reflect
 
 <question>
@@ -623,7 +634,7 @@ ${currentQuestion}
 ${thisStep.answer}
 </answer>
 `,
-              answer: `
+            answer: `
 ${evaluation.think}
 
 ${errorAnalysis.recap}
@@ -632,14 +643,12 @@ ${errorAnalysis.blame}
 
 ${errorAnalysis.improvement}
 `,
-              type: 'qa',
-            })
+            type: 'qa',
+          })
 
-            badAttempts++;
-            allowAnswer = false;  // disable answer action in the immediate next step
-            diaryContext = [];
-            step = 0;
-          }
+          allowAnswer = false;  // disable answer action in the immediate next step
+          diaryContext = [];
+          step = 0;
         }
       } else if (evaluation.pass) {
         // solved a gap question
@@ -913,7 +922,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     } as AnswerAction;
     await updateReferences(thisStep, allURLs);
     (thisStep as AnswerAction).isFinal = true;
-    context.actionTracker.trackAction({totalStep, thisStep, gaps, badAttempts});
+    context.actionTracker.trackAction({totalStep, thisStep, gaps});
   }
 
   if (!trivialQuestion) {

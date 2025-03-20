@@ -634,26 +634,13 @@ export async function evaluateAnswer(
   for (const evaluationType of evaluationTypes) {
     let prompt: { system: string; user: string } | undefined
     switch (evaluationType) {
-      // case 'attribution': {
-      //   if (allKnowledge.length === 0) {
-      //     return {
-      //       pass: false,
-      //       think: `The knowledge is completely empty and the answer can not be derived from it. Need to found some other references and URLs`,
-      //       type: 'attribution',
-      //     };
-      //   }
-      //   prompt = getAttributionPrompt(question, action.answer, allKnowledge);
-      //   break;
-      // }
 
       case 'definitive':
         prompt = getDefinitivePrompt(question, action.answer);
         break;
-
       case 'freshness':
         prompt = getFreshnessPrompt(question, action, new Date().toISOString());
         break;
-
       case 'plurality':
         prompt = getPluralityPrompt(question, action.answer);
         break;
@@ -681,6 +668,6 @@ export async function evaluateAnswer(
     }
   }
 
-    return result?.object as EvaluationResponse;
+  return result?.object as EvaluationResponse;
 
 }
