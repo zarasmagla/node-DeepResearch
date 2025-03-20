@@ -407,7 +407,7 @@ export async function getResponse(question?: string,
   let allowSearch = true;
   let allowRead = true;
   let allowReflect = true;
-  let allowCoding = true;
+  let allowCoding = false;
   let system = '';
   let maxStrictEvals = Math.max(1, Math.min(3, maxBadAttempts - 1));
   let msgWithKnowledge: CoreMessage[] = [];
