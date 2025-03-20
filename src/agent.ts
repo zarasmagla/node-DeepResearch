@@ -35,7 +35,7 @@ import {
 } from "./utils/url-tools";
 import {
   buildMdFromAnswer,
-  chooseK, fixCodeBlockIndentation,
+  chooseK, convertHtmlTablesToMd, fixCodeBlockIndentation,
   removeExtraLineBreaks,
   removeHTMLtags, repairMarkdownFootnotesOuter
 } from "./utils/text-tools";
@@ -927,21 +927,24 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
   if (!trivialQuestion) {
     (thisStep as AnswerAction).mdAnswer =
-      fixBadURLMdLinks(
-        fixCodeBlockIndentation(
-          repairMarkdownFootnotesOuter(
-            await fixMarkdown(
-              buildMdFromAnswer((thisStep as AnswerAction)),
-              allKnowledge,
-              context,
-              SchemaGen
-            ))
-        ),
-        allURLs);
+      convertHtmlTablesToMd(
+        fixBadURLMdLinks(
+          fixCodeBlockIndentation(
+            repairMarkdownFootnotesOuter(
+              await fixMarkdown(
+                buildMdFromAnswer((thisStep as AnswerAction)),
+                allKnowledge,
+                context,
+                SchemaGen
+              ))
+          ),
+          allURLs));
   } else {
-    (thisStep as AnswerAction).mdAnswer = fixCodeBlockIndentation(
-      buildMdFromAnswer((thisStep as AnswerAction))
-    );
+    (thisStep as AnswerAction).mdAnswer =
+      convertHtmlTablesToMd(
+        fixCodeBlockIndentation(
+          buildMdFromAnswer((thisStep as AnswerAction)))
+      );
   }
 
   console.log(thisStep)
