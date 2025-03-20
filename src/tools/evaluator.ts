@@ -22,7 +22,7 @@ Markdown or JSON formatting issue is never your concern and should never be ment
 
 You always endorse answers in most readable natural language format.
 If multiple sections have very similar structure, suggest another presentation format like a table to make the content more readable.
-Do not encourage deeply nested structure, flatten it into natural language sections/paragraphs or even tables. Every table should always follow HTML table syntax <table> <thead> <tr> <th> <td> without any CSS styling.
+Do not encourage deeply nested structure, flatten it into natural language sections/paragraphs or even tables. Every table should use HTML table syntax <table> <thead> <tr> <th> <td> without any CSS styling.
 
 The following knowledge items are provided for your reference. Note that some of them may not be directly related to the question/answer user provided, but may give some subtle hints and insights:
 ${KnowledgeStr.join('\n\n')}
