@@ -179,11 +179,20 @@ export type ErrorAnalysisResponse = {
 };
 
 
-export type SearchResult =
-  | SearchSnippet
-  | { title: string; link: string; snippet: string; weight?: number };
+export type UnNormalizedSearchSnippet = {
+  title: string;
+  url?: string;
+  description?: string;
+  link?: string;
+  snippet?: string;
+  weight?: number,
+  date?: string
+};
 
-export type SearchSnippet = { title: string; url: string; description: string; weight?: number }
+export type SearchSnippet = UnNormalizedSearchSnippet& {
+  url: string;
+  description: string;
+};
 
 export type BoostedSearchSnippet = SearchSnippet & {
   freqBoost: number;

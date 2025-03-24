@@ -215,7 +215,7 @@ function getTokenBudgetAndMaxAttempts(
   if (maxCompletionTokens !== null) {
     return {
       tokenBudget: maxCompletionTokens,
-      maxBadAttempts: 2 // Default to medium setting for max attempts
+      maxBadAttempts: 1 // Default to medium setting for max attempts
     };
   }
 
@@ -226,7 +226,7 @@ function getTokenBudgetAndMaxAttempts(
       return {tokenBudget: 1000000, maxBadAttempts: 2};
     case 'medium':
     default:
-      return {tokenBudget: 500000, maxBadAttempts: 2};
+      return {tokenBudget: 500000, maxBadAttempts: 1};
   }
 }
 

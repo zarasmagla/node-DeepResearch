@@ -1,4 +1,4 @@
-import {BoostedSearchSnippet, KnowledgeItem, SearchResult, SearchSnippet, TrackerContext, VisitAction} from "../types";
+import {BoostedSearchSnippet, KnowledgeItem, SearchSnippet, TrackerContext, VisitAction} from "../types";
 import {getI18nText, smartMergeStrings} from "./text-tools";
 import {rerankDocuments} from "../tools/jina-rerank";
 import {readUrl} from "../tools/read";
@@ -182,7 +182,7 @@ const extractUrlParts = (urlStr: string) => {
 };
 
 // Function to count occurrences of hostnames and paths
-export const countUrlParts = (urlItems: SearchResult[]) => {
+export const countUrlParts = (urlItems: SearchSnippet[]) => {
   const hostnameCount: Record<string, number> = {};
   const pathPrefixCount: Record<string, number> = {};
   let totalUrls = 0;

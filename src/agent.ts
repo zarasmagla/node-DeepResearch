@@ -14,10 +14,9 @@ import {
   StepAction,
   AnswerAction,
   KnowledgeItem,
-  SearchResult,
   EvaluationType,
   BoostedSearchSnippet,
-  SearchSnippet, EvaluationResponse, Reference, SERPQuery, RepeatEvaluationType
+  SearchSnippet, EvaluationResponse, Reference, SERPQuery, RepeatEvaluationType, UnNormalizedSearchSnippet
 } from "./types";
 import {TrackerContext} from "./types";
 import {search} from "./tools/jina-search";
@@ -254,7 +253,7 @@ async function updateReferences(thisStep: AnswerAction, allURLs: Record<string, 
           .replace(/\s+/g, ' '),
         title: allURLs[normalizedUrl]?.title || '',
         url: normalizedUrl,
-        dateTime: ref?.dateTime || ''
+        dateTime: ref?.dateTime || allURLs[normalizedUrl]?.date || '',
       };
     })
     .filter(Boolean) as Reference[]; // Add type assertion here
@@ -284,7 +283,7 @@ async function executeSearchQueries(
   context.actionTracker.trackThink('search_for', SchemaGen.languageCode, {keywords: uniqQOnly.join(', ')});
   let utilityScore = 0;
   for (const query of keywordsQueries) {
-    let results: SearchResult[] = [];
+    let results: UnNormalizedSearchSnippet[] = [];
     const oldQuery = query.q;
     if (onlyHostnames && onlyHostnames.length > 0) {
       query.q = `${query.q} site:${onlyHostnames.join(' OR site:')}`;
@@ -321,15 +320,16 @@ async function executeSearchQueries(
 
     const minResults: SearchSnippet[] = results
       .map(r => {
-        const url = normalizeUrl('url' in r ? r.url : r.link);
+        const url = normalizeUrl('url' in r ? r.url! : r.link!);
         if (!url) return null; // Skip invalid URLs
 
         return {
           title: r.title,
           url,
           description: 'description' in r ? r.description : r.snippet,
-          weight: 1
-        };
+          weight: 1,
+          date: r.date,
+        } as SearchSnippet;
       })
       .filter(Boolean) as SearchSnippet[]; // Filter out null entries and assert type
 
@@ -798,7 +798,7 @@ You decided to think out of the box or cut from a completely different angle.
         .map(url => normalizeUrl(url))
         .filter(url => url && !visitedURLs.includes(url)) as string[];
 
-      thisStep.URLTargets = [...new Set([...thisStep.URLTargets, ...weightedURLs.map(r => r.url)])].slice(0, MAX_URLS_PER_STEP);
+      thisStep.URLTargets = [...new Set([...thisStep.URLTargets, ...weightedURLs.map(r => r.url!)])].slice(0, MAX_URLS_PER_STEP);
 
       const uniqueURLs = thisStep.URLTargets;
       console.log(uniqueURLs)
