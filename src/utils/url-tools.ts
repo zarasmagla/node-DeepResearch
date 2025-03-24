@@ -160,9 +160,9 @@ export function normalizeUrl(urlString: string, debug = false, options = {
   }
 }
 
-export function filterURLs(allURLs: Record<string, SearchSnippet>, visitedURLs: string[], badHostnames: string[]): SearchSnippet[] {
+export function filterURLs(allURLs: Record<string, SearchSnippet>, visitedURLs: string[], badHostnames: string[], onlyHostnames: string[]): SearchSnippet[] {
   return Object.entries(allURLs)
-    .filter(([url,]) => !visitedURLs.includes(url) && !badHostnames.includes(extractUrlParts(url).hostname))
+    .filter(([url,]) => !visitedURLs.includes(url) && !badHostnames.includes(extractUrlParts(url).hostname) && (onlyHostnames.length === 0 || onlyHostnames.includes(extractUrlParts(url).hostname)))
     .map(([, result]) => result);
 }
 

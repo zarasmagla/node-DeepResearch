@@ -224,6 +224,7 @@ export interface ChatCompletionRequest {
 
   boost_hostnames?: string[];
   bad_hostnames?: string[];
+  only_hostnames?: string[];
 }
 
 export interface URLAnnotation {

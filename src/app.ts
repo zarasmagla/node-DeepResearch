@@ -557,6 +557,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       body.no_direct_answer,
       body.boost_hostnames,
       body.bad_hostnames,
+      body.only_hostnames,
       )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
 

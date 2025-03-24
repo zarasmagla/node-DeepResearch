@@ -272,7 +272,8 @@ async function executeSearchQueries(
   keywordsQueries: any[],
   context: TrackerContext,
   allURLs: Record<string, SearchSnippet>,
-  SchemaGen: any
+  SchemaGen: Schemas,
+  onlyHostnames?: string[]
 ): Promise<{
   newKnowledge: KnowledgeItem[],
   searchedQueries: string[]
@@ -285,6 +286,9 @@ async function executeSearchQueries(
   for (const query of keywordsQueries) {
     let results: SearchResult[] = [];
     const oldQuery = query.q;
+    if (onlyHostnames && onlyHostnames.length > 0) {
+      query.q = `${query.q} site:${onlyHostnames.join(' OR site:')}`;
+    }
 
     try {
       console.log('Search query:', query);
@@ -342,10 +346,16 @@ async function executeSearchQueries(
       updated: query.tbs ? formatDateRange(query) : undefined
     });
   }
-
-  console.log(`Utility/Queries: ${utilityScore}/${searchedQueries.length}`);
-  if (searchedQueries.length > MAX_QUERIES_PER_STEP) {
-    console.log(`So many queries??? ${searchedQueries.map(q => `"${q}"`).join(', ')}`)
+  if (searchedQueries.length === 0) {
+    if (onlyHostnames && onlyHostnames.length > 0) {
+      console.log(`No results found for queries: ${uniqQOnly.join(', ')} on hostnames: ${onlyHostnames.join(', ')}`);
+      context.actionTracker.trackThink('hostnames_no_results', SchemaGen.languageCode, {hostnames: onlyHostnames.join(', ')});
+    }
+  } else {
+    console.log(`Utility/Queries: ${utilityScore}/${searchedQueries.length}`);
+    if (searchedQueries.length > MAX_QUERIES_PER_STEP) {
+      console.log(`So many queries??? ${searchedQueries.map(q => `"${q}"`).join(', ')}`)
+    }
   }
   return {
     newKnowledge,
@@ -366,6 +376,7 @@ export async function getResponse(question?: string,
                                   noDirectAnswer: boolean = false,
                                   boostHostnames: string[] = [],
                                   badHostnames: string[] = [],
+                                  onlyHostnames: string[] = []
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
   let step = 0;
@@ -457,12 +468,11 @@ export async function getResponse(question?: string,
       allowReflect = false;
     }
 
-    // update all urls with buildURLMap
-    // allowRead = allowRead && (Object.keys(allURLs).length > 0);
+
     if (allURLs && Object.keys(allURLs).length > 0) {
       // rerank urls
       weightedURLs = rankURLs(
-        filterURLs(allURLs, visitedURLs, badHostnames),
+        filterURLs(allURLs, visitedURLs, badHostnames, onlyHostnames),
         {
           question: currentQuestion,
           boostHostnames
@@ -471,6 +481,7 @@ export async function getResponse(question?: string,
       weightedURLs = keepKPerHostname(weightedURLs, 2);
       console.log('Weighted URLs:', weightedURLs.length);
     }
+    allowRead = allowRead && (weightedURLs.length > 0);
 
     allowSearch = allowSearch && (weightedURLs.length < 200);  // disable search when too many urls already
 
@@ -743,25 +754,28 @@ But then you realized you have asked them before. You decided to to think out of
             keywordsQueries,
             context,
             allURLs,
-            SchemaGen
+            SchemaGen,
+            onlyHostnames
           );
 
-        allKeywords.push(...searchedQueries);
-        allKnowledge.push(...newKnowledge);
+        if (searchedQueries.length > 0) {
+          anyResult = true;
+          allKeywords.push(...searchedQueries);
+          allKnowledge.push(...newKnowledge);
 
-        diaryContext.push(`
+          diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords: "${keywordsQueries.map(q => q.q).join(', ')}".
 You found quite some information and add them to your URL list and **visit** them later when needed. 
 `);
 
-        updateContext({
-          totalStep,
-          question: currentQuestion,
-          ...thisStep,
-          result: result
-        });
-        anyResult = true;
+          updateContext({
+            totalStep,
+            question: currentQuestion,
+            ...thisStep,
+            result: result
+          });
+        }
       }
       if (!anyResult || !keywordsQueries?.length) {
         diaryContext.push(`
