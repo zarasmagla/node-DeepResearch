@@ -257,9 +257,9 @@ Ensure each reflection question:
 
     if (allowRead) {
       actionSchemas.visit = z.object({
-        URLTargets: z.array(z.string())
+        URLTargets: z.array(z.number())
           .max(MAX_URLS_PER_STEP)
-          .describe(`Required when action='visit'. Must be an array of URLs, choose up the most relevant ${MAX_URLS_PER_STEP} URLs to visit`)
+          .describe(`Required when action='visit'. Must be the index of the URL in from the original list of URLs. Maximum ${MAX_URLS_PER_STEP} URLs allowed.`)
       }).optional();
     }
 

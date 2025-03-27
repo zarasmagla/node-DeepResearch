@@ -51,7 +51,7 @@ export type ReflectAction = BaseAction & {
 
 export type VisitAction = BaseAction & {
   action: "visit";
-  URLTargets: string[];
+  URLTargets: number[] | string[];
 };
 
 export type CodingAction = BaseAction & {

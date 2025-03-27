@@ -30,7 +30,7 @@ import {
   rankURLs,
   filterURLs,
   normalizeUrl,
-  weightedURLToString, getLastModified, keepKPerHostname, processURLs, fixBadURLMdLinks
+  sortSelectURLs, getLastModified, keepKPerHostname, processURLs, fixBadURLMdLinks, extractUrlsWithDescription
 } from "./utils/url-tools";
 import {
   buildMdFromAnswer,
@@ -111,7 +111,7 @@ function getPrompt(
   knowledge?: KnowledgeItem[],
   allURLs?: BoostedSearchSnippet[],
   beastMode?: boolean,
-): string {
+): { system: string, urlList?: string[]} {
   const sections: string[] = [];
   const actionSections: string[] = [];
 
@@ -136,19 +136,20 @@ ${context.join('\n')}
 
   // Build actions section
 
-  if (allowRead) {
-    const urlList = weightedURLToString(allURLs || [], 20);
+  const urlList = sortSelectURLs(allURLs || [], 20);
+  if (allowRead && urlList.length > 0) {
+    const urlListStr = urlList
+      .map((item, idx) => `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${item.url}": "${item.merged}"`)
+    .join('\n')
 
     actionSections.push(`
 <action-visit>
 - Crawl and read full content from URLs, you can get the fulltext, last updated datetime etc of any URL.  
-- Must check URLs mentioned in <question> if any
-${urlList ? `    
+- Must check URLs mentioned in <question> if any    
 - Choose and visit relevant URLs below for more knowledge. higher weight suggests more relevant:
 <url-list>
-${urlList}
+${urlListStr}
 </url-list>
-`.trim() : ''}
 </action-visit>
 `);
   }
@@ -228,7 +229,10 @@ ${actionSections.join('\n\n')}
   // Add footer
   sections.push(`Think step by step, choose the action, then respond by matching the schema of that action.`);
 
-  return removeExtraLineBreaks(sections.join('\n\n'));
+  return {
+    system: removeExtraLineBreaks(sections.join('\n\n')),
+    urlList: urlList.map(u => u.url)
+};
 }
 
 
@@ -421,7 +425,6 @@ export async function getResponse(question?: string,
   let allowRead = true;
   let allowReflect = true;
   let allowCoding = false;
-  let system = '';
   let msgWithKnowledge: CoreMessage[] = [];
   let thisStep: StepAction = {action: 'answer', answer: '', references: [], think: '', isFinal: false};
 
@@ -433,6 +436,23 @@ export async function getResponse(question?: string,
   const regularBudget = tokenBudget * 0.85;
   const finalAnswerPIP: string[] = [];
   let trivialQuestion = false;
+
+  // add all mentioned URLs in messages to allURLs
+  messages.forEach(m => {
+    let strMsg = '';
+    if (typeof m.content === 'string') {
+      strMsg =  m.content.trim();
+    } else if (typeof  m.content === 'object' && Array.isArray( m.content)) {
+      // find the very last sub content whose 'type' is 'text'  and use 'text' as the question
+      strMsg =  m.content.filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+    }
+
+    extractUrlsWithDescription(strMsg).forEach(u => {
+      addToAllURLs(u, allURLs);
+    });
+  })
+
+
   while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget) {
     // add 1s delay to avoid rate limiting
     step++;
@@ -486,7 +506,7 @@ export async function getResponse(question?: string,
     allowSearch = allowSearch && (weightedURLs.length < 200);  // disable search when too many urls already
 
     // generate prompt for this step
-    system = getPrompt(
+    const { system, urlList} = getPrompt(
       diaryContext,
       allQuestions,
       allKeywords,
@@ -792,10 +812,10 @@ You decided to think out of the box or cut from a completely different angle.
         });
       }
       allowSearch = false;
-    } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length) {
+    } else if (thisStep.action === 'visit' && thisStep.URLTargets?.length && urlList?.length) {
       // normalize URLs
-      thisStep.URLTargets = thisStep.URLTargets
-        .map(url => normalizeUrl(url))
+      thisStep.URLTargets = (thisStep.URLTargets as number[])
+        .map(idx => normalizeUrl(urlList[idx - 1]))
         .filter(url => url && !visitedURLs.includes(url)) as string[];
 
       thisStep.URLTargets = [...new Set([...thisStep.URLTargets, ...weightedURLs.map(r => r.url!)])].slice(0, MAX_URLS_PER_STEP);
@@ -892,21 +912,12 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     await sleep(STEP_SLEEP);
   }
 
-  await storeContext(system, schema, {
-    allContext,
-    allKeywords,
-    allQuestions,
-    allKnowledge,
-    weightedURLs,
-    msgWithKnowledge
-  }, totalStep);
-
   if (!(thisStep as AnswerAction).isFinal) {
     console.log('Enter Beast mode!!!')
     // any answer is better than no answer, humanity last resort
     step++;
     totalStep++;
-    system = getPrompt(
+    const { system } = getPrompt(
       diaryContext,
       allQuestions,
       allKeywords,
@@ -962,15 +973,6 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   }
 
   console.log(thisStep)
-
-  await storeContext(system, schema, {
-    allContext,
-    allKeywords,
-    allQuestions,
-    allKnowledge,
-    weightedURLs,
-    msgWithKnowledge
-  }, totalStep);
 
   // max return 300 urls
   const returnedURLs = weightedURLs.slice(0, numReturnedURLs).map(r => r.url);
