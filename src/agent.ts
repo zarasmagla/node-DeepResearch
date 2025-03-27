@@ -41,6 +41,7 @@ import {
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 import {formatDateBasedOnType, formatDateRange} from "./utils/date-tools";
 import {fixMarkdown} from "./tools/md-fixer";
+import {repairUnknownChars} from "./tools/broken-ch-fixer";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -139,7 +140,7 @@ ${context.join('\n')}
   const urlList = sortSelectURLs(allURLs || [], 20);
   if (allowRead && urlList.length > 0) {
     const urlListStr = urlList
-      .map((item, idx) => `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${item.url}": "${item.merged}"`)
+      .map((item, idx) => `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${item.url}": "${item.merged.slice(0, 50)}"`)
       .join('\n')
 
     actionSections.push(`
@@ -957,12 +958,13 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
           fixBadURLMdLinks(
             fixCodeBlockIndentation(
               repairMarkdownFootnotesOuter(
-                await fixMarkdown(
-                  buildMdFromAnswer((thisStep as AnswerAction)),
-                  allKnowledge,
-                  context,
-                  SchemaGen
-                ))
+                await repairUnknownChars(
+                  await fixMarkdown(
+                    buildMdFromAnswer((thisStep as AnswerAction)),
+                    allKnowledge,
+                    context,
+                    SchemaGen
+                  ), context))
             ),
             allURLs)));
   } else {

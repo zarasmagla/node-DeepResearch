@@ -49,7 +49,7 @@ export async function fixMarkdown(
     trackers?.actionTracker.trackThink('final_answer', schema.languageCode)
 
     const result = await generateText({
-      model: getModel('evaluator'),
+      model: getModel('fallback'),
       system: prompt.system,
       prompt: prompt.user,
     });
