@@ -664,3 +664,139 @@ if (typeof window === 'undefined') {
     }
   };
 }
+
+/**
+ * Escapes special regex characters in a string
+ */
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Counts occurrences of a specific character in a string
+ */
+function countChar(text: string, char: string): number {
+  return (text.match(new RegExp(escapeRegExp(char), 'g')) || []).length;
+}
+
+/**
+ * Processes formatted text and moves colons outside the formatting markers
+ */
+function processFormattedText(text: string, openMarker: string, closeMarker: string): string {
+  const pattern = new RegExp(`${escapeRegExp(openMarker)}(.*?)${escapeRegExp(closeMarker)}`, 'g');
+
+  return text.replace(pattern, (match, content) => {
+    // Check if content contains colon
+    if (content.includes(':') || content.includes('：')) {
+      // Count colons before removing them
+      const standardColonCount = countChar(content, ':');
+      const wideColonCount = countChar(content, '：');
+
+      // Remove colons and trim content
+      const trimmedContent = content.replace(/[:：]/g, '').trim();
+
+      // Add colons back outside the formatting
+      const standardColons = ':'.repeat(standardColonCount);
+      const wideColons = '：'.repeat(wideColonCount);
+
+      return `${openMarker}${trimmedContent}${closeMarker}${standardColons}${wideColons}`;
+    }
+    return match;
+  });
+}
+
+/**
+ * Repairs markdown by:
+ * 1. Removing <hr> and <br> tags that are not inside tables
+ * 2. Moving colons outside of bold and italic formatting
+ *
+ * @param markdown - The markdown string to repair
+ * @returns The repaired markdown, or the original if an error occurs
+ */
+export function repairMarkdownFinal(markdown: string): string {
+  try {
+    let repairedMarkdown = markdown;
+
+    // Step 1: Handle <hr> and <br> tags outside tables
+
+    // First, identify table regions to exclude them from the replacement
+    const tableRegions: Array<[number, number]> = [];
+
+    // Find HTML tables
+    const htmlTableRegex = /<table[\s\S]*?<\/table>/g;
+    let htmlTableMatch;
+    while ((htmlTableMatch = htmlTableRegex.exec(repairedMarkdown)) !== null) {
+      tableRegions.push([htmlTableMatch.index, htmlTableMatch.index + htmlTableMatch[0].length]);
+    }
+
+    // Find markdown tables
+    const lines = repairedMarkdown.split('\n');
+    let inMarkdownTable = false;
+    let markdownTableStart = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      if (line.startsWith('|') && line.includes('|', 1)) {
+        if (!inMarkdownTable) {
+          inMarkdownTable = true;
+          markdownTableStart = repairedMarkdown.indexOf(lines[i]);
+        }
+      } else if (inMarkdownTable && line === '') {
+        inMarkdownTable = false;
+        const tableEnd = repairedMarkdown.indexOf(lines[i - 1]) + lines[i - 1].length;
+        tableRegions.push([markdownTableStart, tableEnd]);
+      }
+    }
+
+    if (inMarkdownTable) {
+      const tableEnd = repairedMarkdown.length;
+      tableRegions.push([markdownTableStart, tableEnd]);
+    }
+
+    // Check if an index is inside any table region
+    const isInTable = (index: number): boolean => {
+      return tableRegions.some(([start, end]) => index >= start && index < end);
+    };
+
+    // Remove <hr> and <br> tags outside tables
+    let result = '';
+    let i = 0;
+
+    while (i < repairedMarkdown.length) {
+      if (repairedMarkdown.substring(i, i + 4) === '<hr>' && !isInTable(i)) {
+        i += 4;
+      }
+      else if (repairedMarkdown.substring(i, i + 4) === '<br>' && !isInTable(i)) {
+        i += 4;
+      }
+      else {
+        result += repairedMarkdown[i];
+        i++;
+      }
+    }
+
+    repairedMarkdown = result;
+
+    // Step 2: Fix formatting with colons
+    // Process from most specific (longest) patterns to most general
+    const formattingPatterns = [
+      ['****', '****'], // Four asterisks
+      ['****', '***'],  // Four opening, three closing
+      ['***', '****'],  // Three opening, four closing
+      ['***', '***'],   // Three asterisks
+      ['**', '**'],     // Two asterisks (bold)
+      ['*', '*']        // One asterisk (italic)
+    ];
+
+    for (const [open, close] of formattingPatterns) {
+      repairedMarkdown = processFormattedText(repairedMarkdown, open, close);
+    }
+
+    return repairedMarkdown;
+  } catch (error) {
+    // Return the original markdown if any error occurs
+    return markdown;
+  }
+}
+

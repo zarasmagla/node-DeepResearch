@@ -36,7 +36,7 @@ import {
   buildMdFromAnswer,
   chooseK, convertHtmlTablesToMd, fixCodeBlockIndentation,
   removeExtraLineBreaks,
-  removeHTMLtags, repairMarkdownFootnotesOuter
+  removeHTMLtags, repairMarkdownFinal, repairMarkdownFootnotesOuter
 } from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 import {formatDateBasedOnType, formatDateRange} from "./utils/date-tools";
@@ -111,7 +111,7 @@ function getPrompt(
   knowledge?: KnowledgeItem[],
   allURLs?: BoostedSearchSnippet[],
   beastMode?: boolean,
-): { system: string, urlList?: string[]} {
+): { system: string, urlList?: string[] } {
   const sections: string[] = [];
   const actionSections: string[] = [];
 
@@ -140,7 +140,7 @@ ${context.join('\n')}
   if (allowRead && urlList.length > 0) {
     const urlListStr = urlList
       .map((item, idx) => `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${item.url}": "${item.merged}"`)
-    .join('\n')
+      .join('\n')
 
     actionSections.push(`
 <action-visit>
@@ -232,7 +232,7 @@ ${actionSections.join('\n\n')}
   return {
     system: removeExtraLineBreaks(sections.join('\n\n')),
     urlList: urlList.map(u => u.url)
-};
+  };
 }
 
 
@@ -441,10 +441,10 @@ export async function getResponse(question?: string,
   messages.forEach(m => {
     let strMsg = '';
     if (typeof m.content === 'string') {
-      strMsg =  m.content.trim();
-    } else if (typeof  m.content === 'object' && Array.isArray( m.content)) {
+      strMsg = m.content.trim();
+    } else if (typeof m.content === 'object' && Array.isArray(m.content)) {
       // find the very last sub content whose 'type' is 'text'  and use 'text' as the question
-      strMsg =  m.content.filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
+      strMsg = m.content.filter(c => c.type === 'text').map(c => c.text).join('\n').trim();
     }
 
     extractUrlsWithDescription(strMsg).forEach(u => {
@@ -506,7 +506,7 @@ export async function getResponse(question?: string,
     allowSearch = allowSearch && (weightedURLs.length < 200);  // disable search when too many urls already
 
     // generate prompt for this step
-    const { system, urlList} = getPrompt(
+    const {system, urlList} = getPrompt(
       diaryContext,
       allQuestions,
       allKeywords,
@@ -917,7 +917,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     // any answer is better than no answer, humanity last resort
     step++;
     totalStep++;
-    const { system } = getPrompt(
+    const {system} = getPrompt(
       diaryContext,
       allQuestions,
       allKeywords,
@@ -952,18 +952,19 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
   if (!trivialQuestion) {
     (thisStep as AnswerAction).mdAnswer =
-      convertHtmlTablesToMd(
-        fixBadURLMdLinks(
-          fixCodeBlockIndentation(
-            repairMarkdownFootnotesOuter(
-              await fixMarkdown(
-                buildMdFromAnswer((thisStep as AnswerAction)),
-                allKnowledge,
-                context,
-                SchemaGen
-              ))
-          ),
-          allURLs));
+      repairMarkdownFinal(
+        convertHtmlTablesToMd(
+          fixBadURLMdLinks(
+            fixCodeBlockIndentation(
+              repairMarkdownFootnotesOuter(
+                await fixMarkdown(
+                  buildMdFromAnswer((thisStep as AnswerAction)),
+                  allKnowledge,
+                  context,
+                  SchemaGen
+                ))
+            ),
+            allURLs)));
   } else {
     (thisStep as AnswerAction).mdAnswer =
       convertHtmlTablesToMd(
@@ -1028,7 +1029,6 @@ ${JSON.stringify(zodToJsonSchema(schema), null, 2)}
     console.error('Context storage failed:', error);
   }
 }
-
 
 export async function main() {
   const question = process.argv[2] || "";
