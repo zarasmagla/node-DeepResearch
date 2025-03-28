@@ -959,12 +959,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
             fixCodeBlockIndentation(
               repairMarkdownFootnotesOuter(
                 await repairUnknownChars(
-                  await fixMarkdown(
-                    buildMdFromAnswer((thisStep as AnswerAction)),
-                    allKnowledge,
-                    context,
-                    SchemaGen
-                  ), context))
+                  buildMdFromAnswer(thisStep as AnswerAction), context))
             ),
             allURLs)));
   } else {

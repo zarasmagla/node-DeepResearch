@@ -717,6 +717,10 @@ export function repairMarkdownFinal(markdown: string): string {
   try {
     let repairedMarkdown = markdown;
 
+    // remove any '�'
+    repairedMarkdown = repairedMarkdown.replace(/�/g, '');
+
+
     // Step 1: Handle <hr> and <br> tags outside tables
 
     // First, identify table regions to exclude them from the replacement

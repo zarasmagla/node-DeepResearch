@@ -5,7 +5,7 @@ import {TrackerContext} from "../types";
 /**
  * Repairs markdown content with � characters by using Gemini to guess the missing text
  */
-export async function repairUnknownChars(mdContent: string, trackers: TrackerContext): Promise<string> {
+export async function repairUnknownChars(mdContent: string, trackers?: TrackerContext): Promise<string> {
   if (!mdContent.includes('�')) return mdContent;
 
   let repairedContent = mdContent;
@@ -68,7 +68,7 @@ On the right of the stains: "${rightContext}"
 So what was the original text between these two contexts?`,
       });
 
-      trackers.tokenTracker.trackUsage('md-fixer', result.usage)
+      trackers?.tokenTracker.trackUsage('md-fixer', result.usage)
       const replacement = result.text.trim();
 
       // Validate the replacement
