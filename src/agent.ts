@@ -40,7 +40,6 @@ import {
 } from "./utils/text-tools";
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 import {formatDateBasedOnType, formatDateRange} from "./utils/date-tools";
-import {fixMarkdown} from "./tools/md-fixer";
 import {repairUnknownChars} from "./tools/broken-ch-fixer";
 
 async function sleep(ms: number) {
