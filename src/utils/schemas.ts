@@ -205,8 +205,8 @@ export class Schemas {
           z.string()
             .min(1)
             .max(30)
-            .describe(`A natual language search request in ${this.languageStyle}. Based on the deep intention behind the original question and the expected answer format.`))
-          .describe(`Required when action='search'. Always prefer a single request, only add another request if the original question covers multiple aspects or elements and one search request is definitely not enough, each request focus on one specific aspect of the original question. Minimize mutual information between each request. Maximum ${MAX_QUERIES_PER_STEP} search requests.`)
+            .describe(`A Google search query. Based on the deep intention behind the original question and the expected answer format.`))
+          .describe(`Required when action='search'. Always prefer a single search query, only add another search query if the original question covers multiple aspects or elements and one search request is definitely not enough, each request focus on one specific aspect of the original question. Minimize mutual information between each query. Maximum ${MAX_QUERIES_PER_STEP} search queries.`)
           .max(MAX_QUERIES_PER_STEP)
       }).optional();
     }
