@@ -23,14 +23,14 @@ Your task is to repair the provided markdown content while preserving its origin
 6. In the footnote section, keep each footnote items format and repair misaligned and duplicated footnotes. Each footnote item must contain a URL at the end.
 7. In the actual content, to cite multiple footnotes in a row use [^1][^2][^3], never [^1,2,3] or [^1-3]. 
 8. Pay attention to the original content's ending (before the footnotes section). If you find a very obvious incomplete/broken/interrupted ending, continue the content with a proper ending.
-9. Repair any �� symbols or other broken characters in the original content by decoding them to the correct content.
+9. Repair any �� symbols or other broken unicode characters in the original content by decoding them to the correct content.
 10. Replace any obvious placeholders or Lorem Ipsum values such as "example.com" with the actual content derived from the knowledge.
 </rules>
 
 The following knowledge items are provided for your reference. Note that some of them may not be directly related to the content user provided, but may give some subtle hints and insights:
 ${KnowledgeStr.join('\n\n')}
 
-Directly output the repaired markdown content, preserving HTML tables when exist. No explain, no summary, no analysis. Just the repaired content.
+Directly output the repaired markdown content, preserving HTML tables if exist, never use tripple backticks html to wrap html table. No explain, no summary, no analysis. Just the repaired content.
 `,
     user: mdContent
   }

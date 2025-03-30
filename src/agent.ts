@@ -41,6 +41,7 @@ import {
 import {MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas} from "./utils/schemas";
 import {formatDateBasedOnType, formatDateRange} from "./utils/date-tools";
 import {repairUnknownChars} from "./tools/broken-ch-fixer";
+import {fixMarkdown} from "./tools/md-fixer";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -958,7 +959,12 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
             fixCodeBlockIndentation(
               repairMarkdownFootnotesOuter(
                 await repairUnknownChars(
-                  buildMdFromAnswer(thisStep as AnswerAction), context))
+                  await fixMarkdown(
+                    buildMdFromAnswer(thisStep as AnswerAction),
+                    allKnowledge,
+                    context,
+                    SchemaGen),
+                  context))
             ),
             allURLs)));
   } else {
