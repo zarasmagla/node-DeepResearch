@@ -1,6 +1,7 @@
 import {AnswerAction, KnowledgeItem, Reference} from "../types";
 import i18nJSON from './i18n.json';
 import {JSDOM} from 'jsdom';
+import fs from "fs/promises";
 
 
 export function buildMdFromAnswer(answer: AnswerAction) {
@@ -804,3 +805,21 @@ export function repairMarkdownFinal(markdown: string): string {
   }
 }
 
+export async function detectBrokenUnicodeViaFileIO(str: string) {
+  // Create a unique filename using timestamp and random string
+  const timestamp = Date.now();
+  const randomStr = Math.random().toString(36).substring(2, 10);
+  const tempFilePath = `./temp_unicode_check_${timestamp}_${randomStr}.txt`;
+
+  // Write the string to a file (forcing encoding/decoding)
+  await fs.writeFile(tempFilePath, str, 'utf8');
+
+  // Read it back
+  const readStr = await fs.readFile(tempFilePath, 'utf8');
+
+  // Clean up
+  await fs.unlink(tempFilePath);
+
+  // Now check for the visible replacement character
+  return {broken: readStr.includes('�'), readStr};
+}
