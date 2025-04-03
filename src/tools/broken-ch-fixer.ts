@@ -2,13 +2,28 @@ import { generateText } from "ai";
 import { getModel } from "../config";
 import {TrackerContext} from "../types";
 
+function detectBrokenUnicodeInMemory(str: string) {
+  // Use the browser or Node.js TextEncoder/TextDecoder APIs
+  const encoder = new TextEncoder(); // Encodes to UTF-8
+  const decoder = new TextDecoder('utf-8', {fatal: false}); // Replaces invalid sequences with �
+
+  // Round-trip the string through UTF-8 encoding
+  const encoded = encoder.encode(str);
+  const decoded = decoder.decode(encoded);
+
+  // Now check for the replacement character
+  return {broken: decoded.includes('�'), decoded};
+}
+
 /**
  * Repairs markdown content with � characters by using Gemini to guess the missing text
  */
 export async function repairUnknownChars(mdContent: string, trackers?: TrackerContext): Promise<string> {
-  if (!mdContent.includes('�')) return mdContent;
+  const { broken, decoded } = detectBrokenUnicodeInMemory(mdContent);
+  if (!broken) return mdContent;
+  console.log("Detected broken unicode in output, attempting to repair...");
 
-  let repairedContent = mdContent;
+  let repairedContent = decoded;
   let remainingUnknowns = true;
   let iterations = 0;
 
@@ -74,7 +89,7 @@ So what was the original text between these two contexts?`,
       // Validate the replacement
       if (
         replacement === "UNKNOWN" ||
-        replacement.includes('�') ||
+        detectBrokenUnicodeInMemory(replacement).broken ||
         replacement.length > unknownCount * 4
       ) {
         console.log(`Skipping invalid replacement ${replacement} at position ${position}`);
