@@ -64,10 +64,10 @@ function containsPhrase(text: string | undefined, phrases: readonly string[]): b
  * @returns True if any link contains a bot protection domain
  */
 function hasBotProtectionLink(
-  links: ReadonlyArray<readonly [string, string]> | undefined, 
+  links: ReadonlyArray<readonly [string, string]> | undefined,
   botProtectionDomains: readonly string[]
 ): boolean {
-  return links?.some(([, url]) => 
+  return links?.some(([, url]) =>
     botProtectionDomains.some(domain => url.includes(domain))
   ) ?? false;
 }
@@ -82,40 +82,40 @@ export async function isBotCheck(response: ReadResponse): Promise<boolean> {
   if (!response) return false;
 
   // Check error messages for bot detection phrases
-  if (containsPhrase(response.message, BOT_CHECK_MESSAGE_PHRASES) || 
+  if (containsPhrase(response.message, BOT_CHECK_MESSAGE_PHRASES) ||
     containsPhrase(response.readableMessage, BOT_CHECK_MESSAGE_PHRASES)) {
     return true;
   }
-  
+
   if (response.data) {
     const { content, links, title } = response.data;
     const status = response.status || 200; // Default to 200 if status is not provided 
-    
+
     // Check content for bot protection phrases
     if (containsPhrase(content, BOT_CHECK_CONTENT_PHRASES)) {
       return true;
     }
-    
+
     // Check if links contain bot protection domains
     if (hasBotProtectionLink(links, BOT_PROTECTION_DOMAINS)) {
       return true;
     }
-    
+
     // Fixed title check - ensure title exists before calling toLowerCase
-    const hasTitleKeyword = title ? 
-      BOT_CHECK_TITLE_KEYWORDS.some(keyword => title.toLowerCase().includes(keyword)) : 
+    const hasTitleKeyword = title ?
+      BOT_CHECK_TITLE_KEYWORDS.some(keyword => title.toLowerCase().includes(keyword)) :
       false;
-    
+
     if (BOT_CHECK_STATUS_CODES.includes(status) && hasTitleKeyword) {
       return true;
     }
-    
+
     const spamDetectLength = 400;
-    
+
     if (content.length > spamDetectLength) {
       return false;
     }
-    
+
     try {
       const isSpam = await classifyText(content);
       if (isSpam) {
