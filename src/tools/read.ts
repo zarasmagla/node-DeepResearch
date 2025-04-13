@@ -1,7 +1,10 @@
 import axios from 'axios';
 import { TokenTracker } from "../utils/token-tracker";
 import { ReadResponse } from '../types';
-import { JINA_API_KEY } from "../config";
+import { JINA_API_KEY, SCRAPE_DO_API_KEY } from "../config";
+import { isBotCheck } from '../utils/bot-detection';
+import { extractDomainFromUri, getDomainCountry } from '../utils/domain-country';
+import { estimateGeminiTokens } from '../utils/gemini-tools';
 
 export async function readUrl(
   url: string,
@@ -42,6 +45,34 @@ export async function readUrl(
 
     if (!data.data) {
       throw new Error('Invalid response data');
+    }
+
+    if (isBotCheck(data)) {
+      console.log('Bot check triggered, attempting to scrape...');
+      
+      const domain = extractDomainFromUri(url);
+      const domainDetails = await getDomainCountry(domain);
+      const scrapeResponse = await axios.get<string>(
+      'https://api.scrape.do',
+      {
+        headers,
+        params: {
+          url: url,
+          token: SCRAPE_DO_API_KEY,
+          geoCode: domainDetails.country?.code || 'us',
+          super: true,
+          output: 'markdown'
+        },
+        timeout: 60000,
+        responseType: 'text'
+      }
+      );
+
+      console.log('Scrape response content length:', scrapeResponse.data.length);
+      
+      data.data.content = scrapeResponse.data;
+      data.data.usage.tokens = estimateGeminiTokens(scrapeResponse.data);
+      data.data.title = scrapeResponse.data.split('\n')[0];
     }
 
     console.log('Read:', {
