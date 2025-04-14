@@ -986,16 +986,16 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
           ),
           allURLs)));
 
-    const {answer, references} = await buildReferences(
-      answerStep.answer,
-      allWebContents,
-      context,
-      SchemaGen
-    );
-
-    answerStep.answer = answer;
-    answerStep.references = references;
-    await updateReferences(answerStep, allURLs)
+    // const {answer, references} = await buildReferences(
+    //   answerStep.answer,
+    //   allWebContents,
+    //   context,
+    //   SchemaGen
+    // );
+    //
+    // answerStep.answer = answer;
+    // answerStep.references = references;
+    // await updateReferences(answerStep, allURLs)
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
   } else {
     answerStep.mdAnswer =
