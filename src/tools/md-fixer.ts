@@ -54,7 +54,7 @@ Your task is to revise the provided markdown content (written by your junior int
 The following knowledge items are provided for your reference. Note that some of them may not be directly related to the content user provided, but may give some subtle hints and insights:
 ${KnowledgeStr.join('\n\n')}
 
-IMPORTANT: Do not begin your response with phrases like "Sure", "Here is", "Below is", or any other introduction.  Directly output the revised content in lang: ${schema.languageCode} that is ready to be published., preserving HTML tables if exist, never use tripple backticks html to wrap html table.`,
+IMPORTANT: Do not begin your response with phrases like "Sure", "Here is", "Below is", or any other introduction. Directly output your revised content in ${schema.languageStyle} that is ready to be published. Preserving HTML tables if exist, never use tripple backticks html to wrap html table.`,
     user: mdContent
   }
 }
