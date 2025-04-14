@@ -101,7 +101,7 @@ export async function buildReferences(
   schema: Schemas,
   maxRef: number = 10,
   minChunkLength: number = 80,
-  minRelScore: number = 0.75
+  minRelScore: number = 0.7
 ): Promise<{ answer: string, references: Array<Reference> }> {
   console.log(`[buildReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);
   console.log(`[buildReferences] Answer length: ${answer.length} chars, Web content sources: ${Object.keys(webContents).length}`);
