@@ -996,7 +996,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     answerStep.answer = answer;
     answerStep.references = references;
     await updateReferences(answerStep, allURLs)
-    answerStep.mdAnswer = buildMdFromAnswer(answerStep);
+    answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
   } else {
     answerStep.mdAnswer =
       convertHtmlTablesToMd(

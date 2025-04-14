@@ -223,7 +223,7 @@ export async function buildReferences(
   const referencesByPosition = [...references]
     .sort((a, b) => a.answerChunkPosition![0] - b.answerChunkPosition![0]);
 
-// Insert markers from beginning to end, tracking offset
+  // Insert markers from beginning to end, tracking offset
   let offset = 0;
   for (let i = 0; i < referencesByPosition.length; i++) {
     const ref = referencesByPosition[i];
@@ -232,17 +232,35 @@ export async function buildReferences(
     // Calculate position to insert the marker (end of the chunk + current offset)
     let insertPosition = ref.answerChunkPosition![1] + offset;
 
-    // Check if there's a newline or table pipe at the end of the chunk and adjust position
-    const chunkEndText = modifiedAnswer.substring(Math.max(0, insertPosition - 5), insertPosition);
-    const newlineMatch = chunkEndText.match(/\n+$/);
-    const tableEndMatch = chunkEndText.match(/\s*\|\s*$/);
+    // Look ahead to check if there's a list item coming next
+    const textAfterInsert = modifiedAnswer.substring(insertPosition);
+    const nextListItemMatch = textAfterInsert.match(/^\s*\n\s*\*/);
 
-    if (newlineMatch) {
-      // Move the insertion position before the newline(s)
-      insertPosition -= newlineMatch[0].length;
-    } else if (tableEndMatch) {
-      // Move the insertion position before the table end pipe
-      insertPosition -= tableEndMatch[0].length;
+    // If we're at a position where the next content is a list item,
+    // we need to adjust WHERE we place the footnote
+    if (nextListItemMatch) {
+      // Move the marker to right after the last content character,
+      // but INSIDE any punctuation at the end of the content
+      const beforeText = modifiedAnswer.substring(Math.max(0, insertPosition - 30), insertPosition);
+      const lastPunctuation = beforeText.match(/[！。？!.?]$/);
+
+      if (lastPunctuation) {
+        // If there's punctuation at the end, insert the marker before it
+        insertPosition--;
+      }
+    } else {
+      // The original conditions for newlines and table pipes can remain
+      const chunkEndText = modifiedAnswer.substring(Math.max(0, insertPosition - 5), insertPosition);
+      const newlineMatch = chunkEndText.match(/\n+$/);
+      const tableEndMatch = chunkEndText.match(/\s*\|\s*$/);
+
+      if (newlineMatch) {
+        // Move the insertion position before the newline(s)
+        insertPosition -= newlineMatch[0].length;
+      } else if (tableEndMatch) {
+        // Move the insertion position before the table end pipe
+        insertPosition -= tableEndMatch[0].length;
+      }
     }
 
     // Insert the marker
