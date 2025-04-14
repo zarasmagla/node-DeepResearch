@@ -3,7 +3,7 @@ import {Reference, TrackerContext, WebContent} from "../types";
 import {rerankDocuments} from "./jina-rerank";
 import {Schemas} from "../utils/schemas";
 
-// New function to calculate Jaccard similarity as fallback
+// Jaccard similarity function for fallback
 function calculateJaccardSimilarity(text1: string, text2: string): number {
   // Convert texts to lowercase and tokenize by splitting on non-alphanumeric characters
   const tokens1 = new Set(text1.toLowerCase().split(/\W+/).filter(t => t.length > 0));
@@ -19,7 +19,7 @@ function calculateJaccardSimilarity(text1: string, text2: string): number {
   return union.size === 0 ? 0 : intersection.size / union.size;
 }
 
-// New function to perform fallback similarity ranking
+// Fallback similarity ranking
 async function fallbackRerankWithJaccard(query: string, documents: string[]): Promise<{ results: { index: number, relevance_score: number }[] }> {
   const results = documents.map((doc, index) => {
     const score = calculateJaccardSimilarity(query, doc);
@@ -89,7 +89,7 @@ export async function buildReferences(
 
     validAnswerChunks.push(i);
 
-    // Create a reranking task (handling batch size constraint later)
+    // Create a reranking task
     rerankTasks.push({
       index: i,
       chunk: answerChunk,
@@ -97,42 +97,17 @@ export async function buildReferences(
     });
   }
 
-  // Fixed batch size of 512 as suggested
-  const BATCH_SIZE = 512;
-
-  // Process all reranking tasks in parallel with fixed batch size
-  const processTaskWithBatches = async (task: any) => {
+  // Process all reranking tasks in parallel using the updated rerankDocuments function
+  const processTask = async (task: any) => {
     try {
-      // Create batches of web content chunks
-      const batches = [];
-      for (let i = 0; i < allWebContentChunks.length; i += BATCH_SIZE) {
-        batches.push(allWebContentChunks.slice(i, i + BATCH_SIZE));
-      }
-
-      // Process all batches in parallel
-      const batchPromises = batches.map(async (batch, batchIndex) => {
-        const batchOffset = batchIndex * BATCH_SIZE;
-        const result = await rerankDocuments(task.chunk, batch, context.tokenTracker);
-
-        // Adjust indices to account for batching
-        return result.results.map(item => ({
-          index: item.index + batchOffset,
-          relevance_score: item.relevance_score
-        }));
-      });
-
-      // Wait for all batch processing to complete
-      const batchResults = await Promise.all(batchPromises);
-
-      // Combine and sort all results
-      const combinedResults = batchResults.flat();
-      combinedResults.sort((a, b) => b.relevance_score - a.relevance_score);
+      // Use rerankDocuments directly - it now handles batching internally
+      const result = await rerankDocuments(task.chunk, allWebContentChunks, context.tokenTracker);
 
       return {
         answerChunkIndex: task.index,
         answerChunk: task.chunk,
         answerChunkPosition: task.position,
-        results: combinedResults
+        results: result.results
       };
     } catch (error) {
       console.error('Reranking failed, falling back to Jaccard similarity', error);
@@ -148,7 +123,7 @@ export async function buildReferences(
   };
 
   // Process all tasks in parallel
-  const taskResults = await Promise.all(rerankTasks.map(processTaskWithBatches));
+  const taskResults = await Promise.all(rerankTasks.map(processTask));
 
   // Collect and flatten all matches
   const allMatches = [];

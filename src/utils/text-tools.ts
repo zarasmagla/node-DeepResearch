@@ -721,7 +721,8 @@ export function repairMarkdownFinal(markdown: string): string {
 
     // remove any '�'
     repairedMarkdown = repairedMarkdown.replace(/�/g, '');
-
+    // remove any <center> tags
+    repairedMarkdown = repairedMarkdown.replace(/<\/?center>/g, '');
 
     // Step 1: Handle <hr> and <br> tags outside tables
 

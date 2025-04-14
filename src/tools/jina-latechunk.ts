@@ -51,12 +51,8 @@ export async function cherryPick(question: string, longContext: string, options:
 
     console.log(`Total length ${longContext.length} split ${chunks.length} chunks into ${chunkBatches.length} batches of ~${chunksPerBatch} chunks each`);
 
-    // Process each batch and collect the embeddings
-    const allChunkEmbeddings: number[][] = [];
-    let totalTokensUsed = 0;
-
-    for (let batchIndex = 0; batchIndex < chunkBatches.length; batchIndex++) {
-      const batch = chunkBatches[batchIndex];
+    // Process all batches in parallel
+    const batchPromises = chunkBatches.map(async (batch, batchIndex) => {
       console.log(`Processing batch ${batchIndex + 1}/${chunkBatches.length} with ${batch.length} chunks`);
 
       // Get embeddings for the current batch
@@ -90,12 +86,25 @@ export async function cherryPick(question: string, longContext: string, options:
 
       // Extract embeddings from this batch
       const batchEmbeddings = batchEmbeddingResponse.data.data.map((item: any) => item.embedding);
-      allChunkEmbeddings.push(...batchEmbeddings);
 
-      // Track token usage
-      const batchTokens = batchEmbeddingResponse.data.usage?.total_tokens || 0;
-      totalTokensUsed += batchTokens;
-    }
+      // Return both embeddings and token usage
+      return {
+        embeddings: batchEmbeddings,
+        tokens: batchEmbeddingResponse.data.usage?.total_tokens || 0
+      };
+    });
+
+    // Wait for all batch processing to complete
+    const batchResults = await Promise.all(batchPromises);
+
+    // Collect all embeddings and total token usage
+    const allChunkEmbeddings: number[][] = [];
+    let totalTokensUsed = 0;
+
+    batchResults.forEach(result => {
+      allChunkEmbeddings.push(...result.embeddings);
+      totalTokensUsed += result.tokens;
+    });
 
     // Get embedding for the question
     const questionEmbeddingResponse = await axios.post(

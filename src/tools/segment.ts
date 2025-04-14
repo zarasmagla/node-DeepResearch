@@ -3,22 +3,6 @@ import {TokenTracker} from "../utils/token-tracker";
 import {JINA_API_KEY} from "../config";
 import {TrackerContext} from "../types";
 
-/**
- * Segments text into chunks, handling text of arbitrary length by batching
- * @param content Text to segment
- * @param tracker Context for tracking token usage
- * @param maxChunkLength Maximum length of each chunk (passed to Jina API)
- * @param returnChunks Whether to return chunks in the API response
- * @returns Object containing chunks and their positions
- */
-/**
- * Segments text into chunks, handling text of arbitrary length by batching
- * @param content Text to segment
- * @param tracker Context for tracking token usage
- * @param maxChunkLength Maximum length of each chunk (passed to Jina API)
- * @param returnChunks Whether to return chunks in the API response
- * @returns Object containing chunks and chunk_positions matching Jina API format
- */
 export async function segmentText(
   content: string,
   tracker: TrackerContext,
@@ -38,19 +22,20 @@ export async function segmentText(
   // Maximum size to send in a single API request (slightly under 64K to be safe)
   const MAX_BATCH_SIZE = 60000;
 
-  // Final results
-  const allChunks = [];
-  const allChunkPositions = [];
-  let totalTokens = 0;
-
   // Split content into batches
   const batches = splitTextIntoBatches(content, MAX_BATCH_SIZE);
   console.log(`Split content into ${batches.length} batches`);
 
-  // Process each batch sequentially
+  // Calculate offsets for each batch upfront
+  const batchOffsets: number[] = [];
   let currentOffset = 0;
-  for (let i = 0; i < batches.length; i++) {
-    const batch = batches[i];
+  for (const batch of batches) {
+    batchOffsets.push(currentOffset);
+    currentOffset += batch.length;
+  }
+
+  // Process all batches in parallel
+  const batchPromises = batches.map(async (batch, i) => {
     console.log(`Processing batch ${i + 1}/${batches.length} (size: ${batch.length})`);
 
     try {
@@ -81,33 +66,43 @@ export async function segmentText(
         tokenizer: data.tokenizer
       });
 
-      // Add chunks from this batch to the results
-      if (data.chunks && returnChunks) {
-        allChunks.push(...data.chunks);
-      }
+      // Get the batch offset
+      const offset = batchOffsets[i];
 
       // Adjust chunk positions to account for the offset of this batch
-      if (data.chunk_positions) {
-        const adjustedPositions = data.chunk_positions.map((position: [number, number]) => {
-          // The API returns chunk_positions as arrays of [start, end]
-          return [
-            position[0] + currentOffset,
-            position[1] + currentOffset
-          ] as [number, number];
-        });
-        allChunkPositions.push(...adjustedPositions);
-      }
+      const adjustedPositions = data.chunk_positions
+        ? data.chunk_positions.map((position: [number, number]) => {
+            return [
+              position[0] + offset,
+              position[1] + offset
+            ] as [number, number];
+          })
+        : [];
 
-      // Track token usage
-      const batchTokens = data.usage?.tokens || 0;
-      totalTokens += batchTokens;
-
-      // Update the current offset for the next batch
-      currentOffset += batch.length;
-
+      return {
+        chunks: data.chunks || [],
+        positions: adjustedPositions,
+        tokens: data.usage?.tokens || 0
+      };
     } catch (error) {
       handleSegmentationError(error);
     }
+  });
+
+  // Wait for all batches to complete
+  const batchResults = await Promise.all(batchPromises);
+
+  // Aggregate results
+  const allChunks = [];
+  const allChunkPositions = [];
+  let totalTokens = 0;
+
+  for (const result of batchResults) {
+    if (returnChunks) {
+      allChunks.push(...result.chunks);
+    }
+    allChunkPositions.push(...result.positions);
+    totalTokens += result.tokens;
   }
 
   // Track total token usage for all batches
