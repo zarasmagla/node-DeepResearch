@@ -1,6 +1,8 @@
 import axios, {AxiosError} from 'axios';
 import {TokenTracker} from "../utils/token-tracker";
 import {JINA_API_KEY} from "../config";
+import {cosineSimilarity} from "./cosine";
+import {JinaEmbeddingRequest, JinaEmbeddingResponse} from "../types";
 
 const JINA_API_URL = 'https://api.jina.ai/v1/embeddings';
 const SIMILARITY_THRESHOLD = 0.86; // Adjustable threshold for cosine similarity
@@ -13,38 +15,6 @@ const JINA_API_CONFIG = {
   LATE_CHUNKING: false
 } as const;
 
-// Types for Jina API
-interface JinaEmbeddingRequest {
-  model: string;
-  task: string;
-  late_chunking: boolean;
-  dimensions: number;
-  embedding_type: string;
-  input: string[];
-}
-
-interface JinaEmbeddingResponse {
-  model: string;
-  object: string;
-  usage: {
-    total_tokens: number;
-    prompt_tokens: number;
-  };
-  data: Array<{
-    object: string;
-    index: number;
-    embedding: number[];
-  }>;
-}
-
-
-// Compute cosine similarity between two vectors
-function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  const dotProduct = vecA.reduce((sum, a, i) => sum + a * vecB[i], 0);
-  const normA = Math.sqrt(vecA.reduce((sum, a) => sum + a * a, 0));
-  const normB = Math.sqrt(vecB.reduce((sum, b) => sum + b * b, 0));
-  return dotProduct / (normA * normB);
-}
 
 // Get embeddings for all queries in one batch
 async function getEmbeddings(queries: string[]): Promise<{ embeddings: number[][], tokens: number }> {
@@ -167,9 +137,9 @@ export async function dedupQueries(
 
     // Track token usage from the API
     (tracker || new TokenTracker()).trackUsage('dedup', {
-        promptTokens: 0,
-        completionTokens: tokens,
-        totalTokens: tokens
+      promptTokens: 0,
+      completionTokens: tokens,
+      totalTokens: tokens
     });
     console.log('Dedup:', uniqueQueries);
     return {

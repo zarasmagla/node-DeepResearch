@@ -1,52 +1,121 @@
 import {segmentText} from './segment';
-import {Reference, TrackerContext, WebContent} from "../types";
-import {rerankDocuments} from "./jina-rerank";
+import {JinaEmbeddingRequest, JinaEmbeddingResponse, Reference, TrackerContext, WebContent} from "../types";
 import {Schemas} from "../utils/schemas";
+import axios, {AxiosError} from 'axios';
+import {JINA_API_KEY} from "../config";
+import {cosineSimilarity, jaccardRank} from "./cosine";
 
-// Jaccard similarity function for fallback
-function calculateJaccardSimilarity(text1: string, text2: string): number {
-  // Convert texts to lowercase and tokenize by splitting on non-alphanumeric characters
-  const tokens1 = new Set(text1.toLowerCase().split(/\W+/).filter(t => t.length > 0));
-  const tokens2 = new Set(text2.toLowerCase().split(/\W+/).filter(t => t.length > 0));
+const BATCH_SIZE = 2000;
+const API_URL = "https://api.jina.ai/v1/embeddings";
 
-  // Calculate intersection size
-  const intersection = new Set([...tokens1].filter(x => tokens2.has(x)));
+// Simplified function to get embeddings in a single request
+async function getEmbeddings(
+  texts: string[],
+  tokenTracker?: any
+): Promise<{ embeddings: number[][], tokens: number }> {
+  console.log(`[embeddings] Getting embeddings for ${texts.length} texts`);
 
-  // Calculate union size
-  const union = new Set([...tokens1, ...tokens2]);
+  if (!JINA_API_KEY) {
+    throw new Error('JINA_API_KEY is not set');
+  }
 
-  // Return Jaccard similarity
-  return union.size === 0 ? 0 : intersection.size / union.size;
+  // Handle empty input case
+  if (texts.length === 0) {
+    return {embeddings: [], tokens: 0};
+  }
+
+  // Process in batches of 2000
+  const allEmbeddings: number[][] = [];
+  let totalTokens = 0;
+  const batchCount = Math.ceil(texts.length / BATCH_SIZE);
+
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const batchTexts = texts.slice(i, i + BATCH_SIZE);
+    const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
+    console.log(`[embeddings] Processing batch ${currentBatch}/${batchCount} (${batchTexts.length} texts)`);
+
+    const request: JinaEmbeddingRequest = {
+      model: "jina-embeddings-v3",
+      task: "text-matching",
+      late_chunking: false, // Late chunking turned off always
+      dimensions: 1024,
+      embedding_type: "float",
+      input: batchTexts,
+      truncate: true
+    };
+
+    try {
+      const response = await axios.post<JinaEmbeddingResponse>(
+        API_URL,
+        request,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${JINA_API_KEY}`
+          }
+        }
+      );
+
+      // Validate response format
+      if (!response.data.data || response.data.data.length !== batchTexts.length) {
+        console.error('Invalid response from Jina API:', response.data);
+        continue;
+      }
+
+      // Sort embeddings by index to maintain original order
+      const batchEmbeddings = response.data.data
+        .sort((a, b) => a.index - b.index)
+        .map(item => item.embedding);
+
+      allEmbeddings.push(...batchEmbeddings);
+      totalTokens += response.data.usage.total_tokens;
+      console.log(`[embeddings] Batch ${currentBatch} complete. Tokens used: ${response.data.usage.total_tokens}, total so far: ${totalTokens}`);
+
+    } catch (error) {
+      console.error('Error calling Jina Embeddings API:', error);
+      if (error instanceof AxiosError && error.response?.status === 402) {
+        return {embeddings: [], tokens: 0};
+      }
+      throw error;
+    }
+  }
+
+  // Track token usage if tracker is provided
+  if (tokenTracker) {
+    tokenTracker.trackUsage('embeddings', {
+      promptTokens: totalTokens,
+      completionTokens: 0,
+      totalTokens: totalTokens
+    });
+  }
+
+  console.log(`[embeddings] Complete. Generated ${allEmbeddings.length} embeddings using ${totalTokens} tokens`);
+  return {embeddings: allEmbeddings, tokens: totalTokens};
 }
 
-// Fallback similarity ranking
-async function fallbackRerankWithJaccard(query: string, documents: string[]): Promise<{ results: { index: number, relevance_score: number }[] }> {
-  const results = documents.map((doc, index) => {
-    const score = calculateJaccardSimilarity(query, doc);
-    return {index, relevance_score: score};
-  });
-
-  // Sort by score in descending order
-  results.sort((a, b) => b.relevance_score - a.relevance_score);
-
-  return {results};
-}
 
 export async function buildReferences(
   answer: string,
   webContents: Record<string, WebContent>,
   context: TrackerContext,
   schema: Schemas,
-  maxRef: number = 6,
+  maxRef: number = 10,
   minChunkLength: number = 80,
+  minRelScore: number = 0.75
 ): Promise<{ answer: string, references: Array<Reference> }> {
+  console.log(`[buildReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);
+  console.log(`[buildReferences] Answer length: ${answer.length} chars, Web content sources: ${Object.keys(webContents).length}`);
+
   // Step 1: Chunk the answer
+  console.log(`[buildReferences] Step 1: Chunking answer text`);
   const {chunks: answerChunks, chunk_positions: answerChunkPositions} = await segmentText(answer, context);
+  console.log(`[buildReferences] Answer segmented into ${answerChunks.length} chunks`);
 
   // Step 2: Prepare all web content chunks, filtering out those below minimum length
-  const allWebContentChunks: any = [];
+  console.log(`[buildReferences] Step 2: Preparing web content chunks and filtering by minimum length (${minChunkLength} chars)`);
+  const allWebContentChunks: string[] = [];
   const chunkToSourceMap: any = {};  // Maps chunk index to source information
-  const validWebChunkIndices = new Set(); // Tracks indices of valid web chunks
+  const validWebChunkIndices = new Set<number>(); // Tracks indices of valid web chunks (those above minimum length)
 
   let chunkIndex = 0;
   for (const [url, content] of Object.entries(webContents)) {
@@ -58,7 +127,7 @@ export async function buildReferences(
       chunkToSourceMap[chunkIndex] = {
         url,
         title: content.title || url,
-        text: chunk
+        text: chunk,
       };
 
       // Track valid web chunks (above minimum length)
@@ -70,13 +139,18 @@ export async function buildReferences(
     }
   }
 
+  console.log(`[buildReferences] Collected ${allWebContentChunks.length} web chunks, ${validWebChunkIndices.size} above minimum length`);
+
   if (allWebContentChunks.length === 0) {
+    console.log(`[buildReferences] No web content chunks available, returning without references`);
     return {answer, references: []};
   }
 
-  // Step 3: Filter answer chunks by minimum length and create reranking tasks
-  const validAnswerChunks = [];
-  const rerankTasks = [];
+  // Step 3: Filter answer chunks by minimum length
+  console.log(`[buildReferences] Step 3: Filtering answer chunks by minimum length`);
+  const validAnswerChunks: string[] = [];
+  const validAnswerChunkIndices: number[] = [];
+  const validAnswerChunkPositions: [number, number][] = [];
 
   context.actionTracker.trackThink('cross_reference', schema.languageCode);
 
@@ -87,97 +161,221 @@ export async function buildReferences(
     // Skip empty chunks or chunks below minimum length
     if (!answerChunk.trim() || answerChunk.length < minChunkLength) continue;
 
-    validAnswerChunks.push(i);
-
-    // Create a reranking task
-    rerankTasks.push({
-      index: i,
-      chunk: answerChunk,
-      position: answerChunkPosition
-    });
+    validAnswerChunks.push(answerChunk);
+    validAnswerChunkIndices.push(i);
+    validAnswerChunkPositions.push(answerChunkPosition);
   }
 
-  // Process all reranking tasks in parallel using the updated rerankDocuments function
-  const processTask = async (task: any) => {
-    try {
-      // Use rerankDocuments directly - it now handles batching internally
-      const result = await rerankDocuments(task.chunk, allWebContentChunks, context.tokenTracker);
+  console.log(`[buildReferences] Found ${validAnswerChunks.length}/${answerChunks.length} valid answer chunks above minimum length`);
 
-      return {
-        answerChunkIndex: task.index,
-        answerChunk: task.chunk,
-        answerChunkPosition: task.position,
-        results: result.results
-      };
-    } catch (error) {
-      console.error('Reranking failed, falling back to Jaccard similarity', error);
-      // Fallback to Jaccard similarity
-      const fallbackResult = await fallbackRerankWithJaccard(task.chunk, allWebContentChunks);
-      return {
-        answerChunkIndex: task.index,
-        answerChunk: task.chunk,
-        answerChunkPosition: task.position,
-        results: fallbackResult.results
-      };
+  if (validAnswerChunks.length === 0) {
+    console.log(`[buildReferences] No valid answer chunks, returning without references`);
+    return {answer, references: []};
+  }
+
+  // Step 4: Get embeddings for BOTH answer chunks and valid web chunks in a single request
+  console.log(`[buildReferences] Step 4: Getting embeddings for all chunks in a single request (only including web chunks above min length)`);
+
+  // Create maps to track the original indices
+  const chunkIndexMap = new Map<number, { type: 'answer' | 'web', originalIndex: number }>();
+
+  // Combine all chunks into a single array for embedding
+  const allChunks: string[] = [];
+
+  // Add answer chunks first
+  validAnswerChunks.forEach((chunk, index) => {
+    allChunks.push(chunk);
+    chunkIndexMap.set(allChunks.length - 1, {type: 'answer', originalIndex: index});
+  });
+
+  // Then add web chunks that meet minimum length requirement
+  for (let i = 0; i < allWebContentChunks.length; i++) {
+    // Only include valid web chunks (those above minimum length)
+    if (validWebChunkIndices.has(i)) {
+      allChunks.push(allWebContentChunks[i]);
+      chunkIndexMap.set(allChunks.length - 1, {type: 'web', originalIndex: i});
     }
-  };
+  }
 
-  // Process all tasks in parallel
-  const taskResults = await Promise.all(rerankTasks.map(processTask));
+  console.log(`[buildReferences] Requesting embeddings for ${allChunks.length} total chunks (${validAnswerChunks.length} answer + ${validWebChunkIndices.size} web)`);
 
-  // Collect and flatten all matches
-  const allMatches = [];
-  for (const taskResult of taskResults) {
-    for (const match of taskResult.results) {
-      // Only include matches where the web chunk is valid (above minimum length)
-      if (validWebChunkIndices.has(match.index)) {
-        allMatches.push({
-          webChunkIndex: match.index,
-          answerChunkIndex: taskResult.answerChunkIndex,
-          relevanceScore: match.relevance_score,
-          answerChunk: taskResult.answerChunk,
-          answerChunkPosition: taskResult.answerChunkPosition
-        });
+  try {
+    // Get embeddings for all chunks in one request
+    const embeddingsResult = await getEmbeddings(allChunks, context.tokenTracker);
+    const allEmbeddings = embeddingsResult.embeddings;
+
+    // Separate the embeddings back into answer and web chunks
+    const answerEmbeddings: number[][] = [];
+    const webEmbeddingMap = new Map<number, number[]>(); // Maps original web chunk index to embedding
+
+    // Sort embeddings back to their original collections
+    for (let i = 0; i < allEmbeddings.length; i++) {
+      const embedding = allEmbeddings[i];
+      const mapping = chunkIndexMap.get(i);
+
+      if (mapping) {
+        if (mapping.type === 'answer') {
+          answerEmbeddings[mapping.originalIndex] = embedding;
+        } else {
+          webEmbeddingMap.set(mapping.originalIndex, embedding);
+        }
       }
     }
-  }
 
-  // Log statistics about relevance scores
-  if (allMatches.length > 0) {
-    const relevanceScores = allMatches.map(match => match.relevanceScore);
-    const minRelevance = Math.min(...relevanceScores);
-    const maxRelevance = Math.max(...relevanceScores);
-    const sumRelevance = relevanceScores.reduce((sum, score) => sum + score, 0);
-    const meanRelevance = sumRelevance / relevanceScores.length;
+    console.log(`[buildReferences] Successfully generated and separated embeddings: ${answerEmbeddings.length} answer, ${webEmbeddingMap.size} web`);
 
-    console.log('Reference relevance statistics:', {
-      min: minRelevance.toFixed(4),
-      max: maxRelevance.toFixed(4),
-      mean: meanRelevance.toFixed(4),
-      count: relevanceScores.length
-    });
-  }
+    // Step 5: Compute pairwise cosine similarity
+    console.log(`[buildReferences] Step 5: Computing pairwise cosine similarity between answer and web chunks`);
+    const allMatches = [];
 
-  // Step 4: Sort all matches by relevance
-  allMatches.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    for (let i = 0; i < validAnswerChunks.length; i++) {
+      const answerChunkIndex = validAnswerChunkIndices[i];
+      const answerChunk = validAnswerChunks[i];
+      const answerChunkPosition = validAnswerChunkPositions[i];
+      const answerEmbedding = answerEmbeddings[i];
 
-  // Step 5: Filter to ensure each web content chunk AND answer chunk is used only once
-  const usedWebChunks = new Set();
-  const usedAnswerChunks = new Set();
-  const filteredMatches = [];
+      const matchesForChunk = [];
 
-  for (const match of allMatches) {
-    if (!usedWebChunks.has(match.webChunkIndex) && !usedAnswerChunks.has(match.answerChunkIndex)) {
-      filteredMatches.push(match);
-      usedWebChunks.add(match.webChunkIndex);
-      usedAnswerChunks.add(match.answerChunkIndex);
+      // Compute similarity with each valid web content chunk
+      // All web chunks in webEmbeddingMap are already pre-filtered to be above minimum length
+      for (const webChunkIndex of validWebChunkIndices) {
+        const webEmbedding = webEmbeddingMap.get(webChunkIndex);
 
-      // Break if we've reached the max number of references
-      if (filteredMatches.length >= maxRef) break;
+        if (webEmbedding) {
+          const score = cosineSimilarity(answerEmbedding, webEmbedding);
+
+          matchesForChunk.push({
+            webChunkIndex,
+            relevanceScore: score
+          });
+        }
+      }
+
+      // Sort by relevance score and take the top matches
+      matchesForChunk.sort((a, b) => b.relevanceScore - a.relevanceScore);
+
+      // Add the top matches to all matches with answerChunk information
+      for (const match of matchesForChunk) {
+        allMatches.push({
+          webChunkIndex: match.webChunkIndex,
+          answerChunkIndex: answerChunkIndex,
+          relevanceScore: match.relevanceScore,
+          answerChunk: answerChunk,
+          answerChunkPosition: answerChunkPosition
+        });
+      }
+
+      console.log(`[buildReferences] Processed answer chunk ${i + 1}/${validAnswerChunks.length}, top score: ${matchesForChunk[0]?.relevanceScore.toFixed(4)}`);
     }
-  }
 
-  // Step 6: Build reference objects
+    // Log statistics about relevance scores
+    if (allMatches.length > 0) {
+      const relevanceScores = allMatches.map(match => match.relevanceScore);
+      const minRelevance = Math.min(...relevanceScores);
+      const maxRelevance = Math.max(...relevanceScores);
+      const sumRelevance = relevanceScores.reduce((sum, score) => sum + score, 0);
+      const meanRelevance = sumRelevance / relevanceScores.length;
+
+      console.log('Reference relevance statistics:', {
+        min: minRelevance.toFixed(4),
+        max: maxRelevance.toFixed(4),
+        mean: meanRelevance.toFixed(4),
+        count: relevanceScores.length
+      });
+    }
+
+    // Step 6: Sort all matches by relevance
+    allMatches.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    console.log(`[buildReferences] Step 6: Sorted ${allMatches.length} potential matches by relevance score`);
+
+    // Step 7: Filter matches as before
+    console.log(`[buildReferences] Step 7: Filtering matches to ensure uniqueness and threshold (min: ${minRelScore})`);
+    const usedWebChunks = new Set();
+    const usedAnswerChunks = new Set();
+    const filteredMatches = [];
+
+    for (const match of allMatches) {
+      // Only consider matches with relevance score >= minRelScore
+      if (match.relevanceScore < minRelScore) continue;
+
+      if (!usedWebChunks.has(match.webChunkIndex) && !usedAnswerChunks.has(match.answerChunkIndex)) {
+        filteredMatches.push(match);
+        usedWebChunks.add(match.webChunkIndex);
+        usedAnswerChunks.add(match.answerChunkIndex);
+
+        // Break if we've reached the max number of references
+        if (filteredMatches.length >= maxRef) break;
+      }
+    }
+
+    console.log(`[buildReferences] Selected ${filteredMatches.length}/${allMatches.length} references after filtering`);
+    return buildFinalResult(answer, filteredMatches, chunkToSourceMap);
+
+  } catch (error) {
+    console.error('Embedding failed, falling back to Jaccard similarity', error);
+    console.log(`[buildReferences] Fallback: Using Jaccard similarity instead of embeddings`);
+
+    // Process all chunks with Jaccard fallback
+    const allMatches = [];
+
+    for (let i = 0; i < validAnswerChunks.length; i++) {
+      const answerChunk = validAnswerChunks[i];
+      const answerChunkIndex = validAnswerChunkIndices[i];
+      const answerChunkPosition = validAnswerChunkPositions[i];
+
+      console.log(`[buildReferences] Processing answer chunk ${i + 1}/${validAnswerChunks.length} with Jaccard similarity`);
+      const fallbackResult = await jaccardRank(answerChunk, allWebContentChunks);
+
+      for (const match of fallbackResult.results) {
+        if (validWebChunkIndices.has(match.index)) {
+          allMatches.push({
+            webChunkIndex: match.index,
+            answerChunkIndex: answerChunkIndex,
+            relevanceScore: match.relevance_score,
+            answerChunk: answerChunk,
+            answerChunkPosition: answerChunkPosition
+          });
+        }
+      }
+    }
+
+    // Sort all matches by relevance and continue with the rest of the function
+    allMatches.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    console.log(`[buildReferences] Fallback complete. Found ${allMatches.length} potential matches`);
+
+    // Filter matches as before
+    const usedWebChunks = new Set();
+    const usedAnswerChunks = new Set();
+    const filteredMatches = [];
+
+    for (const match of allMatches) {
+      if (!usedWebChunks.has(match.webChunkIndex) && !usedAnswerChunks.has(match.answerChunkIndex)) {
+        // Check if the relevance score meets the minimum threshold
+        if (match.relevanceScore >= minRelScore) {
+          filteredMatches.push(match);
+          usedWebChunks.add(match.webChunkIndex);
+          usedAnswerChunks.add(match.answerChunkIndex);
+
+          // Break if we've reached the max number of references
+          if (filteredMatches.length >= maxRef) break;
+        }
+      }
+    }
+
+    console.log(`[buildReferences] Selected ${filteredMatches.length} references using fallback method`);
+    return buildFinalResult(answer, filteredMatches, chunkToSourceMap);
+  }
+}
+
+// Helper function to build the final result
+function buildFinalResult(
+  answer: string,
+  filteredMatches: any[],
+  chunkToSourceMap: any
+): { answer: string, references: Array<Reference> } {
+  console.log(`[buildFinalResult] Building final result with ${filteredMatches.length} references`);
+
+  // Build reference objects
   const references: Reference[] = filteredMatches.map((match) => {
     const source = chunkToSourceMap[match.webChunkIndex];
     return {
@@ -191,12 +389,14 @@ export async function buildReferences(
     };
   });
 
-  // Step 7: Inject reference markers ([^1], [^2], etc.) into the answer
+  // Inject reference markers ([^1], [^2], etc.) into the answer
   let modifiedAnswer = answer;
 
   // Sort references by position in the answer (to insert markers in correct order)
   const referencesByPosition = [...references]
     .sort((a, b) => a.answerChunkPosition![0] - b.answerChunkPosition![0]);
+
+  console.log(`[buildFinalResult] Injecting reference markers into answer`);
 
   // Insert markers from beginning to end, tracking offset
   let offset = 0;
@@ -247,6 +447,8 @@ export async function buildReferences(
     // Update offset for subsequent insertions
     offset += marker.length;
   }
+
+  console.log(`[buildFinalResult] Complete. Generated ${references.length} references`);
   return {
     answer: modifiedAnswer,
     references

@@ -6,7 +6,7 @@ import {TrackerContext} from "../types";
 export async function segmentText(
   content: string,
   tracker: TrackerContext,
-  maxChunkLength = 1000,
+  maxChunkLength = 500,
   returnChunks = true,
 ): Promise<{
   chunks: string[];

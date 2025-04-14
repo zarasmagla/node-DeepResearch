@@ -2,6 +2,7 @@ import {TrackerContext} from "../types";
 import axios from 'axios';
 import {JINA_API_KEY} from "../config";
 import {Schemas} from "../utils/schemas";
+import {cosineSimilarity} from "./cosine";
 
 export async function cherryPick(question: string, longContext: string, options: any = {}, trackers: TrackerContext, schemaGen: Schemas, url: string) {
 
@@ -207,30 +208,4 @@ ${snippet}
     // Fallback: just return the beginning of the context up to the desired length
     return longContext.substring(0, snippetLength * numSnippets);
   }
-}
-
-// Function to calculate cosine similarity between two vectors
-function cosineSimilarity(vectorA: number[], vectorB: number[]): number {
-  if (vectorA.length !== vectorB.length) {
-    throw new Error("Vectors must have the same length");
-  }
-
-  let dotProduct = 0;
-  let magnitudeA = 0;
-  let magnitudeB = 0;
-
-  for (let i = 0; i < vectorA.length; i++) {
-    dotProduct += vectorA[i] * vectorB[i];
-    magnitudeA += vectorA[i] * vectorA[i];
-    magnitudeB += vectorB[i] * vectorB[i];
-  }
-
-  magnitudeA = Math.sqrt(magnitudeA);
-  magnitudeB = Math.sqrt(magnitudeB);
-
-  if (magnitudeA === 0 || magnitudeB === 0) {
-    return 0;
-  }
-
-  return dotProduct / (magnitudeA * magnitudeB);
 }
