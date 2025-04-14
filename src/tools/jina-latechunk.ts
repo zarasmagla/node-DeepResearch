@@ -6,9 +6,9 @@ import {Schemas} from "../utils/schemas";
 export async function cherryPick(question: string, longContext: string, options: any = {}, trackers: TrackerContext, schemaGen: Schemas, url: string) {
 
   const {
-    snippetLength = 3000,  // char length of each snippet
+    snippetLength = 5000,  // char length of each snippet
     numSnippets = Math.max(2, Math.min(5, Math.floor(longContext.length / snippetLength))),
-    chunkSize = 300,  // char length of each chunk
+    chunkSize = 500,  // char length of each chunk
   } = options;
 
   const maxTokensPerRequest = 8192 // Maximum tokens per embedding request
