@@ -1,106 +1,16 @@
 import {segmentText} from './segment';
-import {JinaEmbeddingRequest, JinaEmbeddingResponse, Reference, TrackerContext, WebContent} from "../types";
+import {Reference, TrackerContext, WebContent} from "../types";
 import {Schemas} from "../utils/schemas";
-import axios, {AxiosError} from 'axios';
-import {JINA_API_KEY} from "../config";
 import {cosineSimilarity, jaccardRank} from "./cosine";
-
-const BATCH_SIZE = 2000;
-const API_URL = "https://api.jina.ai/v1/embeddings";
-
-// Simplified function to get embeddings in a single request
-async function getEmbeddings(
-  texts: string[],
-  tokenTracker?: any
-): Promise<{ embeddings: number[][], tokens: number }> {
-  console.log(`[embeddings] Getting embeddings for ${texts.length} texts`);
-
-  if (!JINA_API_KEY) {
-    throw new Error('JINA_API_KEY is not set');
-  }
-
-  // Handle empty input case
-  if (texts.length === 0) {
-    return {embeddings: [], tokens: 0};
-  }
-
-  // Process in batches of 2000
-  const allEmbeddings: number[][] = [];
-  let totalTokens = 0;
-  const batchCount = Math.ceil(texts.length / BATCH_SIZE);
-
-  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-    const batchTexts = texts.slice(i, i + BATCH_SIZE);
-    const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
-    console.log(`[embeddings] Processing batch ${currentBatch}/${batchCount} (${batchTexts.length} texts)`);
-
-    const request: JinaEmbeddingRequest = {
-      model: "jina-embeddings-v3",
-      task: "text-matching",
-      late_chunking: false, // Late chunking turned off always
-      dimensions: 1024,
-      embedding_type: "float",
-      input: batchTexts,
-      truncate: true
-    };
-
-    try {
-      const response = await axios.post<JinaEmbeddingResponse>(
-        API_URL,
-        request,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${JINA_API_KEY}`
-          }
-        }
-      );
-
-      // Validate response format
-      if (!response.data.data || response.data.data.length !== batchTexts.length) {
-        console.error('Invalid response from Jina API:', response.data);
-        continue;
-      }
-
-      // Sort embeddings by index to maintain original order
-      const batchEmbeddings = response.data.data
-        .sort((a, b) => a.index - b.index)
-        .map(item => item.embedding);
-
-      allEmbeddings.push(...batchEmbeddings);
-      totalTokens += response.data.usage.total_tokens;
-      console.log(`[embeddings] Batch ${currentBatch} complete. Tokens used: ${response.data.usage.total_tokens}, total so far: ${totalTokens}`);
-
-    } catch (error) {
-      console.error('Error calling Jina Embeddings API:', error);
-      if (error instanceof AxiosError && error.response?.status === 402) {
-        return {embeddings: [], tokens: 0};
-      }
-      throw error;
-    }
-  }
-
-  // Track token usage if tracker is provided
-  if (tokenTracker) {
-    tokenTracker.trackUsage('embeddings', {
-      promptTokens: totalTokens,
-      completionTokens: 0,
-      totalTokens: totalTokens
-    });
-  }
-
-  console.log(`[embeddings] Complete. Generated ${allEmbeddings.length} embeddings using ${totalTokens} tokens`);
-  return {embeddings: allEmbeddings, tokens: totalTokens};
-}
-
+import {getEmbeddings} from "./embeddings";
 
 export async function buildReferences(
   answer: string,
   webContents: Record<string, WebContent>,
   context: TrackerContext,
   schema: Schemas,
-  maxRef: number = 10,
   minChunkLength: number = 80,
+  maxRef: number = 10,
   minRelScore: number = 0.7
 ): Promise<{ answer: string, references: Array<Reference> }> {
   console.log(`[buildReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);

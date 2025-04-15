@@ -391,7 +391,9 @@ export async function getResponse(question?: string,
                                   noDirectAnswer: boolean = false,
                                   boostHostnames: string[] = [],
                                   badHostnames: string[] = [],
-                                  onlyHostnames: string[] = []
+                                  onlyHostnames: string[] = [],
+                                  maxRef: number = 10,
+                                  minRelScore: number = 0.7
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
   let step = 0;
@@ -990,7 +992,10 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       answerStep.answer,
       allWebContents,
       context,
-      SchemaGen
+      SchemaGen,
+      80,
+      maxRef,
+      minRelScore
     );
 
     answerStep.answer = answer;
