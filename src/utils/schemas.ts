@@ -1,6 +1,6 @@
-import {z} from "zod";
-import {ObjectGeneratorSafe} from "./safe-generator";
-import {EvaluationType, PromptPair} from "../types";
+import { z } from "zod";
+import { ObjectGeneratorSafe } from "./safe-generator";
+import { EvaluationType, PromptPair } from "../types";
 
 export const MAX_URLS_PER_STEP = 5
 export const MAX_QUERIES_PER_STEP = 5
@@ -49,6 +49,12 @@ Evaluation: {
     "languageStyle": "formal academic English with sociological terminology"
 }
 
+Question: "აუ დამეხმარეთ რა, სად ვიპოვო ნორმალური ქართული რესტორანი აქ ახლოს? მშია მაგრად 😩"
+Evaluation: {
+    "langCode": "ka",
+    "languageStyle": "informal hungry Georgian requesting a local recommendation"
+}
+
 Question: "what's 7 * 9? need to check something real quick"
 Evaluation: {
     "langCode": "en",
@@ -59,9 +65,10 @@ Evaluation: {
   };
 }
 
+
 export class Schemas {
-  public languageStyle: string = 'formal English';
-  public languageCode: string = 'en';
+  public languageStyle: string = 'formal Georgian';
+  public languageCode: string = 'ka';
 
 
   async setLanguage(query: string) {
@@ -110,22 +117,22 @@ export class Schemas {
 
   getErrorAnalysisSchema(): z.ZodObject<any> {
     return z.object({
-      recap: z.string().describe('Recap of the actions taken and the steps conducted in first person narrative.').max(500),
-      blame: z.string().describe(`Which action or the step was the root cause of the answer rejection. ${this.getLanguagePrompt()}`).max(500),
+      recap: z.string().describe(`Recap of the actions taken and the steps conducted in first person narrative., no more than 500 characters, it is very important that this is not too long. ${this.getLanguagePrompt()}`).max(500),
+      blame: z.string().describe(`Which action or the step was the root cause of the answer rejection. ${this.getLanguagePrompt()}, no more than 500 characters, it is very important that this is not too long.`).max(500),
       improvement: z.string().describe(`Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe. ${this.getLanguagePrompt()}`).max(500)
     });
   }
 
   getQueryRewriterSchema(): z.ZodObject<any> {
     return z.object({
-      think: z.string().describe(`Explain why you choose those search queries. ${this.getLanguagePrompt()}`).max(500),
+      think: z.string().describe(`Explain why you choose those search queries. no more than 500 characters, it is very important that this is not too long. ${this.getLanguagePrompt()}, no more than 500 characters, it is very important that this is not too long.`).max(500),
       queries: z.array(
         z.object({
           tbs: z.enum(['qdr:h', 'qdr:d', 'qdr:w', 'qdr:m', 'qdr:y']).describe('time-based search filter, must use this field if the search request asks for latest info. qdr:h for past hour, qdr:d for past 24 hours, qdr:w for past week, qdr:m for past month, qdr:y for past year. Choose exactly one.'),
           gl: z.string().describe('defines the country to use for the search. a two-letter country code. e.g., us for the United States, uk for United Kingdom, or fr for France.'),
           hl: z.string().describe('the language to use for the search. a two-letter language code. e.g., en for English, es for Spanish, or fr for French.'),
           location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the city level in order to simulate a real user’s search.').optional(),
-          q: z.string().describe('keyword-based search query, 2-3 words preferred, total length < 30 characters').max(50),
+          q: z.string().describe('keyword-based search query, 2-3 words preferred, total length < 50 characters, try to not be more than 50 characters').max(80),
         }))
         .max(MAX_QUERIES_PER_STEP)
         .describe(`'Array of search keywords queries, orthogonal to each other. Maximum ${MAX_QUERIES_PER_STEP} queries allowed.'`)
@@ -134,7 +141,7 @@ export class Schemas {
 
   getEvaluatorSchema(evalType: EvaluationType): z.ZodObject<any> {
     const baseSchemaBefore = {
-      think: z.string().describe(`Explanation the thought process why the answer does not pass the evaluation, ${this.getLanguagePrompt()}`).max(500),
+      think: z.string().describe(`Explanation the thought process why the answer does not pass the evaluation, ${this.getLanguagePrompt()}, no more than 500 characters, it is very important that this is not too long.`).max(500),
     };
     const baseSchemaAfter = {
       pass: z.boolean().describe('If the answer passes the test defined by the evaluator')
@@ -196,7 +203,7 @@ export class Schemas {
   }
 
   getAgentSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean,
-                 currentQuestion?: string): z.ZodObject<any> {
+    currentQuestion?: string): z.ZodObject<any> {
     const actionSchemas: Record<string, z.ZodOptional<any>> = {};
 
     if (allowSearch) {
@@ -257,7 +264,7 @@ Ensure each reflection question:
 
     // Create an object with action as a string literal and exactly one action property
     return z.object({
-      think: z.string().describe(`Concisely explain your reasoning process in ${this.getLanguagePrompt()}.`).max(500),
+      think: z.string().describe(`Concisely explain your reasoning process in ${this.getLanguagePrompt()}., no more than 500 characters, it is very important that this is not too long.`).max(600),
       action: z.enum(Object.keys(actionSchemas).map(key => key) as [string, ...string[]])
         .describe("Choose exactly one best action from the available actions, fill in the corresponding action schema required. Keep the reasons in mind: (1) What specific information is still needed? (2) Why is this action most likely to provide that information? (3) What alternatives did you consider and why were they rejected? (4) How will this action advance toward the complete answer?"),
       ...actionSchemas,
