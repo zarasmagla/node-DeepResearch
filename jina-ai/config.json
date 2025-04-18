@@ -34,20 +34,20 @@
   "models": {
     "gemini": {
       "default": {
-        "model": "gemini-2.0-flash",
+        "model": "gemini-2.5-flash-preview-04-17",
         "temperature": 0.6,
         "maxTokens": 8000
       },
       "tools": {
-        "coder": { "maxTokens": 2000, "model": "gemini-2.0-flash-lite" },
+        "coder": { "maxTokens": 5000, "model": "gemini-2.0-flash-lite" },
         "searchGrounding": {},
-        "dedup": { },
-        "evaluator": {"maxTokens": 2000 },
-        "errorAnalyzer": {"maxTokens": 1000},
-        "queryRewriter": {"maxTokens": 2000},
+        "dedup": {},
+        "evaluator": { "maxTokens": 5000 },
+        "errorAnalyzer": { "maxTokens": 1000 },
+        "queryRewriter": { "maxTokens": 5000 },
         "agent": {},
         "agentBeastMode": {},
-        "fallback": {"maxTokens": 8000, "model": "gemini-2.0-flash-lite"}
+        "fallback": { "maxTokens": 8000, "model": "gemini-2.0-flash-lite" }
       }
     },
     "openai": {
