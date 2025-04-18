@@ -29,7 +29,7 @@
   "models": {
     "gemini": {
       "default": {
-        "model": "gemini-2.0-flash",
+        "model": "gemini-2.5-flash-preview-04-17",
         "temperature": 0,
         "maxTokens": 2000
       },
@@ -38,7 +38,7 @@
         "searchGrounding": { "temperature": 0 },
         "dedup": { "temperature": 0.1 },
         "evaluator": { "temperature": 0.6, "maxTokens": 200 },
-        "errorAnalyzer": { },
+        "errorAnalyzer": {},
         "queryRewriter": { "temperature": 0.1 },
         "agent": { "temperature": 0.7 },
         "agentBeastMode": { "temperature": 0.7 },
@@ -55,8 +55,8 @@
         "coder": { "temperature": 0.7 },
         "searchGrounding": { "temperature": 0 },
         "dedup": { "temperature": 0.1 },
-        "evaluator": { },
-        "errorAnalyzer": { },
+        "evaluator": {},
+        "errorAnalyzer": {},
         "queryRewriter": { "temperature": 0.1 },
         "agent": { "temperature": 0.7 },
         "agentBeastMode": { "temperature": 0.7 },
