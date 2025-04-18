@@ -391,7 +391,9 @@ export async function getResponse(question?: string,
                                   noDirectAnswer: boolean = false,
                                   boostHostnames: string[] = [],
                                   badHostnames: string[] = [],
-                                  onlyHostnames: string[] = []
+                                  onlyHostnames: string[] = [],
+                                  maxRef: number = 10,
+                                  minRelScore: number = 0.75
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
   let step = 0;
@@ -986,16 +988,19 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
           ),
           allURLs)));
 
-    // const {answer, references} = await buildReferences(
-    //   answerStep.answer,
-    //   allWebContents,
-    //   context,
-    //   SchemaGen
-    // );
-    //
-    // answerStep.answer = answer;
-    // answerStep.references = references;
-    // await updateReferences(answerStep, allURLs)
+    const {answer, references} = await buildReferences(
+      answerStep.answer,
+      allWebContents,
+      context,
+      SchemaGen,
+      80,
+      maxRef,
+      minRelScore
+    );
+
+    answerStep.answer = answer;
+    answerStep.references = references;
+    await updateReferences(answerStep, allURLs)
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
   } else {
     answerStep.mdAnswer =

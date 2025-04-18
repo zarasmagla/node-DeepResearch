@@ -6,7 +6,7 @@ import {TrackerContext} from "../types";
 export async function segmentText(
   content: string,
   tracker: TrackerContext,
-  maxChunkLength = 1000,
+  maxChunkLength = 500,
   returnChunks = true,
 ): Promise<{
   chunks: string[];
@@ -36,7 +36,7 @@ export async function segmentText(
 
   // Process all batches in parallel
   const batchPromises = batches.map(async (batch, i) => {
-    console.log(`Processing batch ${i + 1}/${batches.length} (size: ${batch.length})`);
+    console.log(`[Segment] Processing batch ${i + 1}/${batches.length} (size: ${batch.length})`);
 
     try {
       const {data} = await axios.post(

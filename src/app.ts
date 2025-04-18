@@ -558,6 +558,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       body.boost_hostnames,
       body.bad_hostnames,
       body.only_hostnames,
+      body.max_annotations,
+      body.min_annotation_relevance
       )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
 
