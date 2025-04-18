@@ -1,6 +1,6 @@
-import {PromptPair, SearchAction, SERPQuery, TrackerContext} from '../types';
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {Schemas} from "../utils/schemas";
+import { PromptPair, SearchAction, SERPQuery, TrackerContext } from '../types';
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import { Schemas } from "../utils/schemas";
 
 
 function getPrompt(query: string, think: string, context: string): PromptPair {
@@ -74,7 +74,6 @@ Note: A query can't only have operators; and operators can't be at the start of 
 Input Query: 宝马二手车价格
 <think>
 宝马二手车价格...哎，这人应该是想买二手宝马吧。表面上是查价格，实际上肯定是想买又怕踩坑。谁不想开个宝马啊，面子十足，但又担心养不起。这年头，开什么车都是身份的象征，尤其是宝马这种豪车，一看就是有点成绩的人。但很多人其实囊中羞涩，硬撑着买了宝马，结果每天都在纠结油费保养费。说到底，可能就是想通过物质来获得安全感或填补内心的某种空虚吧。
-
 要帮他的话，得多方位思考一下...二手宝马肯定有不少问题，尤其是那些车主不会主动告诉你的隐患，维修起来可能要命。不同系列的宝马价格差异也挺大的，得看看详细数据和实际公里数。价格这东西也一直在变，去年的行情和今年的可不一样，${currentYear}年最新的趋势怎么样？宝马和奔驰还有一些更平价的车比起来，到底值不值这个钱？宝马是德国车，德国人对这车的了解肯定最深，德国车主的真实评价会更有参考价值。最后，现实点看，肯定有人买了宝马后悔的，那些血泪教训不能不听啊，得找找那些真实案例。
 </think>
 queries: [
@@ -108,7 +107,6 @@ queries: [
 Input Query: sustainable regenerative agriculture soil health restoration techniques
 <think>
 Sustainable regenerative agriculture soil health restoration techniques... interesting search. They're probably looking to fix depleted soil on their farm or garden. Behind this search though, there's likely a whole story - someone who's read books like "The Soil Will Save Us" or watched documentaries on Netflix about how conventional farming is killing the planet. They're probably anxious about climate change and want to feel like they're part of the solution, not the problem. Might be someone who brings up soil carbon sequestration at dinner parties too, you know the type. They see themselves as an enlightened land steward, rejecting the ways of "Big Ag." Though I wonder if they're actually implementing anything or just going down research rabbit holes while their garden sits untouched.
-
 Let me think about this from different angles... There's always a gap between theory and practice with these regenerative methods - what failures and limitations are people not talking about? And what about the hardcore science - like actual measurable fungi-to-bacteria ratios and carbon sequestration rates? I bet there's wisdom in indigenous practices too - Aboriginal fire management techniques predate all our "innovative" methods by thousands of years. Anyone serious would want to know which techniques work best in which contexts - no-till versus biochar versus compost tea and all that. ${currentYear}'s research would be most relevant, especially those university field trials on soil inoculants. The Austrians have been doing this in the Alps forever, so their German-language resources probably have techniques that haven't made it to English yet. And let's be honest, someone should challenge whether all the regenerative ag hype can actually scale to feed everyone.
 </think>
 queries: [
@@ -151,7 +149,6 @@ queries: [
 Input Query: KIリテラシー向上させる方法
 <think>
 AIリテラシー向上させる方法か...なるほど。最近AIがどんどん話題になってきて、ついていけなくなる不安があるんだろうな。表面的には単にAIの知識を増やしたいってことだけど、本音を言えば、職場でAIツールをうまく使いこなして一目置かれたいんじゃないかな。周りは「ChatGPTでこんなことができる」とか言ってるのに、自分だけ置いてけぼりになるのが怖いんだろう。案外、基本的なAIの知識がなくて、それをみんなに知られたくないという気持ちもあるかも。根っこのところでは、技術の波に飲み込まれる恐怖感があるんだよな、わかるよその気持ち。
-
 いろんな視点で考えてみよう...AIって実際どこまでできるんだろう？宣伝文句と実際の能力にはかなりギャップがありそうだし、その限界を知ることも大事だよね。あと、AIリテラシーって言っても、どう学べばいいのか体系的に整理されてるのかな？過去の「AI革命」とかって結局どうなったんだろう。バブルが弾けて終わったものもあるし、その教訓から学べることもあるはず。プログラミングと違ってAIリテラシーって何なのかもはっきりさせたいよね。批判的思考力との関係も気になる。${currentYear}年のAIトレンドは特に変化が速そうだから、最新情報を押さえておくべきだな。海外の方が進んでるから、英語の資料も見た方がいいかもしれないし。そもそもAIリテラシーを身につける必要があるのか？「流行りだから」という理由だけなら、実は意味がないかもしれないよね。
 </think>
 queries: [
@@ -180,6 +177,42 @@ queries: [
   }
 ]
 </example-3>
+
+<example-4>
+Input Query: ქართული სამზარეულოს რეცეპტები
+<think>
+ქართული სამზარეულოს რეცეპტები... ეს ადამიანი ეძებს ქართული სამზარეულოს რეცეპტებს. ზედაპირულად, ისინი უბრალოდ უნდათ ისწავლონ ქართული კერძების მომზადება, მაგრამ აქ უფრო ღრმა მოტივაცია შეიძლება იყოს. შესაძლოა ისინი ქართული წარმოშობისაა და უნდათ დაუკავშირდნენ თავიანთ ფესვებს, ან შეიძლება მოგზაურობდნენ საქართველოში და შეუყვარდათ საკვები. შეიძლება ისინი ცდილობენ შთაბეჭდილება მოახდინონ მეგობრებზე ეგზოტიკური სამზარეულოთი, ან უბრალოდ ეძებენ ახალ გამოცდილებას.
+
+სხვადასხვა კუთხით რომ შევხედოთ... ავთენტური ქართული რეცეპტები განსხვავდება დასავლეთში ადაპტირებული ვერსიებისგან, ამიტომ მნიშვნელოვანია ტრადიციული მეთოდების და ინგრედიენტების ცოდნა. ქართული სამზარეულო ასევე მრავალფეროვანია რეგიონების მიხედვით - აჭარული, კახური, მეგრული და სხვა. ისტორიულად, ქართული სამზარეულო ვითარდებოდა საუკუნეების განმავლობაში სხვადასხვა გავლენებით. შედარებით, ქართული სამზარეულო განსხვავდება სხვა კავკასიური სამზარეულოებისგან, როგორიცაა სომხური ან აზერბაიჯანული. ${currentYear} წელს, შეიძლება არსებობდეს ახალი ტენდენციები ქართულ სამზარეულოში. რა თქმა უნდა, ყველაზე ავთენტური ინფორმაცია ქართულ ენაზე იქნება, ქართველი შეფებისგან. და ბოლოს, ზოგიერთი ადამიანი შეიძლება სკეპტიკურად იყოს განწყობილი ქართული სამზარეულოს მიმართ, ან ეძებდეს ინფორმაციას მისი შეზღუდვების შესახებ, მაგალითად დიეტური შეზღუდვებისთვის.
+</think>
+queries: [
+{
+"q": "ავთენტური ქართული რეცეპტები ტრადიციული ინგრედიენტები"
+},
+{
+"q": "ქართული სამზარეულო რეგიონული განსხვავებები"
+},
+{
+"tbs": "qdr:y",
+"q": "ქართული კულინარიის ისტორია განვითარება"
+},
+{
+"q": "ქართული vs სომხური vs აზერბაიჯანული სამზარეულო"
+},
+{
+"tbs": "qdr:m",
+"q": "თანამედროვე ქართული კერძები ტენდენციები"
+},
+{
+"gl": "ge",
+"hl": "ka",
+"q": "პროფესიონალი შეფების ქართული რეცეპტები"
+},
+{
+"q": "ქართული სამზარეულო დიეტური შეზღუდვები ალტერნატივები"
+}
+]
+</example-4>
 </examples>
 
 Each generated query must follow JSON schema format.
@@ -200,7 +233,7 @@ Given those info, now please generate the best effective queries that follow JSO
 }
 const TOOL_NAME = 'queryRewriter';
 
-export async function rewriteQuery(action: SearchAction, context: string,  trackers: TrackerContext, schemaGen: Schemas): Promise<SERPQuery[] > {
+export async function rewriteQuery(action: SearchAction, context: string, trackers: TrackerContext, schemaGen: Schemas): Promise<SERPQuery[]> {
   try {
     const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
     const queryPromises = action.searchRequests.map(async (req) => {
@@ -218,7 +251,8 @@ export async function rewriteQuery(action: SearchAction, context: string,  track
     const queryResults = await Promise.all(queryPromises);
     const allQueries: SERPQuery[] = queryResults.flat();
     console.log(TOOL_NAME, allQueries);
-    return allQueries;
+    // For some reason allQueries contains undefined, we just filter thouse values
+    return allQueries.filter(Boolean);
   } catch (error) {
     console.error(`Error in ${TOOL_NAME}`, error);
     throw error;
