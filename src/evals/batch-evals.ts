@@ -1,12 +1,12 @@
 import fs from 'fs/promises';
-import {exec} from 'child_process';
-import {promisify} from 'util';
-import {getResponse} from '../agent';
-import {generateObject} from 'ai';
-import {GEMINI_API_KEY} from '../config';
-import {z} from 'zod';
-import {AnswerAction, TrackerContext} from "../types";
-import {createGoogleGenerativeAI} from "@ai-sdk/google";
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { getResponse } from '../agent';
+import { generateObject } from 'ai';
+import { GEMINI_API_KEY } from '../config';
+import { z } from 'zod';
+import { AnswerAction, TrackerContext } from "../types";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 
 const execAsync = promisify(exec);
 
@@ -84,7 +84,7 @@ function printStats(stats: EvaluationStats): void {
 
 async function getCurrentGitCommit(): Promise<string> {
   try {
-    const {stdout} = await execAsync('git rev-parse --short HEAD');
+    const { stdout } = await execAsync('git rev-parse --short HEAD');
     return stdout.trim();
   } catch (error) {
     console.error('Error getting git commit:', error);
@@ -107,7 +107,7 @@ Minor wording differences are acceptable as long as the core information of the 
 
   try {
     const result = await generateObject({
-      model: createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })('gemini-2.0-flash'),  // fix to gemini-2.0-flash for evaluation
+      model: createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })('gemini-2.5-flash-preview-04-17'),  // fix to gemini-2.0-flash for evaluation
       schema,
       prompt,
       maxTokens: 1000,
@@ -134,7 +134,7 @@ async function batchEvaluate(inputFile: string): Promise<void> {
 
   // Process each question
   for (let i = 0; i < questions.length; i++) {
-    const {question, answer: expectedAnswer} = questions[i];
+    const { question, answer: expectedAnswer } = questions[i];
     console.log(`\nProcessing question ${i + 1}/${questions.length}: ${question}`);
 
     try {
@@ -206,4 +206,4 @@ if (require.main === module) {
   batchEvaluate(inputFile).catch(console.error);
 }
 
-export {batchEvaluate};
+export { batchEvaluate };
