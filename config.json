@@ -37,12 +37,8 @@
         "coder": { "temperature": 0.7 },
         "searchGrounding": { "temperature": 0 },
         "dedup": { "temperature": 0.1 },
-<<<<<<< HEAD
         "evaluator": { "temperature": 0.6, "maxTokens": 2000 },
-=======
-        "evaluator": { "temperature": 0.6, "maxTokens": 200 },
->>>>>>> 44a789f (feat: add bot detection and scraping capabilities)
-        "errorAnalyzer": { },
+        "errorAnalyzer": {},
         "queryRewriter": { "temperature": 0.1 },
         "agent": { "temperature": 0.7 },
         "agentBeastMode": { "temperature": 0.7 },
@@ -59,8 +55,8 @@
         "coder": { "temperature": 0.7 },
         "searchGrounding": { "temperature": 0 },
         "dedup": { "temperature": 0.1 },
-        "evaluator": { },
-        "errorAnalyzer": { },
+        "evaluator": {},
+        "errorAnalyzer": {},
         "queryRewriter": { "temperature": 0.1 },
         "agent": { "temperature": 0.7 },
         "agentBeastMode": { "temperature": 0.7 },
