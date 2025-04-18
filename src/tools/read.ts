@@ -47,7 +47,7 @@ export async function readUrl(
       throw new Error('Invalid response data');
     }
 
-    if (isBotCheck(data)) {
+    if (await isBotCheck(data)) {
       console.log('Bot check triggered, attempting to scrape...');
 
       const domain = extractDomainFromUri(url);

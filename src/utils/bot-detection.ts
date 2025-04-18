@@ -1,3 +1,4 @@
+import { classifyText } from '../tools/jina-classify-spam';
 import { ReadResponse } from '../types';
 
 /**
@@ -77,8 +78,14 @@ function hasBotProtectionLink(
  * @param response - The API response to analyze
  * @returns True if the response shows signs of bot protection
  */
-export function isBotCheck(response: ReadResponse): boolean {
+export async function isBotCheck(response: ReadResponse): Promise<boolean> {
   if (!response) return false;
+
+  // Check error messages for bot detection phrases
+  if (containsPhrase(response.message, BOT_CHECK_MESSAGE_PHRASES) || 
+    containsPhrase(response.readableMessage, BOT_CHECK_MESSAGE_PHRASES)) {
+    return true;
+  }
   
   if (response.data) {
     const { content, links, title } = response.data;
@@ -94,19 +101,40 @@ export function isBotCheck(response: ReadResponse): boolean {
       return true;
     }
     
-    // Check title keywords when status code is suspicious
-    const hasTitleKeyword = title?.toLowerCase() && 
-      BOT_CHECK_TITLE_KEYWORDS.some(keyword => 
-        title.toLowerCase().includes(keyword));
+    // Fixed title check - ensure title exists before calling toLowerCase
+    const hasTitleKeyword = title ? 
+      BOT_CHECK_TITLE_KEYWORDS.some(keyword => title.toLowerCase().includes(keyword)) : 
+      false;
     
     if (BOT_CHECK_STATUS_CODES.includes(status) && hasTitleKeyword) {
       return true;
     }
+    
+    const spamDetectLength = 400;
+    
+    if (content.length > spamDetectLength) {
+      return false;
+    }
+    
+    try {
+      const isSpam = await classifyText(content);
+      if (isSpam) {
+        console.error({
+          type: 'CONTENT_BLOCKED',
+          reason: 'spam_detection',
+          contentLength: content.length,
+          url: response.data.url,
+          preview: content.length > 0 ? content.slice(0, spamDetectLength) : '[empty content]'
+        });
+        return true;
+      }
+    } catch (error) {
+      console.error('Error during content classification:', error);
+      return false;
+    }
   }
-  
-  // Check error messages for bot detection phrases
-  return containsPhrase(response.message, BOT_CHECK_MESSAGE_PHRASES) || 
-         containsPhrase(response.readableMessage, BOT_CHECK_MESSAGE_PHRASES);
+
+  return false;
 }
 
 /**
