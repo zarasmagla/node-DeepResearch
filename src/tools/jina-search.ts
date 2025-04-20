@@ -19,6 +19,7 @@ export async function search(
           'Accept': 'application/json',
           'Authorization': `Bearer ${JINA_API_KEY}`,
           'X-Respond-With': 'no-content',
+          'X-No-Cache': 'true',
         },
         timeout: 30000,
         responseType: 'json'
