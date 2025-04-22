@@ -1,26 +1,23 @@
 import axios from 'axios';
 import { TokenTracker } from "../utils/token-tracker";
-import { SearchResponse } from '../types';
+import { SearchResponse, SERPQuery } from '../types';
 import { JINA_API_KEY } from "../config";
 
 export async function search(
-  query: string,
+  query: SERPQuery,
   tracker?: TokenTracker
 ): Promise<{ response: SearchResponse }> {
-  if (!query.trim()) {
-    throw new Error('Query cannot be empty');
-  }
-
   try {
-    const { data } = await axios.get<SearchResponse>(
-      `https://s.jina.ai/?q=${encodeURIComponent(query)}`,
+    const { data } = await axios.post<SearchResponse>(
+      `https://s.jina.ai/`,
+      query,
       {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${JINA_API_KEY}`,
           'X-Respond-With': 'no-content',
         },
-        timeout: 30000,
+        timeout: 10000,
         responseType: 'json'
       }
     );
@@ -39,7 +36,7 @@ export async function search(
     const tokenTracker = tracker || new TokenTracker();
     tokenTracker.trackUsage('search', {
       totalTokens,
-      promptTokens: query.length,
+      promptTokens: query.q.length,
       completionTokens: totalTokens
     });
 
