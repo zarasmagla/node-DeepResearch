@@ -76,7 +76,7 @@ async function getBatchEmbeddingsWithRetry(
   currentBatch: number,
   batchCount: number
 ): Promise<{ batchEmbeddings: number[][], batchTokens: number }> {
-  let batchEmbeddings: number[][] = [];
+  const batchEmbeddings: number[][] = [];
   let batchTokens = 0;
   let retryCount = 0;
   let textsToProcess = [...batchTexts]; // Copy the original texts
@@ -92,11 +92,11 @@ async function getBatchEmbeddingsWithRetry(
       model: "jina-embeddings-v3",
       task: options.task || "text-matching",
       input: textsToProcess,
-      truncate: true
+      truncate: true,
+      dimensions: options.dimensions || 512,
     };
 
     // Add optional parameters if provided
-    if (options.dimensions) request.dimensions = options.dimensions;
     if (options.late_chunking) request.late_chunking = options.late_chunking;
     if (options.embedding_type) request.embedding_type = options.embedding_type;
 
@@ -116,7 +116,7 @@ async function getBatchEmbeddingsWithRetry(
         console.error('No data returned from Jina API');
         if (retryCount === MAX_RETRIES - 1) {
           // On last retry, create placeholder embeddings
-          const dimensionSize = options.dimensions || 1024;
+          const dimensionSize = options.dimensions || 512;
           const placeholderEmbeddings = textsToProcess.map(text => {
             console.error(`Failed to get embedding after all retries: [${text.substring(0, 50)}...]`);
             return new Array(dimensionSize).fill(0);
@@ -136,7 +136,7 @@ async function getBatchEmbeddingsWithRetry(
       }
 
       const receivedIndices = new Set(response.data.data.map(item => item.index));
-      const dimensionSize = response.data.data[0]?.embedding?.length || options.dimensions || 1024;
+      const dimensionSize = response.data.data[0]?.embedding?.length || options.dimensions || 512;
       
       // Process successful embeddings
       const successfulEmbeddings: number[][] = [];
@@ -187,7 +187,7 @@ async function getBatchEmbeddingsWithRetry(
       
       // On last retry, create placeholder embeddings
       if (retryCount === MAX_RETRIES - 1) {
-        const dimensionSize = options.dimensions || 1024;
+        const dimensionSize = options.dimensions || 512;
         for (let idx = 0; idx < textsToProcess.length; idx++) {
           const originalIndex = indexMap.get(idx)!;
           console.error(`Failed to get embedding after all retries for index ${originalIndex}: [${textsToProcess[idx].substring(0, 50)}...]`);
@@ -213,7 +213,7 @@ async function getBatchEmbeddingsWithRetry(
   // Handle any remaining missing embeddings after max retries
   if (textsToProcess.length > 0) {
     console.error(`[embeddings] Failed to get embeddings for ${textsToProcess.length} texts after ${MAX_RETRIES} retries`);
-    const dimensionSize = options.dimensions || 1024;
+    const dimensionSize = options.dimensions || 512;
     
     for (let idx = 0; idx < textsToProcess.length; idx++) {
       const originalIndex = indexMap.get(idx)!;
