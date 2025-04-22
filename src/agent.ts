@@ -1003,11 +1003,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     await updateReferences(answerStep, allURLs)
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
   } else {
-    answerStep.mdAnswer =
-      convertHtmlTablesToMd(
-        fixCodeBlockIndentation(
-          buildMdFromAnswer(answerStep))
-      );
+    answerStep.mdAnswer = buildMdFromAnswer(answerStep);
   }
 
   console.log(thisStep)
