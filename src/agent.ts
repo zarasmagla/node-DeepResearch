@@ -302,7 +302,7 @@ async function executeSearchQueries(
       console.log('Search query:', query);
       switch (SEARCH_PROVIDER) {
         case 'jina':
-          results = (await search(query.q, context.tokenTracker)).response?.data || [];
+          results = (await search(query, context.tokenTracker)).response?.data || [];
           break;
         case 'duck':
           results = (await duckSearch(query.q, {safeSearch: SafeSearchType.STRICT})).results;
