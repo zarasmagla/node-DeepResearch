@@ -13,6 +13,7 @@ import {TokenTracker} from "./utils/token-tracker";
 import {ActionTracker} from "./utils/action-tracker";
 import {ObjectGeneratorSafe} from "./utils/safe-generator";
 import {jsonSchema} from "ai"; // or another converter library
+import {normalizeHostName} from "./utils/url-tools";
 
 const app = express();
 
@@ -555,9 +556,9 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       body.messages,
       body.max_returned_urls,
       body.no_direct_answer,
-      body.boost_hostnames,
-      body.bad_hostnames,
-      body.only_hostnames,
+      body.boost_hostnames?.map(i => normalizeHostName(i)),
+      body.bad_hostnames?.map(i => normalizeHostName(i)),
+      body.only_hostnames?.map(i => normalizeHostName(i)),
       body.max_annotations,
       body.min_annotation_relevance
       )
