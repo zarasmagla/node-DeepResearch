@@ -289,7 +289,7 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
 
     // Hostname boost (normalized by total URLs)
     const hostnameFreq = normalizeCount(hostnameCount[hostname] || 0, totalUrls);
-    const hostnameBoost = hostnameFreq * hostnameBoostFactor * (boostHostnames.includes(hostname) ? 2 : 1);
+    const hostnameBoost = hostnameFreq * hostnameBoostFactor + (boostHostnames.includes(hostname) ? 2 : 0);
 
     // Path boost (consider all path prefixes with decay for longer paths)
     let pathBoost = 0;
