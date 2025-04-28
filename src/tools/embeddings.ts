@@ -93,7 +93,7 @@ async function getBatchEmbeddingsWithRetry(
       task: options.task || "text-matching",
       input: textsToProcess,
       truncate: true,
-      dimensions: options.dimensions || 512,
+      dimensions: options.dimensions || 128,
     };
 
     // Add optional parameters if provided
@@ -116,7 +116,7 @@ async function getBatchEmbeddingsWithRetry(
         console.error('No data returned from Jina API');
         if (retryCount === MAX_RETRIES - 1) {
           // On last retry, create placeholder embeddings
-          const dimensionSize = options.dimensions || 512;
+          const dimensionSize = options.dimensions || 128;
           const placeholderEmbeddings = textsToProcess.map(text => {
             console.error(`Failed to get embedding after all retries: [${text.substring(0, 50)}...]`);
             return new Array(dimensionSize).fill(0);
@@ -136,7 +136,7 @@ async function getBatchEmbeddingsWithRetry(
       }
 
       const receivedIndices = new Set(response.data.data.map(item => item.index));
-      const dimensionSize = response.data.data[0]?.embedding?.length || options.dimensions || 512;
+      const dimensionSize = response.data.data[0]?.embedding?.length || options.dimensions || 128;
       
       // Process successful embeddings
       const successfulEmbeddings: number[][] = [];
@@ -187,7 +187,7 @@ async function getBatchEmbeddingsWithRetry(
       
       // On last retry, create placeholder embeddings
       if (retryCount === MAX_RETRIES - 1) {
-        const dimensionSize = options.dimensions || 512;
+        const dimensionSize = options.dimensions || 128;
         for (let idx = 0; idx < textsToProcess.length; idx++) {
           const originalIndex = indexMap.get(idx)!;
           console.error(`Failed to get embedding after all retries for index ${originalIndex}: [${textsToProcess[idx].substring(0, 50)}...]`);
@@ -213,7 +213,7 @@ async function getBatchEmbeddingsWithRetry(
   // Handle any remaining missing embeddings after max retries
   if (textsToProcess.length > 0) {
     console.error(`[embeddings] Failed to get embeddings for ${textsToProcess.length} texts after ${MAX_RETRIES} retries`);
-    const dimensionSize = options.dimensions || 512;
+    const dimensionSize = options.dimensions || 128;
     
     for (let idx = 0; idx < textsToProcess.length; idx++) {
       const originalIndex = indexMap.get(idx)!;
