@@ -995,7 +995,8 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       SchemaGen,
       80,
       maxRef,
-      minRelScore
+      minRelScore,
+      onlyHostnames
     );
 
     answerStep.answer = answer;
