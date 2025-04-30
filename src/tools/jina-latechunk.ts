@@ -38,7 +38,7 @@ export async function cherryPick(question: string, longContext: string, options:
       trackers.tokenTracker,
       {
         task: "retrieval.passage",
-        dimensions: 128,
+        dimensions: 1024,
         late_chunking: true,
         embedding_type: "float"
       }
@@ -52,7 +52,7 @@ export async function cherryPick(question: string, longContext: string, options:
       trackers.tokenTracker,
       {
         task: "retrieval.query",
-        dimensions: 128,
+        dimensions: 1024,
         embedding_type: "float"
       }
     );
