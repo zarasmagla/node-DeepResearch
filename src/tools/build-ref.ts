@@ -322,7 +322,7 @@ function buildFinalResult(
 
     // Look ahead to check if there's a list item coming next
     const textAfterInsert = modifiedAnswer.substring(insertPosition);
-    const nextListItemMatch = textAfterInsert.match(/^\s*\n\s*\*/);
+    const nextListItemMatch = textAfterInsert.match(/^\s*\n\s*\*\s+/);
 
     // If we're at a position where the next content is a list item,
     // we need to adjust WHERE we place the footnote
