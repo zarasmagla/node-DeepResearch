@@ -1,6 +1,6 @@
 import axios from "axios";
 import { TokenTracker } from "../utils/token-tracker";
-import { ReadResponse } from '../types';
+import { ReadResponse } from "../types";
 import { JINA_API_KEY, SCRAPE_DO_API_KEY } from "../config";
 import { isBotCheck } from "../utils/bot-detection";
 import {
@@ -15,11 +15,11 @@ export async function readUrl(
   tracker?: TokenTracker
 ): Promise<{ response: ReadResponse }> {
   if (!url.trim()) {
-    throw new Error('URL cannot be empty');
+    throw new Error("URL cannot be empty");
   }
 
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    throw new Error('Invalid URL, only http and https URLs are supported');
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    throw new Error("Invalid URL, only http and https URLs are supported");
   }
 
   let responseData: ReadResponse | null = null;
