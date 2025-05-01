@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from "axios";
 import { TokenTracker } from "../utils/token-tracker";
 import { SearchResponse, SERPQuery } from '../types';
 import { JINA_API_KEY } from "../config";
@@ -13,10 +13,10 @@ export async function search(
       query,
       {
         headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${JINA_API_KEY}`,
-          'X-Respond-With': 'no-content',
-          'X-No-Cache': 'true',
+          Accept: "application/json",
+          Authorization: `Bearer ${JINA_API_KEY}`,
+          "X-Respond-With": "no-content",
+          "X-No-Cache": true,
         },
         timeout: 10000,
         responseType: 'json'
@@ -24,7 +24,7 @@ export async function search(
     );
 
     if (!data.data || !Array.isArray(data.data)) {
-      throw new Error('Invalid response format');
+      throw new Error("Invalid response format");
     }
 
     const totalTokens = data.data.reduce(
@@ -32,10 +32,10 @@ export async function search(
       0
     );
 
-    console.log('Total URLs:', data.data.length);
+    console.log("Total URLs:", data.data.length);
 
     const tokenTracker = tracker || new TokenTracker();
-    tokenTracker.trackUsage('search', {
+    tokenTracker.trackUsage("search", {
       totalTokens,
       promptTokens: query.q.length,
       completionTokens: totalTokens
@@ -49,11 +49,11 @@ export async function search(
         const errorData = error.response.data as any;
 
         if (status === 402) {
-          throw new Error(errorData?.readableMessage || 'Insufficient balance');
+          throw new Error(errorData?.readableMessage || "Insufficient balance");
         }
         throw new Error(errorData?.readableMessage || `HTTP Error ${status}`);
       } else if (error.request) {
-        throw new Error('No response received from server');
+        throw new Error("No response received from server");
       } else {
         throw new Error(`Request failed: ${error.message}`);
       }
