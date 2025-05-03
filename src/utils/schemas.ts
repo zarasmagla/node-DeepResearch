@@ -1,6 +1,6 @@
-import {z} from "zod";
-import {ObjectGeneratorSafe} from "./safe-generator";
-import {EvaluationType, PromptPair} from "../types";
+import { z } from "zod";
+import { ObjectGeneratorSafe } from "./safe-generator";
+import { EvaluationType, PromptPair } from "../types";
 
 export const MAX_URLS_PER_STEP = 5
 export const MAX_QUERIES_PER_STEP = 5
@@ -13,9 +13,9 @@ function getLanguagePrompt(question: string): PromptPair {
 <rules>
 Combine both language and emotional vibe in a descriptive phrase, considering:
   - Language: The primary language or mix of languages used
-  - Emotional tone: panic, excitement, frustration, curiosity, etc.
+  - Emotional tone: panic, excitement, frustration, curiosity, skepticism, etc.
   - Formality level: academic, casual, professional, etc.
-  - Domain context: technical, academic, social, etc.
+  - Domain context: technical, academic, social, political, fact-checking etc.
 </rules>
 
 <examples>
@@ -49,6 +49,18 @@ Evaluation: {
     "languageStyle": "formal academic English with sociological terminology"
 }
 
+Question: "გამარჯობა, ხომ არ იცით, როგორ ხდება Node.js-ში ასინქრონული ოპერაციების ეფექტურად მართვა Promises-ის და async/await-ის გამოყენებით?"
+Evaluation: {
+    "langCode": "ka",
+    "languageStyle": "technical Georgian seeking programming advice"
+}
+
+Question: "გამარჯობა, შეგიძლიათ გადაამოწმოთ ამ სტატიების სანდოობა კოვიდ-19-ის ვაქცინების შესახებ? ბევრი ურთიერთგამომრიცხავი ინფორმაცია ვრცელდება."
+Evaluation: {
+    "langCode": "ka",
+    "languageStyle": "concerned Georgian seeking fact-verification"
+}
+
 Question: "what's 7 * 9? need to check something real quick"
 Evaluation: {
     "langCode": "en",
@@ -58,6 +70,7 @@ Evaluation: {
     user: question
   };
 }
+
 
 export class Schemas {
   public languageStyle: string = 'formal English';
@@ -86,14 +99,14 @@ export class Schemas {
 
   getLanguageSchema() {
     return z.object({
-      langCode: z.string().describe('ISO 639-1 language code').max(10),
-      langStyle: z.string().describe('[vibe & tone] in [what language], such as formal english, informal chinese, technical german, humor english, slang, genZ, emojis etc.').max(100)
+      langCode: z.string().describe('ISO 639-1 language code. Maximum 10 characters.'),
+      langStyle: z.string().describe('[vibe & tone] in [what language], such as formal english, informal chinese, technical german, humor english, slang, genZ, emojis etc. Maximum 100 characters.')
     });
   }
 
   getQuestionEvaluateSchema(): z.ZodObject<any> {
     return z.object({
-      think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()}`).max(500),
+      think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()} Maximum 500 characters.`),
       needsDefinitive: z.boolean(),
       needsFreshness: z.boolean(),
       needsPlurality: z.boolean(),
@@ -103,36 +116,35 @@ export class Schemas {
 
   getCodeGeneratorSchema(): z.ZodObject<any> {
     return z.object({
-      think: z.string().describe(`Short explain or comments on the thought process behind the code. ${this.getLanguagePrompt()}`).max(200),
+      think: z.string().describe(`Short explain or comments on the thought process behind the code. ${this.getLanguagePrompt()} Maximum 200 characters.`),
       code: z.string().describe('The JavaScript code that solves the problem and always use \'return\' statement to return the result. Focus on solving the core problem; No need for error handling or try-catch blocks or code comments. No need to declare variables that are already available, especially big long strings or arrays.'),
     });
   }
 
   getErrorAnalysisSchema(): z.ZodObject<any> {
     return z.object({
-      recap: z.string().describe('Recap of the actions taken and the steps conducted in first person narrative.').max(500),
-      blame: z.string().describe(`Which action or the step was the root cause of the answer rejection. ${this.getLanguagePrompt()}`).max(500),
-      improvement: z.string().describe(`Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe. ${this.getLanguagePrompt()}`).max(500)
+      recap: z.string().describe(`Recap of the actions taken and the steps conducted in first person narrative. Maximum 500 characters.`),
+      blame: z.string().describe(`Which action or the step was the root cause of the answer rejection. ${this.getLanguagePrompt()} Maximum 500 characters.`),
+      improvement: z.string().describe(`Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe. ${this.getLanguagePrompt()} Maximum 500 characters.`)
     });
   }
 
   getQueryRewriterSchema(): z.ZodObject<any> {
     return z.object({
-      think: z.string().describe(`Explain why you choose those search queries. ${this.getLanguagePrompt()}`).max(500),
+      think: z.string().describe(`Explain why you choose those search queries. ${this.getLanguagePrompt()} Maximum 500 characters.`),
       queries: z.array(
         z.object({
           tbs: z.enum(['qdr:h', 'qdr:d', 'qdr:w', 'qdr:m', 'qdr:y']).describe('time-based search filter, must use this field if the search request asks for latest info. qdr:h for past hour, qdr:d for past 24 hours, qdr:w for past week, qdr:m for past month, qdr:y for past year. Choose exactly one.'),
           location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the city level in order to simulate a real user’s search.').optional(),
-          q: z.string().describe('keyword-based search query, 2-3 words preferred, total length < 30 characters').max(50),
+          q: z.string().describe('keyword-based search query, 2-3 words preferred. Maximum 80 characters.'),
         }))
-        .max(MAX_QUERIES_PER_STEP)
         .describe(`'Array of search keywords queries, orthogonal to each other. Maximum ${MAX_QUERIES_PER_STEP} queries allowed.'`)
     });
   }
 
   getEvaluatorSchema(evalType: EvaluationType): z.ZodObject<any> {
     const baseSchemaBefore = {
-      think: z.string().describe(`Explanation the thought process why the answer does not pass the evaluation, ${this.getLanguagePrompt()}`).max(500),
+      think: z.string().describe(`Explanation the thought process why the answer does not pass the evaluation, ${this.getLanguagePrompt()} Maximum 500 characters.`),
     };
     const baseSchemaAfter = {
       pass: z.boolean().describe('If the answer passes the test defined by the evaluator')
@@ -168,7 +180,7 @@ export class Schemas {
         return z.object({
           type: z.literal('attribution'),
           ...baseSchemaBefore,
-          exactQuote: z.string().describe('Exact relevant quote and evidence from the source that strongly support the answer and justify this question-answer pair').max(200).optional(),
+          exactQuote: z.string().describe('Exact relevant quote and evidence from the source that strongly support the answer and justify this question-answer pair. Maximum 200 characters.').optional(),
           ...baseSchemaAfter
         });
       case "completeness":
@@ -176,8 +188,8 @@ export class Schemas {
           type: z.literal('completeness'),
           ...baseSchemaBefore,
           completeness_analysis: z.object({
-            aspects_expected: z.string().describe('Comma-separated list of all aspects or dimensions that the question explicitly asks for.').max(100),
-            aspects_provided: z.string().describe('Comma-separated list of all aspects or dimensions that were actually addressed in the answer').max(100),
+            aspects_expected: z.string().describe('Comma-separated list of all aspects or dimensions that the question explicitly asks for. Maximum 100 characters.'),
+            aspects_provided: z.string().describe('Comma-separated list of all aspects or dimensions that were actually addressed in the answer. Maximum 100 characters.'),
           }),
           ...baseSchemaAfter
         });
@@ -185,7 +197,7 @@ export class Schemas {
         return z.object({
           type: z.literal('strict'),
           ...baseSchemaBefore,
-          improvement_plan: z.string().describe('Explain how a perfect answer should look like and what are needed to improve the current answer. Starts with "For the best answer, you must..."').max(1000),
+          improvement_plan: z.string().describe('Explain how a perfect answer should look like and what are needed to improve the current answer. Starts with "For the best answer, you must..." Maximum 1000 characters.'),
           ...baseSchemaAfter
         });
       default:
@@ -194,7 +206,7 @@ export class Schemas {
   }
 
   getAgentSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean,
-                 currentQuestion?: string): z.ZodObject<any> {
+    currentQuestion?: string): z.ZodObject<any> {
     const actionSchemas: Record<string, z.ZodOptional<any>> = {};
 
     if (allowSearch) {
@@ -202,17 +214,15 @@ export class Schemas {
         searchRequests: z.array(
           z.string()
             .min(1)
-            .max(30)
-            .describe(`A Google search query. Based on the deep intention behind the original question and the expected answer format.`))
+            .describe(`A Google search query. Based on the deep intention behind the original question and the expected answer format. Maximum 30 characters.`))
           .describe(`Required when action='search'. Always prefer a single search query, only add another search query if the original question covers multiple aspects or elements and one search request is definitely not enough, each request focus on one specific aspect of the original question. Minimize mutual information between each query. Maximum ${MAX_QUERIES_PER_STEP} search queries.`)
-          .max(MAX_QUERIES_PER_STEP)
       }).optional();
     }
 
     if (allowCoding) {
       actionSchemas.coding = z.object({
-        codingIssue: z.string().max(500)
-          .describe("Required when action='coding'. Describe what issue to solve with coding, format like a github issue ticket. Specify the input value when it is short.")
+        codingIssue: z.string()
+          .describe("Required when action='coding'. Describe what issue to solve with coding, format like a github issue ticket. Specify the input value when it is short. Maximum 500 characters.")
       }).optional();
     }
 
@@ -240,22 +250,20 @@ Ensure each reflection question:
  - Makes the unconscious conscious
  - NEVER pose general questions like: "How can I verify the accuracy of information before including it in my answer?", "What information was actually contained in the URLs I found?", "How can i tell if a source is reliable?".         
           `)
-        ).max(MAX_REFLECT_PER_STEP)
-          .describe(`Required when action='reflect'. Reflection and planing, generate a list of most important questions to fill the knowledge gaps to <og-question> ${currentQuestion} </og-question>. Maximum provide ${MAX_REFLECT_PER_STEP} reflect questions.`)
+        ).describe(`Required when action='reflect'. Reflection and planing, generate a list of most important questions to fill the knowledge gaps to <og-question> ${currentQuestion} </og-question>. Maximum provide ${MAX_REFLECT_PER_STEP} reflect questions.`)
       }).optional()
     }
 
     if (allowRead) {
       actionSchemas.visit = z.object({
         URLTargets: z.array(z.number())
-          .max(MAX_URLS_PER_STEP)
           .describe(`Required when action='visit'. Must be the index of the URL in from the original list of URLs. Maximum ${MAX_URLS_PER_STEP} URLs allowed.`)
       }).optional();
     }
 
     // Create an object with action as a string literal and exactly one action property
     return z.object({
-      think: z.string().describe(`Concisely explain your reasoning process in ${this.getLanguagePrompt()}.`).max(500),
+      think: z.string().describe(`Concisely explain your reasoning process in ${this.getLanguagePrompt()}. Maximum 600 characters.`),
       action: z.enum(Object.keys(actionSchemas).map(key => key) as [string, ...string[]])
         .describe("Choose exactly one best action from the available actions, fill in the corresponding action schema required. Keep the reasons in mind: (1) What specific information is still needed? (2) Why is this action most likely to provide that information? (3) What alternatives did you consider and why were they rejected? (4) How will this action advance toward the complete answer?"),
       ...actionSchemas,

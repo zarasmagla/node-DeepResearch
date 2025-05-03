@@ -46,6 +46,7 @@ export const BRAVE_API_KEY = env.BRAVE_API_KEY;
 export const SERPER_API_KEY = env.SERPER_API_KEY;
 export const SEARCH_PROVIDER = configJson.defaults.search_provider;
 export const STEP_SLEEP = configJson.defaults.step_sleep;
+export const SCRAPE_DO_API_KEY = env.SCRAPE_DO_API_KEY;
 
 // Determine LLM provider
 export const LLM_PROVIDER: LLMProvider = (() => {
