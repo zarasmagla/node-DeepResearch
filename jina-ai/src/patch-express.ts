@@ -111,7 +111,7 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                 rateLimitPolicy = [
                     RateLimitDesc.from({
                         occurrence: 1,
-                        periodSeconds: 60
+                        periodSeconds: 120
                     })
                 ]
             }
