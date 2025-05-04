@@ -22,6 +22,7 @@ interface GenerateOptions<T> {
   system?: string;
   messages?: CoreMessage[];
   numRetries?: number;
+  providerOptions?: Record<string, any>;
 }
 
 export class ObjectGeneratorSafe {
@@ -137,6 +138,7 @@ export class ObjectGeneratorSafe {
       system,
       messages,
       numRetries = 0,
+      providerOptions,
     } = options;
 
     if (!model || !schema) {
@@ -153,6 +155,7 @@ export class ObjectGeneratorSafe {
         messages,
         maxTokens: getToolConfig(model).maxTokens,
         temperature: getToolConfig(model).temperature,
+        providerOptions,
       });
 
       this.tokenTracker.trackUsage(model, result.usage);
@@ -175,7 +178,8 @@ export class ObjectGeneratorSafe {
             prompt,
             system,
             messages,
-            numRetries: numRetries - 1
+            numRetries: numRetries - 1,
+            providerOptions,
           });
         } else {
           // Second fallback: Try with fallback model if provided
@@ -198,6 +202,7 @@ export class ObjectGeneratorSafe {
               prompt: `Following the given JSON schema, extract the field from below: \n\n ${failedOutput}`,
               maxTokens: getToolConfig('fallback').maxTokens,
               temperature: getToolConfig('fallback').temperature,
+              providerOptions,
             });
 
             this.tokenTracker.trackUsage('fallback', fallbackResult.usage); // Track against fallback model
