@@ -45,7 +45,7 @@
         "evaluator": { "maxTokens": 5000 },
         "errorAnalyzer": { "maxTokens": 1000 },
         "queryRewriter": { "maxTokens": 5000 },
-        "agent": {},
+        "agent": { "maxTokens": 10000 },
         "agentBeastMode": {},
         "fallback": { "maxTokens": 8000, "model": "gemini-2.0-flash-lite" }
       }
