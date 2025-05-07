@@ -14,8 +14,8 @@
     "rewrite": "npx ts-node src/tools/query-rewriter.ts",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
-    "serve": "npx ts-node-dev src/server.ts",
-    "start": "ts-node src/server.ts",
+    "serve": "npx ts-node-dev --respawn src/server.ts",
+    "start": "NODE_ENV=production ts-node src/server.ts",
     "eval": "ts-node src/evals/batch-evals.ts",
     "test": "jest --testTimeout=30000",
     "test:watch": "jest --watch",
@@ -28,6 +28,7 @@
   "dependencies": {
     "@ai-sdk/google": "^1.0.0",
     "@ai-sdk/openai": "^1.1.9",
+    "@google-cloud/logging-winston": "^6.0.0",
     "@types/jsdom": "^21.1.7",
     "ai": "^4.1.26",
     "axios": "^1.7.9",
@@ -41,6 +42,7 @@
     "node-cache": "^5.1.2",
     "node-fetch": "^3.3.2",
     "undici": "^7.3.0",
+    "winston": "^3.17.0",
     "zod": "^3.22.4",
     "zod-to-json-schema": "^3.24.1"
   },

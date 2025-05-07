@@ -14,8 +14,22 @@ import { ActionTracker } from "./utils/action-tracker";
 import { ObjectGeneratorSafe } from "./utils/safe-generator";
 import { jsonSchema } from "ai"; // or another converter library
 import { normalizeHostName } from "./utils/url-tools";
+import winston from 'winston';
+import { LoggingWinston } from '@google-cloud/logging-winston';
 
 const app = express();
+
+// Create a Winston logger that streams to Cloud Logging
+const loggingWinston = new LoggingWinston();
+
+const logger = winston.createLogger({
+  level: 'info',
+  transports: [
+    new winston.transports.Console(),
+    // Add Cloud Logging
+    loggingWinston,
+  ],
+});
 
 // Get secret from command line args for optional authentication
 const secret = process.argv.find(arg => arg.startsWith('--secret='))?.split('=')[1];
@@ -26,8 +40,10 @@ app.use(express.json({
   limit: '10mb'
 }));
 
+
 // Add health check endpoint for Docker container verification
 app.get('/health', (req, res) => {
+  logger.info('Health check endpoint accessed');
   res.json({ status: 'ok' });
 });
 
@@ -298,7 +314,7 @@ if (secret) {
   app.use((req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
-      console.log('[chat/completions] Unauthorized request');
+      logger.error('[chat/completions] Unauthorized request');
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -346,7 +362,7 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
         res.write(`data: ${JSON.stringify(chunk)}\n\n`);
       }
     } catch (error) {
-      console.error('Error in streaming:', error);
+      logger.error('Error in streaming:', error);
     } finally {
       // Clear state before moving to next item
       streamingState.isEmitting = false;
@@ -365,14 +381,14 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   if (secret) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
-      console.log('[chat/completions] Unauthorized request');
+      logger.error('[chat/completions] Unauthorized request');
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
   }
 
   // Log request details (excluding sensitive data)
-  console.log('[chat/completions] Request:', {
+  logger.info('[chat/completions] Request:', {
     model: req.body.model,
     stream: req.body.stream,
     messageCount: req.body.messages?.length,
@@ -389,7 +405,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Last message must be from user' });
   }
 
-  console.log('messages', JSON.stringify(body.messages));
+  logger.info('messages', JSON.stringify(body.messages));
 
   // clean <think> from all assistant messages
   body.messages = body.messages?.filter(message => {
@@ -452,7 +468,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     // Convert JSON schema to Zod schema using a proper converter
     try {
       responseSchema = jsonSchema(body.response_format.json_schema);
-      console.log(responseSchema)
+      logger.info(responseSchema)
     } catch (error: any) {
       return res.status(400).json({ error: `Invalid JSON schema: ${error.message}` });
     }
@@ -582,7 +598,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           model: 'agent',
           schema: responseSchema,
           prompt: finalAnswer,
-          system: "Extract the structured data from the text according to the JSON schema.",
+          system: "Extract the structured data from the text according to the JSON schema. But translate everything into Georgian language except quotes.",
           providerOptions: {
             google: {
               thinkingConfig: {
@@ -591,12 +607,13 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
             }
           }
         });
-
+        // Access result properties safely
+        logger.info('Finish reason:', (result as any).finishReason || 'unknown');
         // Use the generated object as the response content
         finalAnswer = JSON.stringify(result.object, null, 2);
-        console.log('Generated object:', finalAnswer)
+        logger.info('Generated object:', finalAnswer);
       } catch (error) {
-        console.error('Error processing response with schema:', error);
+        logger.error('Error processing response with schema:', error);
       }
     }
 
