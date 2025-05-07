@@ -157,6 +157,7 @@ export class ObjectGeneratorSafe {
         temperature: getToolConfig(model).temperature,
         providerOptions,
       });
+      console.log('finish reason result', result.finishReason);
       this.tokenTracker.trackUsage(model, result.usage);
       return result;
 
