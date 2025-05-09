@@ -1,6 +1,6 @@
-import {z} from "zod";
-import {ObjectGeneratorSafe} from "./safe-generator";
-import {EvaluationType, PromptPair} from "../types";
+import { z } from "zod";
+import { ObjectGeneratorSafe } from "./safe-generator";
+import { EvaluationType, PromptPair } from "../types";
 
 export const MAX_URLS_PER_STEP = 5
 export const MAX_QUERIES_PER_STEP = 5
@@ -59,12 +59,51 @@ Evaluation: {
   };
 }
 
+const languageISO6391Map: Record<string, string> = {
+  'en': 'English',
+  'zh': 'Chinese',
+  'zh-CN': 'Simplified Chinese',
+  'zh-TW': 'Traditional Chinese',
+  'de': 'German',
+  'fr': 'French',
+  'es': 'Spanish',
+  'it': 'Italian',
+  'ja': 'Japanese',
+  'ko': 'Korean',
+  'pt': 'Portuguese',
+  'ru': 'Russian',
+  'ar': 'Arabic',
+  'hi': 'Hindi',
+  'bn': 'Bengali',
+  'tr': 'Turkish',
+  'nl': 'Dutch',
+  'pl': 'Polish',
+  'sv': 'Swedish',
+  'no': 'Norwegian',
+  'da': 'Danish',
+  'fi': 'Finnish',
+  'el': 'Greek',
+  'he': 'Hebrew',
+  'hu': 'Hungarian',
+  'id': 'Indonesian',
+  'ms': 'Malay',
+  'th': 'Thai',
+  'vi': 'Vietnamese',
+  'ro': 'Romanian',
+  'bg': 'Bulgarian',
+}
+
 export class Schemas {
   public languageStyle: string = 'formal English';
   public languageCode: string = 'en';
 
 
   async setLanguage(query: string) {
+    if (languageISO6391Map[query]) {
+      this.languageCode = query;
+      this.languageStyle = `formal ${languageISO6391Map[query]}`;
+      return;
+    }
     const generator = new ObjectGeneratorSafe();
     const prompt = getLanguagePrompt(query.slice(0, 100))
 
@@ -194,7 +233,7 @@ export class Schemas {
   }
 
   getAgentSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean,
-                 currentQuestion?: string): z.ZodObject<any> {
+    currentQuestion?: string): z.ZodObject<any> {
     const actionSchemas: Record<string, z.ZodOptional<any>> = {};
 
     if (allowSearch) {
