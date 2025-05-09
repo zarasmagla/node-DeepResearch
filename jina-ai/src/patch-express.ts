@@ -86,10 +86,10 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                 [RPC_CALL_ENVIRONMENT]: { req, res }
             });
 
-            const uid = await authDto.solveUID();
-            if (!uid && !ctx.ip) {
-                throw new OperationNotAllowedError(`Missing IP information for anonymous user`);
-            }
+            const uid = await authDto.assertUID();
+            // if (!uid && !ctx.ip) {
+            //     throw new OperationNotAllowedError(`Missing IP information for anonymous user`);
+            // }
             let rateLimitPolicy
             if (uid) {
                 const user = await authDto.assertUser();
@@ -110,7 +110,7 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
             } else {
                 rateLimitPolicy = [
                     RateLimitDesc.from({
-                        occurrence: 1,
+                        occurrence: 0,
                         periodSeconds: 120
                     })
                 ]
