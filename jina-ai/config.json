@@ -10,7 +10,7 @@
     "DEFAULT_MODEL_NAME": ""
   },
   "defaults": {
-    "search_provider": "serper",
+    "search_provider": "jina",
     "llm_provider": "vertex",
     "step_sleep": 500
   },
@@ -45,7 +45,7 @@
         "evaluator": { "maxTokens": 5000 },
         "errorAnalyzer": { "maxTokens": 1000 },
         "queryRewriter": { "maxTokens": 5000 },
-        "agent": {},
+        "agent": { "maxTokens": 10000 },
         "agentBeastMode": {},
         "fallback": { "maxTokens": 8000, "model": "gemini-2.0-flash-lite" }
       }

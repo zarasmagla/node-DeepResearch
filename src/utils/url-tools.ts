@@ -173,7 +173,7 @@ const extractUrlParts = (urlStr: string) => {
   try {
     const url = new URL(urlStr);
     return {
-      hostname: url.hostname,
+      hostname: url.hostname.startsWith('www.') ? url.hostname.slice(4) : url.hostname,
       path: url.pathname
     };
   } catch (e) {
@@ -181,6 +181,15 @@ const extractUrlParts = (urlStr: string) => {
     return {hostname: "", path: ""};
   }
 };
+
+export const normalizeHostName = (hostStr: string) => {
+  const extract = extractUrlParts(hostStr);
+  const host = extract.hostname;
+  if (!host) {
+    return hostStr.startsWith('www.') ? hostStr.slice(4).toLowerCase() : hostStr.toLowerCase();
+  }
+  return host;
+}
 
 // Function to count occurrences of hostnames and paths
 export const countUrlParts = (urlItems: SearchSnippet[]) => {
@@ -280,7 +289,7 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
 
     // Hostname boost (normalized by total URLs)
     const hostnameFreq = normalizeCount(hostnameCount[hostname] || 0, totalUrls);
-    const hostnameBoost = hostnameFreq * hostnameBoostFactor * (boostHostnames.includes(hostname) ? 2 : 1);
+    const hostnameBoost = hostnameFreq * hostnameBoostFactor + (boostHostnames.includes(hostname) ? 2 : 0);
 
     // Path boost (consider all path prefixes with decay for longer paths)
     let pathBoost = 0;

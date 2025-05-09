@@ -1,6 +1,6 @@
-import express, {Request, Response, RequestHandler} from 'express';
+import express, { Request, Response, RequestHandler } from 'express';
 import cors from 'cors';
-import {getResponse} from './agent';
+import { getResponse } from './agent';
 import {
   TrackerContext,
   ChatCompletionRequest,
@@ -9,12 +9,27 @@ import {
   AnswerAction,
   Model, StepAction, VisitAction
 } from './types';
-import {TokenTracker} from "./utils/token-tracker";
-import {ActionTracker} from "./utils/action-tracker";
-import {ObjectGeneratorSafe} from "./utils/safe-generator";
-import {jsonSchema} from "ai"; // or another converter library
+import { TokenTracker } from "./utils/token-tracker";
+import { ActionTracker } from "./utils/action-tracker";
+import { ObjectGeneratorSafe } from "./utils/safe-generator";
+import { jsonSchema } from "ai"; // or another converter library
+import { normalizeHostName } from "./utils/url-tools";
+import winston from 'winston';
+import { LoggingWinston } from '@google-cloud/logging-winston';
 
 const app = express();
+
+// Create a Winston logger that streams to Cloud Logging
+const loggingWinston = new LoggingWinston();
+
+const logger = winston.createLogger({
+  level: 'info',
+  transports: [
+    new winston.transports.Console(),
+    // Add Cloud Logging
+    loggingWinston,
+  ],
+});
 
 // Get secret from command line args for optional authentication
 const secret = process.argv.find(arg => arg.startsWith('--secret='))?.split('=')[1];
@@ -25,9 +40,11 @@ app.use(express.json({
   limit: '10mb'
 }));
 
+
 // Add health check endpoint for Docker container verification
 app.get('/health', (req, res) => {
-  res.json({status: 'ok'});
+  logger.info('Health check endpoint accessed');
+  res.json({ status: 'ok' });
 });
 
 async function* streamTextNaturally(text: string, streamingState: StreamingState) {
@@ -191,7 +208,7 @@ async function emitRemainingContent(
     system_fingerprint: 'fp_' + requestId,
     choices: [{
       index: 0,
-      delta: {content, type: "think"},
+      delta: { content, type: "think" },
       logprobs: null,
       finish_reason: null
     }],
@@ -221,12 +238,12 @@ function getTokenBudgetAndMaxAttempts(
 
   switch (reasoningEffort) {
     case 'low':
-      return {tokenBudget: 100000, maxBadAttempts: 1};
+      return { tokenBudget: 100000, maxBadAttempts: 1 };
     case 'high':
-      return {tokenBudget: 1000000, maxBadAttempts: 2};
+      return { tokenBudget: 1000000, maxBadAttempts: 2 };
     case 'medium':
     default:
-      return {tokenBudget: 500000, maxBadAttempts: 1};
+      return { tokenBudget: 500000, maxBadAttempts: 1 };
   }
 }
 
@@ -297,8 +314,8 @@ if (secret) {
   app.use((req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
-      console.log('[chat/completions] Unauthorized request');
-      res.status(401).json({error: 'Unauthorized'});
+      logger.error('[chat/completions] Unauthorized request');
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
 
@@ -337,7 +354,7 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
           system_fingerprint: 'fp_' + requestId,
           choices: [{
             index: 0,
-            delta: {content: word, type: 'think'},
+            delta: { content: word, type: 'think' },
             logprobs: null,
             finish_reason: null
           }]
@@ -345,7 +362,7 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
         res.write(`data: ${JSON.stringify(chunk)}\n\n`);
       }
     } catch (error) {
-      console.error('Error in streaming:', error);
+      logger.error('Error in streaming:', error);
     } finally {
       // Clear state before moving to next item
       streamingState.isEmitting = false;
@@ -364,14 +381,14 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   if (secret) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
-      console.log('[chat/completions] Unauthorized request');
-      res.status(401).json({error: 'Unauthorized'});
+      logger.error('[chat/completions] Unauthorized request');
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
   }
 
   // Log request details (excluding sensitive data)
-  console.log('[chat/completions] Request:', {
+  logger.info('[chat/completions] Request:', {
     model: req.body.model,
     stream: req.body.stream,
     messageCount: req.body.messages?.length,
@@ -381,14 +398,14 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
 
   const body = req.body as ChatCompletionRequest;
   if (!body.messages?.length) {
-    return res.status(400).json({error: 'Messages array is required and must not be empty'});
+    return res.status(400).json({ error: 'Messages array is required and must not be empty' });
   }
   const lastMessage = body.messages[body.messages.length - 1];
   if (lastMessage.role !== 'user') {
-    return res.status(400).json({error: 'Last message must be from user'});
+    return res.status(400).json({ error: 'Last message must be from user' });
   }
 
-  console.log('messages', JSON.stringify(body.messages));
+  logger.info('messages', JSON.stringify(body.messages));
 
   // clean <think> from all assistant messages
   body.messages = body.messages?.filter(message => {
@@ -434,7 +451,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     return true; // Keep other messages
   });
 
-  let {tokenBudget, maxBadAttempts} = getTokenBudgetAndMaxAttempts(
+  let { tokenBudget, maxBadAttempts } = getTokenBudgetAndMaxAttempts(
     body.reasoning_effort,
     body.max_completion_tokens
   );
@@ -451,9 +468,9 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     // Convert JSON schema to Zod schema using a proper converter
     try {
       responseSchema = jsonSchema(body.response_format.json_schema);
-      console.log(responseSchema)
+      logger.info(responseSchema)
     } catch (error: any) {
-      return res.status(400).json({error: `Invalid JSON schema: ${error.message}`});
+      return res.status(400).json({ error: `Invalid JSON schema: ${error.message}` });
     }
   }
 
@@ -489,7 +506,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       system_fingerprint: 'fp_' + requestId,
       choices: [{
         index: 0,
-        delta: {role: 'assistant', content: '<think>', type: 'think'},
+        delta: { role: 'assistant', content: '<think>', type: 'think' },
         logprobs: null,
         finish_reason: null
       }]
@@ -510,7 +527,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
             system_fingerprint: 'fp_' + requestId,
             choices: [{
               index: 0,
-              delta: {type: 'think', url},
+              delta: { type: 'think', url },
               logprobs: null,
               finish_reason: null,
             }]
@@ -555,12 +572,12 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       body.messages,
       body.max_returned_urls,
       body.no_direct_answer,
-      body.boost_hostnames,
-      body.bad_hostnames,
-      body.only_hostnames,
+      body.boost_hostnames?.map(i => normalizeHostName(i)),
+      body.bad_hostnames?.map(i => normalizeHostName(i)),
+      body.only_hostnames?.map(i => normalizeHostName(i)),
       body.max_annotations,
       body.min_annotation_relevance
-      )
+    )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
 
     const annotations = (finalStep as AnswerAction).references?.map(ref => ({
@@ -581,14 +598,22 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
           model: 'agent',
           schema: responseSchema,
           prompt: finalAnswer,
-          system: "Extract the structured data from the text according to the JSON schema.",
+          system: "Extract the structured data from the text according to the JSON schema. But translate everything into Georgian language except quotes.",
+          providerOptions: {
+            google: {
+              thinkingConfig: {
+                thinkingBudget: 0, // Added thinkingBudget for Google
+              }
+            }
+          }
         });
-
+        // Access result properties safely
+        logger.info('Finish reason:', (result as any).finishReason || 'unknown');
         // Use the generated object as the response content
         finalAnswer = JSON.stringify(result.object, null, 2);
-        console.log('Generated object:', finalAnswer)
+        logger.info('Generated object:', finalAnswer);
       } catch (error) {
-        console.error('Error processing response with schema:', error);
+        logger.error('Error processing response with schema:', error);
       }
     }
 
@@ -605,7 +630,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: `</think>\n\n`, type: 'think'},
+          delta: { content: `</think>\n\n`, type: 'think' },
           logprobs: null,
           finish_reason: 'thinking_end'
         }]
@@ -703,7 +728,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: '</think>', type: 'think'},
+          delta: { content: '</think>', type: 'think' },
           logprobs: null,
           finish_reason: 'error'
         }],
@@ -720,7 +745,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         system_fingerprint: 'fp_' + requestId,
         choices: [{
           index: 0,
-          delta: {content: errorMessage, type: 'error'},
+          delta: { content: errorMessage, type: 'error' },
           logprobs: null,
           finish_reason: 'error'
         }],

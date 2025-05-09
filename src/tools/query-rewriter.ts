@@ -56,11 +56,9 @@ Leverage the soundbites from the context user provides to generate queries that 
 2. Schema usage rules:
    - Always include the 'q' field in every query object (should be the last field listed)
    - Use 'tbs' for time-sensitive queries (remove time constraints from 'q' field)
-   - Use 'gl' and 'hl' for region/language-specific queries (remove region/language from 'q' field)
-   - Use appropriate language code in 'hl' when using non-English queries
    - Include 'location' only when geographically relevant
    - Never duplicate information in 'q' that is already specified in other fields
-   - List fields in this order: tbs, gl, hl, location, q
+   - List fields in this order: tbs, location, q
 
 <query-operators>
 For the 'q' field content:

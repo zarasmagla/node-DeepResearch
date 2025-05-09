@@ -110,8 +110,8 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
             } else {
                 rateLimitPolicy = [
                     RateLimitDesc.from({
-                        occurrence: 2,
-                        periodSeconds: 60
+                        occurrence: 1,
+                        periodSeconds: 120
                     })
                 ]
             }
@@ -171,8 +171,20 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                     patchedCtx.context = patchedCtx.context.map((x: object) => ({ ...x, result: undefined }))
                 }
 
+                let data;
+                try {
+                    data = JSON.stringify(patchedCtx);
+                } catch (err: any) {
+                    const obj = marshalErrorLike(err);
+                    if (err.stack) {
+                        obj.stack = err.stack;
+                    }
+                    data = JSON.stringify(obj);
+                    logger.warn(`Failed to stringify promptContext`, { err: obj });
+                }
+
                 firebaseDefaultBucket.file(`promptContext/${ctx.traceId}.json`).save(
-                    JSON.stringify(patchedCtx),
+                    data,
                     {
                         metadata: {
                             contentType: 'application/json',

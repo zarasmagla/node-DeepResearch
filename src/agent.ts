@@ -302,7 +302,7 @@ async function executeSearchQueries(
       console.log('Search query:', query);
       switch (SEARCH_PROVIDER) {
         case 'jina':
-          results = (await search(query.q, context.tokenTracker)).response?.data || [];
+          results = (await search(query, context.tokenTracker)).response?.data || [];
           break;
         case 'duck':
           results = (await duckSearch(query.q, {safeSearch: SafeSearchType.STRICT})).results;
@@ -995,7 +995,8 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       SchemaGen,
       80,
       maxRef,
-      minRelScore
+      minRelScore,
+      onlyHostnames
     );
 
     answerStep.answer = answer;
@@ -1003,11 +1004,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     await updateReferences(answerStep, allURLs)
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
   } else {
-    answerStep.mdAnswer =
-      convertHtmlTablesToMd(
-        fixCodeBlockIndentation(
-          buildMdFromAnswer(answerStep))
-      );
+    answerStep.mdAnswer = buildMdFromAnswer(answerStep);
   }
 
   console.log(thisStep)

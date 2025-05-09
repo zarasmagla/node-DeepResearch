@@ -76,7 +76,7 @@ async function getBatchEmbeddingsWithRetry(
   currentBatch: number,
   batchCount: number
 ): Promise<{ batchEmbeddings: number[][], batchTokens: number }> {
-  let batchEmbeddings: number[][] = [];
+  const batchEmbeddings: number[][] = [];
   let batchTokens = 0;
   let retryCount = 0;
   let textsToProcess = [...batchTexts]; // Copy the original texts
@@ -92,7 +92,7 @@ async function getBatchEmbeddingsWithRetry(
       model: "jina-embeddings-v3",
       task: options.task || "text-matching",
       input: textsToProcess,
-      truncate: true
+      truncate: true,
     };
 
     // Add optional parameters if provided

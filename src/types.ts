@@ -8,8 +8,6 @@ type BaseAction = {
 
 export type SERPQuery = {
   q: string,
-  hl?: string,
-  gl?: string,
   location?: string,
   tbs?: string,
 }

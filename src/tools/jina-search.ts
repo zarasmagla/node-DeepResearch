@@ -4,7 +4,7 @@ import { SearchResponse } from "../types";
 import { JINA_API_KEY } from "../config";
 
 export async function search(
-  query: string,
+  query: SERPQuery,
   tracker?: TokenTracker
 ): Promise<{ response: SearchResponse }> {
   if (!query.trim()) {

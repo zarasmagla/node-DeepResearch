@@ -3,6 +3,7 @@ import {Reference, TrackerContext, WebContent} from "../types";
 import {Schemas} from "../utils/schemas";
 import {cosineSimilarity, jaccardRank} from "./cosine";
 import {getEmbeddings} from "./embeddings";
+import {normalizeHostName} from '../utils/url-tools';
 
 export async function buildReferences(
   answer: string,
@@ -11,7 +12,8 @@ export async function buildReferences(
   schema: Schemas,
   minChunkLength: number = 80,
   maxRef: number = 10,
-  minRelScore: number = 0.7
+  minRelScore: number = 0.7,
+  onlyHostnames: string[] = []
 ): Promise<{ answer: string, references: Array<Reference> }> {
   console.log(`[buildReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);
   console.log(`[buildReferences] Answer length: ${answer.length} chars, Web content sources: ${Object.keys(webContents).length}`);
@@ -30,6 +32,7 @@ export async function buildReferences(
   let chunkIndex = 0;
   for (const [url, content] of Object.entries(webContents)) {
     if (!content.chunks || content.chunks.length === 0) continue;
+    if (onlyHostnames.length > 0 && !onlyHostnames.includes(normalizeHostName(url))) continue;
 
     for (let i = 0; i < content.chunks.length; i++) {
       const chunk = content.chunks[i];
@@ -41,7 +44,7 @@ export async function buildReferences(
       };
 
       // Track valid web chunks (above minimum length)
-      if (chunk.length >= minChunkLength) {
+      if (chunk?.length >= minChunkLength) {
         validWebChunkIndices.add(chunkIndex);
       }
 
@@ -319,7 +322,7 @@ function buildFinalResult(
 
     // Look ahead to check if there's a list item coming next
     const textAfterInsert = modifiedAnswer.substring(insertPosition);
-    const nextListItemMatch = textAfterInsert.match(/^\s*\n\s*\*/);
+    const nextListItemMatch = textAfterInsert.match(/^\s*\n\s*\*\s+/);
 
     // If we're at a position where the next content is a list item,
     // we need to adjust WHERE we place the footnote
