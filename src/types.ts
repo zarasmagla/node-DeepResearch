@@ -196,7 +196,7 @@ export type SearchSnippet = UnNormalizedSearchSnippet & {
 };
 
 export type WebContent = {
-  full: string,
+  full?: string,
   chunks: string[]
   chunk_positions: number[][],
   title: string
