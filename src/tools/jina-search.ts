@@ -18,7 +18,7 @@ export async function search(
           "X-Respond-With": "no-content",
           "X-No-Cache": true,
         },
-        timeout: 10000,
+        timeout: 30000,
         responseType: 'json'
       }
     );

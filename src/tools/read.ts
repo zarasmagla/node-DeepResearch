@@ -1,4 +1,4 @@
-import axios from "axios";
+import axiosClient from "../utils/axios-client";
 import { TokenTracker } from "../utils/token-tracker";
 import { ReadResponse } from "../types";
 import { JINA_API_KEY, SCRAPE_DO_API_KEY } from "../config";
@@ -39,7 +39,7 @@ export async function readUrl(
       jinaHeaders['X-With-Links-Summary'] = 'all';
     }
 
-    const { data: jinaResponse } = await axios.post<ReadResponse>(
+    const { data: jinaResponse } = await axiosClient.post<ReadResponse>(
       'https://r.jina.ai/',
       { url },
       {
@@ -65,13 +65,6 @@ export async function readUrl(
       }`
     );
     lastError = error instanceof Error ? error : new Error(String(error));
-    if (axios.isAxiosError(error) && error.response?.status === 402) {
-      // If Jina fails due to insufficient balance, throw immediately
-      throw new Error(
-        (error.response.data as any)?.readableMessage ||
-        "Jina: Insufficient balance"
-      );
-    }
   }
 
   // --- Fallback to Scrape.do if Jina failed or returned invalid/bot data ---
@@ -82,7 +75,7 @@ export async function readUrl(
     try {
       const domain = extractDomainFromUri(url);
       const domainDetails = await getDomainCountry(domain);
-      const scrapeResponse = await axios.get<string>("https://api.scrape.do", {
+      const scrapeResponse = await axiosClient.get<string>("https://api.scrape.do", {
         params: {
           token: SCRAPE_DO_API_KEY,
           url: url,
