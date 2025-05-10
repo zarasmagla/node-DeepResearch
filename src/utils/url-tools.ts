@@ -523,11 +523,18 @@ export async function processURLs(
           title: data.title
         }
 
+        const knowledgeItemQuestion = `Regarding "${question}", what key information does the linked source provide?`;
+
         // Add to knowledge base
         allKnowledge.push({
-          question: `What do expert say about "${question}"?`,
+          question: knowledgeItemQuestion,
           answer: await cherryPick(question, data.content, {}, context, schemaGen, url),
-          references: [data.url],
+          references: [
+            {
+              url: data.url,
+              title: data.title,
+            }
+          ],
           type: 'url',
           updated: guessedTime ? formatDateBasedOnType(new Date(guessedTime), 'full') : undefined
         });
