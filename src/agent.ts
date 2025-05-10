@@ -394,7 +394,7 @@ export async function getResponse(question?: string,
   onlyHostnames: string[] = [],
   maxRef: number = 10,
   minRelScore: number = 0.75,
-  languageCode: string | undefined = 'zh-CN'
+  languageCode: string | undefined = undefined
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
   let step = 0;
