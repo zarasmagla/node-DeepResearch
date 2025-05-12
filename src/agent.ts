@@ -1012,6 +1012,8 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
   // max return 300 urls
   const returnedURLs = weightedURLs.slice(0, numReturnedURLs).map(r => r.url);
+  // reset all context
+  allContext.length = 0;
   return {
     result: thisStep,
     context,
