@@ -29,23 +29,23 @@ export async function readUrl(
   try {
     console.log(`Attempting to read URL with Jina: ${url}`);
     const jinaHeaders: Record<string, string> = {
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${JINA_API_KEY}`,
-      'Content-Type': 'application/json',
-      'X-Retain-Images': 'none',
-      'X-Md-Link-Style': 'discarded',
+      Accept: "application/json",
+      Authorization: `Bearer ${JINA_API_KEY}`,
+      "Content-Type": "application/json",
+      "X-Retain-Images": "none",
+      "X-Md-Link-Style": "discarded",
     };
     if (withAllLinks) {
-      jinaHeaders['X-With-Links-Summary'] = 'all';
+      jinaHeaders["X-With-Links-Summary"] = "all";
     }
 
     const { data: jinaResponse } = await axiosClient.post<ReadResponse>(
-      'https://r.jina.ai/',
+      "https://r.jina.ai/",
       { url },
       {
         headers: jinaHeaders,
         timeout: 60000, // 60 seconds timeout
-        responseType: 'json',
+        responseType: "json",
       }
     );
 
@@ -66,13 +66,6 @@ export async function readUrl(
       }`
     );
     lastError = error instanceof Error ? error : new Error(String(error));
-    if (axios.isAxiosError(error) && error.response?.status === 402) {
-      // If Jina fails due to insufficient balance, throw immediately
-      throw new Error(
-        (error.response.data as any)?.readableMessage ||
-          "Jina: Insufficient balance"
-      );
-    }
   }
 
   // --- Fallback to Scrape.do if Jina failed or returned invalid/bot data ---
@@ -83,17 +76,20 @@ export async function readUrl(
     try {
       const domain = extractDomainFromUri(url);
       const domainDetails = await getDomainCountry(domain);
-      const scrapeResponse = await axios.get<string>("https://api.scrape.do", {
-        params: {
-          token: SCRAPE_DO_API_KEY,
-          url: url,
-          geoCode: domainDetails.country?.code || "us", // Default to 'us' if country code not found
-          super: true, // Enable premium proxies if needed
-          output: "markdown", // Request markdown output
-        },
-        timeout: 90000, // Longer timeout for potentially complex scrapes
-        responseType: "text", // Expecting markdown text
-      });
+      const scrapeResponse = await axiosClient.get<string>(
+        "https://api.scrape.do",
+        {
+          params: {
+            token: SCRAPE_DO_API_KEY,
+            url: url,
+            geoCode: domainDetails.country?.code || "us", // Default to 'us' if country code not found
+            super: true, // Enable premium proxies if needed
+            output: "markdown", // Request markdown output
+          },
+          timeout: 90000, // Longer timeout for potentially complex scrapes
+          responseType: "text", // Expecting markdown text
+        }
+      );
 
       if (!scrapeResponse.data || scrapeResponse.data.trim().length === 0) {
         throw new Error("Scrape.do returned empty content.");
