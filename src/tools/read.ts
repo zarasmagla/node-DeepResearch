@@ -29,23 +29,23 @@ export async function readUrl(
   try {
     console.log(`Attempting to read URL with Jina: ${url}`);
     const jinaHeaders: Record<string, string> = {
-      'Accept': 'application/json',
-      'Authorization': `Bearer ${JINA_API_KEY}`,
-      'Content-Type': 'application/json',
-      'X-Retain-Images': 'none',
-      'X-Md-Link-Style': 'discarded',
+      Accept: "application/json",
+      Authorization: `Bearer ${JINA_API_KEY}`,
+      "Content-Type": "application/json",
+      "X-Retain-Images": "none",
+      "X-Md-Link-Style": "discarded",
     };
     if (withAllLinks) {
-      jinaHeaders['X-With-Links-Summary'] = 'all';
+      jinaHeaders["X-With-Links-Summary"] = "all";
     }
 
     const { data: jinaResponse } = await axiosClient.post<ReadResponse>(
-      'https://r.jina.ai/',
+      "https://r.jina.ai/",
       { url },
       {
         headers: jinaHeaders,
         timeout: 60000, // 60 seconds timeout
-        responseType: 'json',
+        responseType: "json",
       }
     );
 
@@ -61,7 +61,8 @@ export async function readUrl(
     }
   } catch (error) {
     console.log(
-      `Jina request failed: ${error instanceof Error ? error.message : String(error)
+      `Jina request failed: ${
+        error instanceof Error ? error.message : String(error)
       }`
     );
     lastError = error instanceof Error ? error : new Error(String(error));
@@ -75,17 +76,20 @@ export async function readUrl(
     try {
       const domain = extractDomainFromUri(url);
       const domainDetails = await getDomainCountry(domain);
-      const scrapeResponse = await axiosClient.get<string>("https://api.scrape.do", {
-        params: {
-          token: SCRAPE_DO_API_KEY,
-          url: url,
-          geoCode: domainDetails.country?.code || "us", // Default to 'us' if country code not found
-          super: true, // Enable premium proxies if needed
-          output: "markdown", // Request markdown output
-        },
-        timeout: 90000, // Longer timeout for potentially complex scrapes
-        responseType: "text", // Expecting markdown text
-      });
+      const scrapeResponse = await axiosClient.get<string>(
+        "https://api.scrape.do",
+        {
+          params: {
+            token: SCRAPE_DO_API_KEY,
+            url: url,
+            geoCode: domainDetails.country?.code || "us", // Default to 'us' if country code not found
+            super: true, // Enable premium proxies if needed
+            output: "markdown", // Request markdown output
+          },
+          timeout: 90000, // Longer timeout for potentially complex scrapes
+          responseType: "text", // Expecting markdown text
+        }
+      );
 
       if (!scrapeResponse.data || scrapeResponse.data.trim().length === 0) {
         throw new Error("Scrape.do returned empty content.");
@@ -120,15 +124,18 @@ export async function readUrl(
       lastError = null; // Clear previous Jina error if Scrape.do succeeded
     } catch (error) {
       console.error(
-        `Scrape.do request failed: ${error instanceof Error ? error.message : String(error)
+        `Scrape.do request failed: ${
+          error instanceof Error ? error.message : String(error)
         }`
       );
+      lastError = error instanceof Error ? error : new Error(String(error));
       // If Scrape.do also fails, throw an error combining the context
       const jinaErrorMsg = lastError?.message
         ? `Jina Error: ${lastError.message}`
         : "Jina failed or returned unusable data.";
-      const scrapeErrorMsg = `Scrape.do Error: ${error instanceof Error ? error.message : String(error)
-        }`;
+      const scrapeErrorMsg = `Scrape.do Error: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
       throw new Error(
         `Failed to read URL content. ${jinaErrorMsg}. ${scrapeErrorMsg}`
       );
@@ -147,15 +154,15 @@ export async function readUrl(
     title: responseData.data.title,
     url: responseData.data.url,
     tokens: responseData.data.usage?.tokens || 0,
-    source: lastError === null && responseData.code === 0 && responseData.status === 200 && responseData.data.content.length > 0 ? "Jina" : "Scrape.do", // Indicate the source
+    source: lastError === null ? "Jina" : "Scrape.do", // Indicate the source
   });
 
   const tokens = responseData.data.usage?.tokens || 0;
   const tokenTracker = tracker || new TokenTracker();
-  tokenTracker.trackUsage('read', {
+  tokenTracker.trackUsage("read", {
     totalTokens: tokens,
     promptTokens: url.length, // Keep original URL length as prompt approximation
-    completionTokens: tokens // Use calculated/estimated tokens as completion
+    completionTokens: tokens, // Use calculated/estimated tokens as completion
   });
 
   return { response: responseData };

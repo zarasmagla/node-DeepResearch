@@ -77,29 +77,31 @@ Input Query: 宝马二手车价格
 要帮他的话，得多方位思考一下...二手宝马肯定有不少问题，尤其是那些车主不会主动告诉你的隐患，维修起来可能要命。不同系列的宝马价格差异也挺大的，得看看详细数据和实际公里数。价格这东西也一直在变，去年的行情和今年的可不一样，${currentYear}年最新的趋势怎么样？宝马和奔驰还有一些更平价的车比起来，到底值不值这个钱？宝马是德国车，德国人对这车的了解肯定最深，德国车主的真实评价会更有参考价值。最后，现实点看，肯定有人买了宝马后悔的，那些血泪教训不能不听啊，得找找那些真实案例。
 </think>
 queries: [
-  {
-    "q": "二手宝马 维修噩梦 隐藏缺陷"
-  },
-  {
-    "q": "宝马各系价格区间 里程对比"
-  },
-  {
-    "tbs": "qdr:y",
-    "q": "二手宝马价格趋势"
-  },
-  {
-    "q": "二手宝马vs奔驰vs奥迪 性价比"
-  },
-  {
-    "tbs": "qdr:m",
-    "q": "宝马行情"
-  },
-  {
-    "q": "BMW Gebrauchtwagen Probleme"
-  },
-  {
-    "q": "二手宝马后悔案例 最差投资"
-  }
+{
+"q": "二手宝马 维修噩梦 隐藏缺陷"
+},
+{
+"q": "宝马各系价格区间 里程对比"
+},
+{
+"tbs": "qdr:y",
+"q": "二手宝马价格趋势"
+},
+{
+"q": "二手宝马vs奔驰vs奥迪 性价比"
+},
+{
+"tbs": "qdr:m",
+"q": "宝马行情"
+},
+{
+"gl": "de",
+"hl": "de",
+"q": "BMW Gebrauchtwagen Probleme"
+},
+{
+"q": "二手宝马后悔案例 最差投资"
+}
 ]
 </example-1>
 
@@ -110,38 +112,44 @@ Sustainable regenerative agriculture soil health restoration techniques... inter
 Let me think about this from different angles... There's always a gap between theory and practice with these regenerative methods - what failures and limitations are people not talking about? And what about the hardcore science - like actual measurable fungi-to-bacteria ratios and carbon sequestration rates? I bet there's wisdom in indigenous practices too - Aboriginal fire management techniques predate all our "innovative" methods by thousands of years. Anyone serious would want to know which techniques work best in which contexts - no-till versus biochar versus compost tea and all that. ${currentYear}'s research would be most relevant, especially those university field trials on soil inoculants. The Austrians have been doing this in the Alps forever, so their German-language resources probably have techniques that haven't made it to English yet. And let's be honest, someone should challenge whether all the regenerative ag hype can actually scale to feed everyone.
 </think>
 queries: [
-  {
-    "tbs": "qdr:y",
-    "location": "Fort Collins",
-    "q": "regenerative agriculture soil failures limitations"
-  },
-  {
-    "location": "Ithaca",
-    "q": "mycorrhizal fungi quantitative sequestration metrics"
-  },
-  {
-    "tbs": "qdr:y",
-    "location": "Perth",
-    "q": "aboriginal firestick farming soil restoration"
-  },
-  {
-    "location": "Totnes",
-    "q": "comparison no-till vs biochar vs compost tea"
-  },
-  {
-    "tbs": "qdr:m",
-    "location": "Davis",
-    "q": "soil microbial inoculants research trials"
-  },
-  {
-    "location": "Graz",
-    "q": "Humusaufbau Alpenregion Techniken"
-  },
-  {
-    "tbs": "qdr:m",
-    "location": "Guelph",
-    "q": "regenerative agriculture exaggerated claims evidence"
-  }
+{
+"tbs": "qdr:y",
+"location": "Fort Collins",
+"q": "regenerative agriculture soil failures limitations"
+},
+{
+"location": "Ithaca",
+"q": "mycorrhizal fungi quantitative sequestration metrics"
+},
+{
+"tbs": "qdr:y",
+"gl": "au",
+"location": "Perth",
+"q": "aboriginal firestick farming soil restoration"
+},
+{
+"gl": "uk",
+"hl": "en",
+"location": "Totnes",
+"q": "comparison no-till vs biochar vs compost tea"
+},
+{
+"tbs": "qdr:m",
+"location": "Davis",
+"q": "soil microbial inoculants research trials"
+},
+{
+"gl": "at",
+"hl": "de",
+"location": "Graz",
+"q": "Humusaufbau Alpenregion Techniken"
+},
+{
+"tbs": "qdr:m",
+"gl": "ca",
+"location": "Guelph",
+"q": "regenerative agriculture exaggerated claims evidence"
+}
 ]
 </example-2>
 

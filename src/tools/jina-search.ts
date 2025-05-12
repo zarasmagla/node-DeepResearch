@@ -1,5 +1,5 @@
 import { TokenTracker } from "../utils/token-tracker";
-import { SearchResponse, SERPQuery } from '../types';
+import { SearchResponse, SERPQuery } from "../types";
 import { JINA_API_KEY } from "../config";
 import axiosClient from '../utils/axios-client';
 
@@ -19,7 +19,7 @@ export async function search(
           "X-No-Cache": true,
         },
         timeout: 30000,
-        responseType: 'json'
+        responseType: "json",
       }
     );
 
@@ -38,7 +38,7 @@ export async function search(
     tokenTracker.trackUsage("search", {
       totalTokens,
       promptTokens: query.q.length,
-      completionTokens: totalTokens
+      completionTokens: totalTokens,
     });
 
     return { response: data };
