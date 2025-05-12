@@ -417,7 +417,7 @@ async function executeSearchQueries(
       utilityScore = utilityScore + addToAllURLs(r, allURLs);
       webContents[r.url] = {
         title: r.title,
-        full: r.description,
+        // full: r.description,
         chunks: [r.description],
         chunk_positions: [[0, r.description?.length]],
       };
@@ -494,7 +494,8 @@ export async function getResponse(
   badHostnames: string[] = [],
   onlyHostnames: string[] = [],
   maxRef: number = 10,
-  minRelScore: number = 0.75
+  minRelScore: number = 0.75,
+  languageCode: string | undefined = undefined
 ): Promise<{
   result: StepAction;
   context: TrackerContext;
@@ -523,7 +524,7 @@ export async function getResponse(
   }
 
   const SchemaGen = new Schemas();
-  await SchemaGen.setLanguage(question);
+  await SchemaGen.setLanguage(languageCode || question)
   const context: TrackerContext = {
     tokenTracker:
       existingContext?.tokenTracker || new TokenTracker(tokenBudget),

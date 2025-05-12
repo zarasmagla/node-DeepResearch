@@ -1,4 +1,4 @@
-import axios from "axios";
+import axiosClient from "../utils/axios-client";
 import { TokenTracker } from "../utils/token-tracker";
 import { ReadResponse } from "../types";
 import { JINA_API_KEY, SCRAPE_DO_API_KEY } from "../config";
@@ -29,23 +29,23 @@ export async function readUrl(
   try {
     console.log(`Attempting to read URL with Jina: ${url}`);
     const jinaHeaders: Record<string, string> = {
-      Accept: "application/json",
-      Authorization: `Bearer ${JINA_API_KEY}`,
-      "Content-Type": "application/json",
-      "X-Retain-Images": "none",
-      "X-Md-Link-Style": "discarded",
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${JINA_API_KEY}`,
+      'Content-Type': 'application/json',
+      'X-Retain-Images': 'none',
+      'X-Md-Link-Style': 'discarded',
     };
     if (withAllLinks) {
-      jinaHeaders["X-With-Links-Summary"] = "all";
+      jinaHeaders['X-With-Links-Summary'] = 'all';
     }
 
-    const { data: jinaResponse } = await axios.post<ReadResponse>(
-      "https://r.jina.ai/",
+    const { data: jinaResponse } = await axiosClient.post<ReadResponse>(
+      'https://r.jina.ai/',
       { url },
       {
         headers: jinaHeaders,
         timeout: 60000, // 60 seconds timeout
-        responseType: "json",
+        responseType: 'json',
       }
     );
 

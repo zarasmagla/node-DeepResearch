@@ -387,13 +387,19 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     }
   }
 
+  const clientIp = req.headers['cf-connecting-ip'] ||
+    req.headers['x-forwarded-for'] ||
+    req.ip ||
+    req.socket.remoteAddress ||
+    'unknown';
   // Log request details (excluding sensitive data)
   logger.info('[chat/completions] Request:', {
     model: req.body.model,
     stream: req.body.stream,
     messageCount: req.body.messages?.length,
     hasAuth: !!req.headers.authorization,
-    requestId: Date.now().toString()
+    requestId: Date.now().toString(),
+    clientIp: clientIp,
   });
 
   const body = req.body as ChatCompletionRequest;
@@ -576,7 +582,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       body.bad_hostnames?.map(i => normalizeHostName(i)),
       body.only_hostnames?.map(i => normalizeHostName(i)),
       body.max_annotations,
-      body.min_annotation_relevance
+      body.min_annotation_relevance,
+      body.language_code
     )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
 

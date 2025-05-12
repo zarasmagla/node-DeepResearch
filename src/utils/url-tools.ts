@@ -515,9 +515,18 @@ export async function processURLs(
         }
 
         // add to web contents
-        const {chunks, chunk_positions } = await segmentText(data.content, context)
+        const {chunks, chunk_positions } = await segmentText(data.content, context);
+        // filter out the chunks that are too short, minChunkLength is 80
+        const minChunkLength = 80;
+        for (let i = 0; i < chunks.length; i++) {
+          if (chunks[i].length < minChunkLength) {
+            chunks.splice(i, 1);
+            chunk_positions.splice(i, 1);
+            i--;
+          }
+        }
         webContents[data.url] = {
-          full: data.content,
+          // full: data.content,
           chunks,
           chunk_positions,
           title: data.title

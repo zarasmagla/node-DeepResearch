@@ -1,5 +1,5 @@
 // Action Types
-import {CoreMessage, LanguageModelUsage} from "ai";
+import { CoreMessage, LanguageModelUsage } from "ai";
 
 type BaseAction = {
   action: "search" | "answer" | "reflect" | "visit" | "coding";
@@ -196,7 +196,7 @@ export type SearchSnippet = UnNormalizedSearchSnippet & {
 };
 
 export type WebContent = {
-  full: string,
+  full?: string,
   chunks: string[]
   chunk_positions: number[][],
   title: string
@@ -245,6 +245,7 @@ export interface ChatCompletionRequest {
 
   max_annotations?: number;
   min_annotation_relevance?: number;
+  language_code?: string;
 }
 
 export interface URLAnnotation {
@@ -304,8 +305,8 @@ export interface ChatCompletionChunk {
 }
 
 // Tracker Types
-import {TokenTracker} from './utils/token-tracker';
-import {ActionTracker} from './utils/action-tracker';
+import { TokenTracker } from './utils/token-tracker';
+import { ActionTracker } from './utils/action-tracker';
 
 export interface TrackerContext {
   tokenTracker: TokenTracker;

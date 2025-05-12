@@ -86,10 +86,10 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                 [RPC_CALL_ENVIRONMENT]: { req, res }
             });
 
-            const uid = await authDto.solveUID();
-            if (!uid && !ctx.ip) {
-                throw new OperationNotAllowedError(`Missing IP information for anonymous user`);
-            }
+            const uid = await authDto.assertUID();
+            // if (!uid && !ctx.ip) {
+            //     throw new OperationNotAllowedError(`Missing IP information for anonymous user`);
+            // }
             let rateLimitPolicy
             if (uid) {
                 const user = await authDto.assertUser();
@@ -99,18 +99,18 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                 rateLimitPolicy = authDto.getRateLimits(appName) || [
                     parseInt(user.metadata?.speed_level) >= 2 ?
                         RateLimitDesc.from({
-                            occurrence: 100,
+                            occurrence: 500,
                             periodSeconds: 60
                         }) :
                         RateLimitDesc.from({
-                            occurrence: 10,
+                            occurrence: 50,
                             periodSeconds: 60
                         })
                 ];
             } else {
                 rateLimitPolicy = [
                     RateLimitDesc.from({
-                        occurrence: 1,
+                        occurrence: 0,
                         periodSeconds: 120
                     })
                 ]
@@ -210,6 +210,10 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
             logger.error(`Error in billing middleware`, { err: marshalErrorLike(err) });
             if (err.stack) {
                 logger.error(err.stack);
+            }
+        } finally {
+            if (ctx.promptContext) {
+                ctx.promptContext = null;
             }
         }
 

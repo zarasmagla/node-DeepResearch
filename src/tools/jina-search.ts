@@ -1,15 +1,15 @@
-import axios from "axios";
 import { TokenTracker } from "../utils/token-tracker";
 import { SearchResponse, SERPQuery } from "../types";
 import { JINA_API_KEY } from "../config";
+import axiosClient from '../utils/axios-client';
 
 export async function search(
   query: SERPQuery,
   tracker?: TokenTracker
 ): Promise<{ response: SearchResponse }> {
   try {
-    const { data } = await axios.post<SearchResponse>(
-      `https://s.jina.ai`,
+    const { data } = await axiosClient.post<SearchResponse>(
+      `https://s.jina.ai/`,
       query,
       {
         headers: {
@@ -43,21 +43,7 @@ export async function search(
 
     return { response: data };
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      if (error.response) {
-        const status = error.response.status;
-        const errorData = error.response.data as any;
-
-        if (status === 402) {
-          throw new Error(errorData?.readableMessage || "Insufficient balance");
-        }
-        throw new Error(errorData?.readableMessage || `HTTP Error ${status}`);
-      } else if (error.request) {
-        throw new Error("No response received from server");
-      } else {
-        throw new Error(`Request failed: ${error.message}`);
-      }
-    }
+    console.error('Error in jina search:', error);
     throw error;
   }
 }
