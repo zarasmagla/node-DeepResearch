@@ -239,12 +239,6 @@ ${actionSections.join('\n\n')}
 }
 
 
-const allContext: StepAction[] = [];  // all steps in the current session, including those leads to wrong results
-
-function updateContext(step: any) {
-  allContext.push(step)
-}
-
 async function updateReferences(thisStep: AnswerAction, allURLs: Record<string, SearchSnippet>) {
   thisStep.references = thisStep.references
     ?.filter(ref => ref?.url)
@@ -399,6 +393,11 @@ export async function getResponse(question?: string,
 
   let step = 0;
   let totalStep = 0;
+  const allContext: StepAction[] = [];  // all steps in the current session, including those leads to wrong results
+
+  const updateContext = function(step: any) {
+    allContext.push(step);
+  }
 
   question = question?.trim() as string;
   // remove incoming system messages to avoid override

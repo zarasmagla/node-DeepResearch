@@ -192,6 +192,8 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                     }
                 ).catch((err: any) => {
                     logger.warn(`Failed to save promptContext`, { err: marshalErrorLike(err) });
+                }).finally(() => {
+                    ctx.promptContext = undefined;
                 });
             }
 
@@ -210,10 +212,6 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
             logger.error(`Error in billing middleware`, { err: marshalErrorLike(err) });
             if (err.stack) {
                 logger.error(err.stack);
-            }
-        } finally {
-            if (ctx.promptContext) {
-                ctx.promptContext = null;
             }
         }
 
