@@ -42,4 +42,4 @@ ENV BRAVE_API_KEY=${BRAVE_API_KEY}
 EXPOSE 3000
 
 # Set startup command
-CMD ["node", "--max-old-space-size=1800", "./dist/server.js"]
+CMD ["node", "./dist/server.js"]
