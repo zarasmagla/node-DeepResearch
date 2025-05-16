@@ -74,6 +74,16 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
         next();
         return;
     }
+
+    // Early API key validation - reject immediately if no valid auth header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        corsMiddleware(req, res, () => {
+            res.status(401).json({ error: 'Unauthorized: API key required' });
+        });
+        return;
+    }
+
     asyncLocalContext.run(async () => {
         const googleTraceId = req.get('x-cloud-trace-context')?.split('/')?.[0];
         const ctx = asyncLocalContext.ctx;
