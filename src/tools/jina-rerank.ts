@@ -1,6 +1,7 @@
-import {TokenTracker} from "../utils/token-tracker";
-import {JINA_API_KEY} from "../config";
+import { TokenTracker } from "../utils/token-tracker";
+import { JINA_API_KEY } from "../config";
 import axiosClient from '../utils/axios-client';
+import { logger } from "../winston-logger";
 
 const JINA_API_URL = 'https://api.jina.ai/v1/rerank';
 
@@ -93,9 +94,9 @@ export async function rerankDocuments(
       document: result.document
     }));
 
-    return {results: finalResults};
+    return { results: finalResults };
   } catch (error) {
-    console.error('Error in reranking documents:', error);
+    logger.error('Error in reranking documents:', error);
 
     // Return empty results if there is an error
     return {

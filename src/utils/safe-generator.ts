@@ -9,7 +9,7 @@ import {
 import { TokenTracker } from "./token-tracker";
 import { getModel, ToolName, getToolConfig } from "../config";
 import Hjson from "hjson"; // Import Hjson library
-
+import { logger } from "../winston-logger";
 interface GenerateObjectResult<T> {
   object: T;
   usage: LanguageModelUsage;
@@ -212,7 +212,7 @@ export class ObjectGeneratorSafe {
         temperature: getToolConfig(model).temperature,
         providerOptions,
       });
-      console.log("finish reason result", result.finishReason);
+      logger.info("finish reason result", result.finishReason);
       this.tokenTracker.trackUsage(model, result.usage);
       return result;
     } catch (error) {
@@ -224,7 +224,7 @@ export class ObjectGeneratorSafe {
         return errorResult;
       } catch (parseError) {
         if (numRetries > 0) {
-          console.error(
+          logger.error(
             `${model} failed on object generation -> manual parsing failed -> retry with ${numRetries - 1
             } retries remaining`
           );
@@ -239,7 +239,7 @@ export class ObjectGeneratorSafe {
           });
         } else {
           // Second fallback: Try with fallback model if provided
-          console.error(
+          logger.error(
             `${model} failed on object generation -> manual parsing failed -> trying fallback with distilled schema`
           );
           try {
@@ -278,7 +278,7 @@ export class ObjectGeneratorSafe {
               this.tokenTracker.trackUsage("fallback", lastChanceResult.usage);
               return lastChanceResult;
             } catch (finalError) {
-              console.error(`All recovery mechanisms failed`);
+              logger.error(`All recovery mechanisms failed`);
               throw error; // Throw original error for better debugging
             }
           }
@@ -291,7 +291,7 @@ export class ObjectGeneratorSafe {
     error: unknown
   ): Promise<GenerateObjectResult<T>> {
     if (NoObjectGeneratedError.isInstance(error)) {
-      console.error(
+      logger.error(
         "Object not generated according to schema, fallback to manual parsing"
       );
       try {
@@ -312,7 +312,7 @@ export class ObjectGeneratorSafe {
             usage: (error as any).usage,
           };
         } catch (hjsonError) {
-          console.error("Both JSON and Hjson parsing failed:", hjsonError);
+          logger.error("Both JSON and Hjson parsing failed:", hjsonError);
           throw error;
         }
       }

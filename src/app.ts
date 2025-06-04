@@ -16,23 +16,11 @@ import { ActionTracker } from "./utils/action-tracker";
 import { ObjectGeneratorSafe } from "./utils/safe-generator";
 import { jsonSchema } from "ai";
 import { normalizeHostName } from "./utils/url-tools";
-import winston from "winston";
-import { LoggingWinston } from "@google-cloud/logging-winston";
 import { get_api_logger } from "./utils/structured-logger";
+import { logger } from "./winston-logger";
 
 const app = express();
 
-// Create a Winston logger that streams to Cloud Logging
-const loggingWinston = new LoggingWinston();
-
-const logger = winston.createLogger({
-  level: "info",
-  transports: [
-    new winston.transports.Console(),
-    // Add Cloud Logging
-    loggingWinston,
-  ],
-});
 
 // Get secret from command line args for optional authentication
 const secret = process.argv

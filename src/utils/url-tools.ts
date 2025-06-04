@@ -1,13 +1,14 @@
-import {BoostedSearchSnippet, KnowledgeItem, SearchSnippet, TrackerContext, VisitAction, WebContent} from "../types";
-import {getI18nText, smartMergeStrings} from "./text-tools";
-import {rerankDocuments} from "../tools/jina-rerank";
-import {readUrl} from "../tools/read";
-import {Schemas} from "./schemas";
-import {cherryPick} from "../tools/jina-latechunk";
-import {formatDateBasedOnType} from "./date-tools";
-import {classifyText} from "../tools/jina-classify-spam";
-import {segmentText} from "../tools/segment";
+import { BoostedSearchSnippet, KnowledgeItem, SearchSnippet, TrackerContext, VisitAction, WebContent } from "../types";
+import { getI18nText, smartMergeStrings } from "./text-tools";
+import { rerankDocuments } from "../tools/jina-rerank";
+import { readUrl } from "../tools/read";
+import { Schemas } from "./schemas";
+import { cherryPick } from "../tools/jina-latechunk";
+import { formatDateBasedOnType } from "./date-tools";
+import { classifyText } from "../tools/jina-classify-spam";
+import { segmentText } from "../tools/segment";
 import axiosClient from "./axios-client";
+import { logger } from "../winston-logger";
 
 export function normalizeUrl(urlString: string, debug = false, options = {
   removeAnchors: true,
@@ -157,7 +158,7 @@ export function normalizeUrl(urlString: string, debug = false, options = {
     return normalizedUrl;
   } catch (error) {
     // Main URL parsing error - this one we should throw
-    console.error(`Invalid URL "${urlString}": ${error}`);
+    logger.error(`Invalid URL "${urlString}": ${error}`);
     return;
   }
 }
@@ -178,8 +179,8 @@ const extractUrlParts = (urlStr: string) => {
       path: url.pathname
     };
   } catch (e) {
-    console.error(`Error parsing URL: ${urlStr}`, e);
-    return {hostname: "", path: ""};
+    logger.error(`Error parsing URL: ${urlStr}`, e);
+    return { hostname: "", path: "" };
   }
 };
 
@@ -203,7 +204,7 @@ export const countUrlParts = (urlItems: SearchSnippet[]) => {
     if (!item || !item.url) return; // Skip invalid items
 
     totalUrls++;
-    const {hostname, path} = extractUrlParts(item.url);
+    const { hostname, path } = extractUrlParts(item.url);
 
     // Count hostnames
     hostnameCount[hostname] = (hostnameCount[hostname] || 0) + 1;
@@ -216,7 +217,7 @@ export const countUrlParts = (urlItems: SearchSnippet[]) => {
     });
   });
 
-  return {hostnameCount, pathPrefixCount, totalUrls};
+  return { hostnameCount, pathPrefixCount, totalUrls };
 };
 
 // Calculate normalized frequency for boosting
@@ -241,7 +242,7 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
 
   // Count URL parts first
   const counts = countUrlParts(urlItems);
-  const {hostnameCount, pathPrefixCount, totalUrls} = counts;
+  const { hostnameCount, pathPrefixCount, totalUrls } = counts;
 
   if (question.trim().length > 0) {
     // Step 1: Create a record to track unique content with their original indices
@@ -260,11 +261,11 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
     // Step 2: Rerank only the unique contents
     const uniqueContents = Object.keys(uniqueContentMap);
     const uniqueIndicesMap = Object.values(uniqueContentMap);
-    console.log(`rerank URLs: ${urlItems.length}->${uniqueContents.length}`)
+    logger.info(`rerank URLs: ${urlItems.length}->${uniqueContents.length}`)
     rerankDocuments(question, uniqueContents, trackers.tokenTracker)
-      .then(({results}) => {
+      .then(({ results }) => {
         // Step 3: Map the scores back to all original items
-        results.forEach(({index, relevance_score}) => {
+        results.forEach(({ index, relevance_score }) => {
           const originalIndices = uniqueIndicesMap[index];
           const boost = relevance_score * jinaRerankFactor;
 
@@ -279,11 +280,11 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
 
   return (urlItems as BoostedSearchSnippet[]).map(item => {
     if (!item || !item.url) {
-      console.error('Skipping invalid item:', item);
+      logger.error('Skipping invalid item:', item);
       return item; // Return unchanged
     }
 
-    const {hostname, path} = extractUrlParts(item.url);
+    const { hostname, path } = extractUrlParts(item.url);
 
     // Base weight from original
     const freq = item.weight || 0; // Default to 1 if weight is missing
@@ -420,7 +421,7 @@ export async function getLastModified(url: string): Promise<string | undefined> 
 
     return undefined;
   } catch (error) {
-    console.error('Failed to fetch last modified date:');
+    logger.error('Failed to fetch last modified date:');
     return undefined;
   }
 }
@@ -458,7 +459,7 @@ export async function processURLs(
 ): Promise<{ urlResults: any[], success: boolean }> {
   // Skip if no URLs to process
   if (urls.length === 0) {
-    return {urlResults: [], success: false};
+    return { urlResults: [], success: false };
   }
 
   const badHostnames: string[] = [];
@@ -466,10 +467,10 @@ export async function processURLs(
   // Track the reading action
   const thisStep: VisitAction = {
     action: 'visit',
-    think: getI18nText('read_for', schemaGen.languageCode, {urls: urls.join(', ')}),
+    think: getI18nText('read_for', schemaGen.languageCode, { urls: urls.join(', ') }),
     URLTargets: urls
   }
-  context.actionTracker.trackAction({thisStep})
+  context.actionTracker.trackAction({ thisStep })
 
   // Process each URL in parallel
   const urlResults = await Promise.all(
@@ -483,11 +484,11 @@ export async function processURLs(
         // Store normalized URL for consistent reference
         url = normalizedUrl;
 
-        const {response} = await readUrl(url, true, context.tokenTracker);
-        const {data} = response;
+        const { response } = await readUrl(url, true, context.tokenTracker);
+        const { data } = response;
         const guessedTime = await getLastModified(url);
         if (guessedTime) {
-          console.log('Guessed time for', url, guessedTime);
+          logger.info('Guessed time for', url, guessedTime);
         }
 
         // Early return if no valid data
@@ -500,12 +501,12 @@ export async function processURLs(
         const spamDetectLength = 300;
         const isGoodContent = data.content.length > spamDetectLength || !await classifyText(data.content);
         if (!isGoodContent) {
-          console.error(`Blocked content ${data.content.length}:`, url, data.content.slice(0, spamDetectLength));
+          logger.error(`Blocked content ${data.content.length}:`, url, data.content.slice(0, spamDetectLength));
           throw new Error(`Blocked content ${url}`);
         }
 
         // add to web contents
-        const {chunks, chunk_positions } = await segmentText(data.content, context);
+        const { chunks, chunk_positions } = await segmentText(data.content, context);
         // filter out the chunks that are too short, minChunkLength is 80
         const minChunkLength = 80;
         for (let i = 0; i < chunks.length; i++) {
@@ -553,9 +554,9 @@ export async function processURLs(
           }
         });
 
-        return {url, result: response};
+        return { url, result: response };
       } catch (error: any) {
-        console.error('Error reading URL:', url, error);
+        logger.error('Error reading URL:', url, error);
         badURLs.push(url);
         // Extract hostname from the URL
         if (
@@ -570,10 +571,10 @@ export async function processURLs(
           try {
             hostname = extractUrlParts(url).hostname;
           } catch (e) {
-            console.error('Error parsing URL for hostname:', url, e);
+            logger.error('Error parsing URL for hostname:', url, e);
           }
           badHostnames.push(hostname);
-          console.log(`Added ${hostname} to bad hostnames list`);
+          logger.info(`Added ${hostname} to bad hostnames list`);
         }
         return null;
       } finally {
@@ -600,11 +601,11 @@ export async function processURLs(
   // remove any URL with bad hostnames from allURLs
   if (badHostnames.length > 0) {
     Object.keys(allURLs).forEach(url => {
-        if (badHostnames.includes(extractUrlParts(url).hostname)) {
-          delete allURLs[url];
-          console.log(`Removed ${url} from allURLs`);
-        }
+      if (badHostnames.includes(extractUrlParts(url).hostname)) {
+        delete allURLs[url];
+        console.log(`Removed ${url} from allURLs`);
       }
+    }
     )
   }
 
@@ -665,7 +666,7 @@ export function extractUrlsWithDescription(text: string, contextWindowSize: numb
   const urlPattern = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_+.~#?&//=]*)/g;
 
   // Find all matches
-  const matches: Array<{url: string, index: number, length: number}> = [];
+  const matches: Array<{ url: string, index: number, length: number }> = [];
   let match: RegExpExecArray | null;
 
   while ((match = urlPattern.exec(text)) !== null) {
@@ -704,14 +705,14 @@ export function extractUrlsWithDescription(text: string, contextWindowSize: numb
 
     // Adjust boundaries to avoid overlapping with other URLs
     if (i > 0) {
-      const prevUrl = matches[i-1];
+      const prevUrl = matches[i - 1];
       if (startPos < prevUrl.index + prevUrl.length) {
         startPos = prevUrl.index + prevUrl.length;
       }
     }
 
     if (i < matches.length - 1) {
-      const nextUrl = matches[i+1];
+      const nextUrl = matches[i + 1];
       if (endPos > nextUrl.index) {
         endPos = nextUrl.index;
       }

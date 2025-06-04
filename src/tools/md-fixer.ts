@@ -3,6 +3,7 @@ import { getKnowledgeStr } from "../utils/text-tools";
 import { getModel } from "../config";
 import { generateText } from "ai";
 import { Schemas } from "../utils/schemas";
+import { logger } from "../winston-logger";
 
 function getPrompt(
   mdContent: string,
@@ -75,7 +76,7 @@ export async function reviseAnswer(
     console.log("repaired before/after", mdContent.length, result.text.length);
 
     if (result.text.length < mdContent.length * 0.85) {
-      console.error(
+      logger.error(
         `repaired content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`
       );
       return mdContent;
@@ -83,7 +84,7 @@ export async function reviseAnswer(
 
     return result.text;
   } catch (error) {
-    console.error(`Error in ${TOOL_NAME}`, error);
+    logger.error(`Error in ${TOOL_NAME}`, error);
     return mdContent;
   }
 }

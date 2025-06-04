@@ -4,6 +4,7 @@ import { ObjectGeneratorSafe } from "../utils/safe-generator";
 import { Schemas } from "../utils/schemas";
 import { getKnowledgeStr } from "../utils/text-tools";
 import { get_tools_logger } from "../utils/structured-logger";
+import { logger } from "../winston-logger";
 
 const TOOL_NAME = 'evaluator';
 
@@ -580,7 +581,7 @@ export async function evaluateQuestion(
       },
     });
 
-    console.log('Question Evaluation:', result.object);
+    logger.info('Question Evaluation:', result.object);
 
     // Always include definitive in types
     const types: EvaluationType[] = [];
@@ -589,14 +590,14 @@ export async function evaluateQuestion(
     if (result.object.needsPlurality) types.push('plurality');
     if (result.object.needsCompleteness) types.push('completeness');
 
-    console.log('Question Metrics:', question, types);
+    logger.info('Question Metrics:', question, types);
     trackers?.actionTracker.trackThink(result.object.think);
 
     // Always evaluate definitive first, then freshness (if needed), then plurality (if needed)
     return types;
 
   } catch (error) {
-    console.error('Error in question evaluation:', error);
+    logger.error('Error in question evaluation:', error);
     // Default to no check
     return [];
   }

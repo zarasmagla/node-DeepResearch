@@ -1,9 +1,10 @@
-import {segmentText} from './segment';
-import {Reference, TrackerContext, WebContent} from "../types";
-import {Schemas} from "../utils/schemas";
-import {cosineSimilarity, jaccardRank} from "./cosine";
-import {getEmbeddings} from "./embeddings";
-import {normalizeHostName} from '../utils/url-tools';
+import { segmentText } from './segment';
+import { Reference, TrackerContext, WebContent } from "../types";
+import { Schemas } from "../utils/schemas";
+import { cosineSimilarity, jaccardRank } from "./cosine";
+import { getEmbeddings } from "./embeddings";
+import { normalizeHostName } from '../utils/url-tools';
+import { logger } from "../winston-logger";
 
 export async function buildReferences(
   answer: string,
@@ -20,7 +21,7 @@ export async function buildReferences(
 
   // Step 1: Chunk the answer
   console.log(`[buildReferences] Step 1: Chunking answer text`);
-  const {chunks: answerChunks, chunk_positions: answerChunkPositions} = await segmentText(answer, context);
+  const { chunks: answerChunks, chunk_positions: answerChunkPositions } = await segmentText(answer, context);
   console.log(`[buildReferences] Answer segmented into ${answerChunks.length} chunks`);
 
   // Step 2: Prepare all web content chunks, filtering out those below minimum length
@@ -56,7 +57,7 @@ export async function buildReferences(
 
   if (allWebContentChunks.length === 0) {
     console.log(`[buildReferences] No web content chunks available, returning without references`);
-    return {answer, references: []};
+    return { answer, references: [] };
   }
 
   // Step 3: Filter answer chunks by minimum length
@@ -83,7 +84,7 @@ export async function buildReferences(
 
   if (validAnswerChunks.length === 0) {
     console.log(`[buildReferences] No valid answer chunks, returning without references`);
-    return {answer, references: []};
+    return { answer, references: [] };
   }
 
   // Step 4: Get embeddings for BOTH answer chunks and valid web chunks in a single request
@@ -98,7 +99,7 @@ export async function buildReferences(
   // Add answer chunks first
   validAnswerChunks.forEach((chunk, index) => {
     allChunks.push(chunk);
-    chunkIndexMap.set(allChunks.length - 1, {type: 'answer', originalIndex: index});
+    chunkIndexMap.set(allChunks.length - 1, { type: 'answer', originalIndex: index });
   });
 
   // Then add web chunks that meet minimum length requirement
@@ -106,7 +107,7 @@ export async function buildReferences(
     // Only include valid web chunks (those above minimum length)
     if (validWebChunkIndices.has(i)) {
       allChunks.push(allWebContentChunks[i]);
-      chunkIndexMap.set(allChunks.length - 1, {type: 'web', originalIndex: i});
+      chunkIndexMap.set(allChunks.length - 1, { type: 'web', originalIndex: i });
     }
   }
 
@@ -225,7 +226,7 @@ export async function buildReferences(
     return buildFinalResult(answer, filteredMatches, chunkToSourceMap);
 
   } catch (error) {
-    console.error('Embedding failed, falling back to Jaccard similarity', error);
+    logger.error('Embedding failed, falling back to Jaccard similarity', error);
     console.log(`[buildReferences] Fallback: Using Jaccard similarity instead of embeddings`);
 
     // Process all chunks with Jaccard fallback

@@ -1,7 +1,8 @@
-import {TrackerContext} from "../types";
-import {Schemas} from "../utils/schemas";
-import {cosineSimilarity} from "./cosine";
-import {getEmbeddings} from "./embeddings";
+import { TrackerContext } from "../types";
+import { Schemas } from "../utils/schemas";
+import { cosineSimilarity } from "./cosine";
+import { getEmbeddings } from "./embeddings";
+import { logger } from "../winston-logger";
 
 // Refactored cherryPick function
 export async function cherryPick(question: string, longContext: string, options: any = {}, trackers: TrackerContext, schemaGen: Schemas, url: string) {
@@ -25,7 +26,7 @@ export async function cherryPick(question: string, longContext: string, options:
 
   console.log('late chunking enabled! num chunks:', chunks.length);
 
-  trackers.actionTracker.trackThink('late_chunk', schemaGen.languageCode, {url});
+  trackers.actionTracker.trackThink('late_chunk', schemaGen.languageCode, { url });
 
   try {
     if (question.trim().length === 0) {
@@ -61,7 +62,7 @@ export async function cherryPick(question: string, longContext: string, options:
 
     // Verify that we got embeddings for all chunks
     if (allChunkEmbeddings.length !== chunks.length) {
-      console.error(`Got ${allChunkEmbeddings.length} embeddings for ${chunks.length} chunks`);
+      logger.error(`Got ${allChunkEmbeddings.length} embeddings for ${chunks.length} chunks`);
     }
 
     // Calculate cosine similarity between the question and each chunk

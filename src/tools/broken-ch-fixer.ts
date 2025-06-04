@@ -1,11 +1,12 @@
 import { generateText } from "ai";
 import { getModel } from "../config";
-import {TrackerContext} from "../types";
-import {detectBrokenUnicodeViaFileIO} from "../utils/text-tools";
+import { TrackerContext } from "../types";
+import { detectBrokenUnicodeViaFileIO } from "../utils/text-tools";
+import { logger } from "../winston-logger";
 
 
 /**
- * Repairs markdown content with � characters by using Gemini to guess the missing text
+ * Repairs markdown content with characters by using Gemini to guess the missing text
  */
 export async function repairUnknownChars(mdContent: string, trackers?: TrackerContext): Promise<string> {
   const { broken, readStr } = await detectBrokenUnicodeViaFileIO(mdContent);
@@ -32,7 +33,7 @@ export async function repairUnknownChars(mdContent: string, trackers?: TrackerCo
     if (position === lastPosition) {
       // Move past this character by removing it
       repairedContent = repairedContent.substring(0, position) +
-                         repairedContent.substring(position + 1);
+        repairedContent.substring(position + 1);
       continue;
     }
 
@@ -86,14 +87,14 @@ So what was the original text between these two contexts?`,
       } else {
         // Replace the unknown sequence with the generated text
         repairedContent = repairedContent.substring(0, position) +
-                         replacement +
-                         repairedContent.substring(position + unknownCount);
+          replacement +
+          repairedContent.substring(position + unknownCount);
       }
 
       console.log(`Repair iteration ${iterations}: replaced ${unknownCount} � chars with "${replacement}"`);
 
     } catch (error) {
-      console.error("Error repairing unknown characters:", error);
+      logger.error("Error repairing unknown characters:", error);
       // Skip to the next � character without modifying this one
     }
   }

@@ -1,7 +1,7 @@
 import { PromptPair, SearchAction, SERPQuery, TrackerContext } from '../types';
 import { ObjectGeneratorSafe } from "../utils/safe-generator";
 import { Schemas } from "../utils/schemas";
-
+import { logger } from "../winston-logger";
 
 function getPrompt(query: string, think: string, context: string): PromptPair {
   const currentTime = new Date();
@@ -276,7 +276,7 @@ export async function rewriteQuery(action: SearchAction, context: string, tracke
     // For some reason allQueries contains undefined, we just filter thouse values
     return allQueries.filter(Boolean);
   } catch (error) {
-    console.error(`Error in ${TOOL_NAME}`, error);
+    logger.error(`Error in ${TOOL_NAME}`, error);
     throw error;
   }
 }

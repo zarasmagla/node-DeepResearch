@@ -7,6 +7,7 @@ import { GEMINI_API_KEY } from '../config';
 import { z } from 'zod';
 import { AnswerAction, TrackerContext } from "../types";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { logger } from "../winston-logger";
 
 const execAsync = promisify(exec);
 
@@ -87,7 +88,7 @@ async function getCurrentGitCommit(): Promise<string> {
     const { stdout } = await execAsync('git rev-parse --short HEAD');
     return stdout.trim();
   } catch (error) {
-    console.error('Error getting git commit:', error);
+    logger.error('Error getting git commit:', error);
     return 'unknown';
   }
 }
@@ -123,7 +124,7 @@ Minor wording differences are acceptable as long as the core information of the 
 
     return result.object;
   } catch (error) {
-    console.error('Evaluation failed:', error);
+    logger.error('Evaluation failed:', error);
     return {
       pass: false,
       reason: `Evaluation error: ${error}`
@@ -176,7 +177,7 @@ async function batchEvaluate(inputFile: string): Promise<void> {
       console.log(`Evaluation: ${evaluation.pass ? 'PASS' : 'FAIL'}`);
       console.log(`Reason: ${evaluation.reason}`);
     } catch (error) {
-      console.error(`Error processing question: ${question}`, error);
+      logger.error(`Error processing question: ${question}`, error);
       results.push({
         pass: false,
         reason: `Error: ${error}`,
@@ -210,7 +211,7 @@ if (require.main === module) {
     process.exit(1);
   }
 
-  batchEvaluate(inputFile).catch(console.error);
+  batchEvaluate(inputFile).catch(logger.error);
 }
 
 export { batchEvaluate };

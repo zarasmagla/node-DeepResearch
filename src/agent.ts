@@ -64,6 +64,7 @@ import { repairUnknownChars } from "./tools/broken-ch-fixer";
 import { reviseAnswer } from "./tools/md-fixer";
 import { buildReferences } from "./tools/build-ref";
 import { get_agent_logger } from "./utils/structured-logger";
+import { logger } from "./winston-logger";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -384,8 +385,7 @@ async function executeSearchQueries(
         throw new Error("No results found");
       }
     } catch (error) {
-      console.error(
-        `${SEARCH_PROVIDER} search failed for query:`,
+      logger.error(`${SEARCH_PROVIDER} search failed for query:`,
         query,
         error
       );
@@ -1150,7 +1150,7 @@ You found the solution and add it to your knowledge for future reference.
           result: result,
         });
       } catch (error) {
-        console.error("Error solving coding issue:", error);
+        console.log("Error solving coding issue:", error);
         diaryContext.push(`
 At step ${step}, you took the **coding** action and try to solve the coding issue: ${thisStep.codingIssue}.
 But unfortunately, you failed to solve the issue. You need to think out of the box or cut from a completely different angle.
@@ -1354,13 +1354,7 @@ async function storeContext(
   try {
     await fs.writeFile(
       `prompt-${step}.txt`,
-      `
-Prompt:
-${prompt}
-
-JSONSchema:
-${JSON.stringify(zodToJsonSchema(schema), null, 2)}
-`
+      `\nPrompt:\n${prompt}\n\nJSONSchema:\n${JSON.stringify(zodToJsonSchema(schema), null, 2)}\n`
     );
     await fs.writeFile("context.json", JSON.stringify(allContext, null, 2));
     await fs.writeFile("queries.json", JSON.stringify(allKeywords, null, 2));
@@ -1372,7 +1366,7 @@ ${JSON.stringify(zodToJsonSchema(schema), null, 2)}
       JSON.stringify(msgWithKnowledge, null, 2)
     );
   } catch (error) {
-    console.error("Context storage failed:", error);
+    logger.error("Context storage failed:", error);
   }
 }
 
@@ -1394,5 +1388,5 @@ export async function main() {
 }
 
 if (require.main === module) {
-  main().catch(console.error);
+  main().catch(logger.error);
 }
