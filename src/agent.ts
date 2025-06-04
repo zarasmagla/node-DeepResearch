@@ -76,19 +76,17 @@ function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
   knowledge.forEach((k) => {
     messages.push({ role: "user", content: k.question.trim() });
     const aMsg = `
-${
-  k.updated && (k.type === "url" || k.type === "side-info")
-    ? `
+${k.updated && (k.type === "url" || k.type === "side-info")
+        ? `
 <answer-datetime>
 ${k.updated}
 </answer-datetime>
 `
-    : ""
-}
+        : ""
+      }
 
-${
-  k.references && (k.type === "url" || k.type === "side-info")
-    ? `
+${k.references && (k.type === "url" || k.type === "side-info")
+        ? `
 <references>
 ${k.references.map(ref => `
 {
@@ -99,8 +97,8 @@ ${k.references.map(ref => `
 `).join(',')}
 </references>
 `
-    : ""
-}
+        : ""
+      }
 
 
 ${k.answer}
@@ -122,25 +120,24 @@ function composeMsgs(
   const userContent = `
 ${question}
 
-${
-  finalAnswerPIP?.length
-    ? `
+${finalAnswerPIP?.length
+      ? `
 <answer-requirements>
 - You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
 - You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
 - Follow reviewer's feedback and improve your answer quality.
 ${finalAnswerPIP
-  .map(
-    (p, idx) => `
+        .map(
+          (p, idx) => `
 <reviewer-${idx + 1}>
 ${p}
 </reviewer-${idx + 1}>
 `
-  )
-  .join("\n")}
+        )
+        .join("\n")}
 </answer-requirements>`
-    : ""
-}
+      : ""
+    }
     `.trim();
 
   msgs.push({ role: "user", content: removeExtraLineBreaks(userContent) });
@@ -188,8 +185,7 @@ ${context.join("\n")}
     const urlListStr = urlList
       .map(
         (item, idx) =>
-          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${
-            item.url
+          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${item.url
           }": "${item.merged.slice(0, 50)}"`
       )
       .join("\n");
@@ -213,16 +209,15 @@ ${urlListStr}
 - Use web search to find relevant information
 - Build a search request based on the deep intention behind the original question and the expected answer format
 - Always prefer a single search request, only add another request if the original question covers multiple aspects or elements and one query is not enough, each request focus on one specific aspect of the original question 
-${
-  allKeywords?.length
-    ? `
+${allKeywords?.length
+        ? `
 - Avoid those unsuccessful search requests and queries:
 <bad-requests>
 ${allKeywords.join("\n")}
 </bad-requests>
 `.trim()
-    : ""
-}
+        : ""
+      }
 </action-search>
 `);
   }
@@ -292,16 +287,8 @@ ${actionSections.join("\n\n")}
   };
 }
 
-const allContext: StepAction[] = []; // all steps in the current session, including those leads to wrong results
 
-function updateContext(step: any) {
-  allContext.push(step);
-}
-
-async function updateReferences(
-  thisStep: AnswerAction,
-  allURLs: Record<string, SearchSnippet>
-) {
+async function updateReferences(thisStep: AnswerAction, allURLs: Record<string, SearchSnippet>) {
   thisStep.references = thisStep.references
     ?.filter((ref) => ref?.url)
     .map((ref) => {
@@ -505,6 +492,11 @@ export async function getResponse(
 }> {
   let step = 0;
   let totalStep = 0;
+  const allContext: StepAction[] = [];  // all steps in the current session, including those leads to wrong results
+
+  const updateContext = function (step: any) {
+    allContext.push(step);
+  }
 
   question = question?.trim() as string;
   // remove incoming system messages to avoid override
@@ -990,8 +982,8 @@ But then you realized you have asked them before. You decided to to think out of
           diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords: "${keywordsQueries
-            .map((q) => q.q)
-            .join(", ")}".
+              .map((q) => q.q)
+              .join(", ")}".
 You found quite some information and add them to your URL list and **visit** them later when needed. 
 `);
 
@@ -1007,8 +999,8 @@ You found quite some information and add them to your URL list and **visit** the
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords:  "${keywordsQueries
-          .map((q) => q.q)
-          .join(", ")}".
+            .map((q) => q.q)
+            .join(", ")}".
 But then you realized you have already searched for these keywords before, no new information is returned.
 You decided to think out of the box or cut from a completely different angle.
 `);
@@ -1069,15 +1061,15 @@ You found some useful information on the web and add them to your knowledge for 
           totalStep,
           ...(success
             ? {
-                question: currentQuestion,
-                ...thisStep,
-                result: urlResults,
-              }
+              question: currentQuestion,
+              ...thisStep,
+              result: urlResults,
+            }
             : {
-                ...thisStep,
-                result:
-                  "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
-              }),
+              ...thisStep,
+              result:
+                "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
+            }),
         });
       } else {
         diaryContext.push(`

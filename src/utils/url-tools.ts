@@ -7,6 +7,7 @@ import {cherryPick} from "../tools/jina-latechunk";
 import {formatDateBasedOnType} from "./date-tools";
 import {classifyText} from "../tools/jina-classify-spam";
 import {segmentText} from "../tools/segment";
+import axiosClient from "./axios-client";
 
 export function normalizeUrl(urlString: string, debug = false, options = {
   removeAnchors: true,
@@ -406,22 +407,11 @@ export async function getLastModified(url: string): Promise<string | undefined> 
     // Call the API with proper encoding
     const apiUrl = `https://api-beta-datetime.jina.ai?url=${encodeURIComponent(url)}`;
 
-    // Create an AbortController with a timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    const response = await fetch(apiUrl, {
-      signal: controller.signal
+    const response = await axiosClient.get(apiUrl, {
+      timeout: 10000,
     });
 
-    // Clear the timeout to prevent memory leaks
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`API returned ${response.status}`);
-    }
-
-    const data = await response.json();
+    const data = response.data;
 
     // Return the bestGuess date if available
     if (data.bestGuess && data.confidence >= 70) {
@@ -430,7 +420,7 @@ export async function getLastModified(url: string): Promise<string | undefined> 
 
     return undefined;
   } catch (error) {
-    console.error('Failed to fetch last modified date:', error);
+    console.error('Failed to fetch last modified date:');
     return undefined;
   }
 }

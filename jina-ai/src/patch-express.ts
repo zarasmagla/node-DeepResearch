@@ -74,6 +74,16 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
         next();
         return;
     }
+
+    // Early API key validation - reject immediately if no valid auth header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        corsMiddleware(req, res, () => {
+            res.status(401).json({ error: 'Unauthorized: API key required' });
+        });
+        return;
+    }
+
     asyncLocalContext.run(async () => {
         const googleTraceId = req.get('x-cloud-trace-context')?.split('/')?.[0];
         const ctx = asyncLocalContext.ctx;
@@ -192,6 +202,8 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
                     }
                 ).catch((err: any) => {
                     logger.warn(`Failed to save promptContext`, { err: marshalErrorLike(err) });
+                }).finally(() => {
+                    ctx.promptContext = undefined;
                 });
             }
 
@@ -210,10 +222,6 @@ export const jinaAiMiddleware = (req: Request, res: Response, next: NextFunction
             logger.error(`Error in billing middleware`, { err: marshalErrorLike(err) });
             if (err.stack) {
                 logger.error(err.stack);
-            }
-        } finally {
-            if (ctx.promptContext) {
-                ctx.promptContext = null;
             }
         }
 

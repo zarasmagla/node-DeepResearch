@@ -1,5 +1,4 @@
 import axios, { AxiosRequestConfig } from 'axios';  
-// import { JINA_API_KEY, SERPER_API_KEY, BRAVE_API_KEY } from "../config";
 
 // Default timeout in milliseconds  
 const DEFAULT_TIMEOUT = 30000;
@@ -45,7 +44,7 @@ const baseConfig: AxiosRequestConfig = {
   headers: {  
     'Accept': 'application/json',  
     'Content-Type': 'application/json',  
-  }
+  },
 };
 
 // Create a single axios instance with the base configuration  
@@ -54,11 +53,12 @@ const axiosClient = axios.create(baseConfig);
 // Add response interceptor for consistent error handling  
 axiosClient.interceptors.response.use(  
   (response) => response,  
-  (error) => {  
+  (error) => {
+    if (error.code === 'ECONNABORTED') {
+      console.error('Request timed out:', error.message);
+      error.request?.destroy?.();
+    }
     if (axios.isAxiosError(error)) {  
-      if (error.code === 'ECONNABORTED') {
-        error.request?.destroy?.();
-      }
       if (error.response) {  
         const status = error.response.status;  
         const errorData = error.response.data as any;  
@@ -68,13 +68,13 @@ axiosClient.interceptors.response.use(
         }  
         throw new Error(errorData?.readableMessage || `HTTP Error ${status}`);  
       } else if (error.request) {  
-        throw new Error(`No response received from server: ${error.message}`);  
+        throw new Error(`No response received from server`);  
       } else {  
         throw new Error(`Request failed: ${error.message}`);  
       }
     }
     throw error;  
-  }  
+  }
 ); 
 
 export default axiosClient;
