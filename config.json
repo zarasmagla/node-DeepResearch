@@ -41,7 +41,7 @@
         "errorAnalyzer": {},
         "queryRewriter": { "temperature": 0.1 },
         "agent": { "temperature": 0.7, "maxTokens": 10000 },
-        "agentBeastMode": { "temperature": 0.7 },
+        "agentBeastMode": { "temperature": 0.7, "maxTokens": 30000 },
         "fallback": { "maxTokens": 8000, "model": "gemini-2.0-flash-lite" }
       }
     },

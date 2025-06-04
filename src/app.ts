@@ -506,7 +506,8 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     try {
       console.log(body.response_format);
       responseSchema = jsonSchema(body.response_format);
-      console.log(responseSchema);
+      const jsonString = JSON.stringify(responseSchema);
+      logger.info("responseSchema", jsonString);
     } catch (error: any) {
       return res
         .status(400)
