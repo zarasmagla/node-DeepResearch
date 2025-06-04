@@ -211,6 +211,15 @@ export class ObjectGeneratorSafe {
         maxTokens: getToolConfig(model).maxTokens,
         temperature: getToolConfig(model).temperature,
         providerOptions,
+        experimental_telemetry: {
+          isEnabled: true,
+          metadata: {
+            toolName: model,
+            model: getToolConfig(model).model,
+            maxTokens: getToolConfig(model).maxTokens,
+            temperature: getToolConfig(model).temperature,
+          },
+        },
       });
       logger.info("finish reason result", result.finishReason);
       this.tokenTracker.trackUsage(model, result.usage);
@@ -218,7 +227,6 @@ export class ObjectGeneratorSafe {
     } catch (error) {
       // First fallback: Try manual parsing of the error response
       try {
-
         const errorResult = await this.handleGenerateObjectError<T>(error);
         this.tokenTracker.trackUsage(model, errorResult.usage);
         return errorResult;
