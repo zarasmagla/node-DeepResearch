@@ -218,14 +218,14 @@ export class ObjectGeneratorSafe {
     } catch (error) {
       // First fallback: Try manual parsing of the error response
       try {
+
         const errorResult = await this.handleGenerateObjectError<T>(error);
         this.tokenTracker.trackUsage(model, errorResult.usage);
         return errorResult;
       } catch (parseError) {
         if (numRetries > 0) {
           console.error(
-            `${model} failed on object generation -> manual parsing failed -> retry with ${
-              numRetries - 1
+            `${model} failed on object generation -> manual parsing failed -> retry with ${numRetries - 1
             } retries remaining`
           );
           return this.generateObject({

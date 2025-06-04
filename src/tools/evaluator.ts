@@ -1,8 +1,8 @@
-import {GenerateObjectResult} from 'ai';
-import {AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, PromptPair, TrackerContext} from '../types';
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {Schemas} from "../utils/schemas";
-import {getKnowledgeStr} from "../utils/text-tools";
+import { GenerateObjectResult } from 'ai';
+import { AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, PromptPair, TrackerContext } from '../types';
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import { Schemas } from "../utils/schemas";
+import { getKnowledgeStr } from "../utils/text-tools";
 
 const TOOL_NAME = 'evaluator';
 
@@ -569,7 +569,14 @@ export async function evaluateQuestion(
       model: TOOL_NAME,
       schema: schemaGen.getQuestionEvaluateSchema(),
       system: prompt.system,
-      prompt: prompt.user
+      prompt: prompt.user,
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Added thinkingBudget for Google
+          },
+        },
+      },
     });
 
     console.log('Question Evaluation:', result.object);
@@ -606,7 +613,14 @@ async function performEvaluation<T>(
     model: TOOL_NAME,
     schema: schemaGen.getEvaluatorSchema(evaluationType),
     system: prompt.system,
-    prompt: prompt.user
+    prompt: prompt.user,
+    providerOptions: {
+      google: {
+        thinkingConfig: {
+          thinkingBudget: 0, // Added thinkingBudget for Google
+        },
+      },
+    },
   }) as GenerateObjectResult<any>;
 
   trackers.actionTracker.trackThink(result.object.think)

@@ -107,11 +107,18 @@ Minor wording differences are acceptable as long as the core information of the 
 
   try {
     const result = await generateObject({
-      model: createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })('gemini-2.5-flash-preview-04-17'),  // fix to gemini-2.0-flash for evaluation
+      model: createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })('gemini-2.5-flash-preview-05-20'),  // fix to gemini-2.0-flash for evaluation
       schema,
       prompt,
       maxTokens: 1000,
       temperature: 0  // Setting temperature to 0 for deterministic output
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Added thinkingBudget for Google
+          },
+        },
+      },
     });
 
     return result.object;

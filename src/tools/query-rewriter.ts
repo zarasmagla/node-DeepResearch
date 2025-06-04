@@ -258,6 +258,13 @@ export async function rewriteQuery(action: SearchAction, context: string, tracke
         schema: schemaGen.getQueryRewriterSchema(),
         system: prompt.system,
         prompt: prompt.user,
+        providerOptions: {
+          google: {
+            thinkingConfig: {
+              thinkingBudget: 0, // Added thinkingBudget for Google
+            },
+          },
+        },
       });
       trackers?.actionTracker.trackThink(result.object.think);
       return result.object.queries;

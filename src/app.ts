@@ -510,11 +510,12 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
   }
 
   let responseSchema = undefined;
-  if (body.response_format?.json_schema) {
+  if (body.response_format) {
     // Convert JSON schema to Zod schema using a proper converter
     try {
-      responseSchema = jsonSchema(body.response_format.json_schema);
-      logger.info(responseSchema);
+      console.log(body.response_format);
+      responseSchema = jsonSchema(body.response_format);
+      console.log(responseSchema);
     } catch (error: any) {
       return res
         .status(400)

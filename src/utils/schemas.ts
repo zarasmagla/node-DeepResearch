@@ -123,7 +123,14 @@ export class Schemas {
       model: 'evaluator',
       schema: this.getLanguageSchema(),
       system: prompt.system,
-      prompt: prompt.user
+      prompt: prompt.user,
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Added thinkingBudget for Google
+          },
+        },
+      },
     });
 
     this.languageCode = result.object.langCode;

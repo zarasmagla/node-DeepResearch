@@ -1,6 +1,6 @@
-import {z} from 'zod';
-import {TokenTracker} from "../utils/token-tracker";
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
+import { z } from 'zod';
+import { TokenTracker } from "../utils/token-tracker";
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
 
 
 const responseSchema = z.object({
@@ -77,10 +77,17 @@ export async function dedupQueries(
       model: TOOL_NAME,
       schema: responseSchema,
       prompt,
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Added thinkingBudget for Google
+          },
+        },
+      },
     });
 
     console.log(TOOL_NAME, result.object.unique_queries);
-    return {unique_queries: result.object.unique_queries};
+    return { unique_queries: result.object.unique_queries };
 
   } catch (error) {
     console.error(`Error in ${TOOL_NAME}`, error);

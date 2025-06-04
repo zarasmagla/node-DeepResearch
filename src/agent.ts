@@ -679,6 +679,13 @@ export async function getResponse(
       system,
       messages: msgWithKnowledge,
       numRetries: 2,
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Added thinkingBudget for Google
+          },
+        },
+      },
     });
     thisStep = {
       action: result.object.action,
@@ -1180,6 +1187,13 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       system,
       messages: msgWithKnowledge,
       numRetries: 2,
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0,
+          },
+        },
+      },
     });
     thisStep = {
       action: result.object.action,

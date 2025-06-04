@@ -1,6 +1,6 @@
-import {ErrorAnalysisResponse, PromptPair, TrackerContext} from '../types';
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {Schemas} from "../utils/schemas";
+import { ErrorAnalysisResponse, PromptPair, TrackerContext } from '../types';
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import { Schemas } from "../utils/schemas";
 
 
 function getPrompt(diaryContext: string[]): PromptPair {
@@ -104,7 +104,14 @@ export async function analyzeSteps(
       model: TOOL_NAME,
       schema: schemaGen.getErrorAnalysisSchema(),
       system: prompt.system,
-      prompt: prompt.user
+      prompt: prompt.user,
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 0, // Added thinkingBudget for Google
+          },
+        },
+      },
     });
 
     console.log(TOOL_NAME, result.object);
