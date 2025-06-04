@@ -111,7 +111,7 @@ Minor wording differences are acceptable as long as the core information of the 
       schema,
       prompt,
       maxTokens: 1000,
-      temperature: 0  // Setting temperature to 0 for deterministic output
+      temperature: 0,  // Setting temperature to 0 for deterministic output
       providerOptions: {
         google: {
           thinkingConfig: {

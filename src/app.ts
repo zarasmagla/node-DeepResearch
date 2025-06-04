@@ -18,6 +18,7 @@ import { jsonSchema } from "ai";
 import { normalizeHostName } from "./utils/url-tools";
 import winston from "winston";
 import { LoggingWinston } from "@google-cloud/logging-winston";
+import { get_api_logger } from "./utils/structured-logger";
 
 const app = express();
 
@@ -434,6 +435,8 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     clientIp: clientIp,
   });
 
+  const startTime = Date.now();
+
   const body = req.body as ChatCompletionRequest;
   if (!body.messages?.length) {
     return res
@@ -525,10 +528,31 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
 
   const requestId = Date.now().toString();
   const created = Math.floor(Date.now() / 1000);
+  const verification_id = body.verification_id || requestId;
+  const apiLogger = get_api_logger();
   const context: TrackerContext = {
     tokenTracker: new TokenTracker(),
     actionTracker: new ActionTracker(),
+    logger: apiLogger,
+    verification_id,
   };
+
+  // Log the start of the chat completion request
+  apiLogger.api_request(
+    "/v1/chat/completions",
+    "POST",
+    verification_id,
+    {
+      model: body.model,
+      messageCount: body.messages?.length,
+      stream: body.stream,
+      tokenBudget,
+      maxBadAttempts,
+    },
+    undefined,
+    undefined,
+    undefined
+  );
 
   // Add this inside the chat completions endpoint, before setting up the action listener
   const streamingState: StreamingState = {
@@ -727,6 +751,24 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         numURLs: allURLs.length,
       };
       res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
+
+      // Structured logging for successful streaming completion
+      apiLogger.api_request(
+        "/v1/chat/completions",
+        "POST",
+        verification_id,
+        undefined,
+        {
+          contentLength: finalAnswer?.length || 0,
+          visitedURLs: visitedURLs.length,
+          readURLs: readURLs.length,
+          totalURLs: allURLs.length,
+          streaming: true,
+        },
+        200,
+        Date.now() - startTime
+      );
+
       res.end();
     } else {
       const response: ChatCompletionResponse = {
@@ -768,6 +810,22 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         numURLs: allURLs.length,
       });
 
+      // Structured logging for successful completion
+      apiLogger.api_request(
+        "/v1/chat/completions",
+        "POST",
+        verification_id,
+        undefined,
+        {
+          contentLength: response.choices[0].message.content.length,
+          visitedURLs: visitedURLs.length,
+          readURLs: readURLs.length,
+          totalURLs: allURLs.length,
+        },
+        200,
+        Date.now() - startTime
+      );
+
       res.json(response);
     }
   } catch (error: any) {
@@ -778,6 +836,18 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
       type: error?.constructor?.name,
       requestId,
     });
+
+    // Structured logging for error
+    apiLogger.api_request(
+      "/v1/chat/completions",
+      "POST",
+      verification_id,
+      undefined,
+      undefined,
+      500,
+      Date.now() - startTime,
+      error
+    );
 
     // Track error as rejected tokens with Vercel token counting
     const errorMessage = error?.message || "An error occurred";

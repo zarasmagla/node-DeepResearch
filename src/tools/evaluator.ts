@@ -3,6 +3,7 @@ import { AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, Prompt
 import { ObjectGeneratorSafe } from "../utils/safe-generator";
 import { Schemas } from "../utils/schemas";
 import { getKnowledgeStr } from "../utils/text-tools";
+import { get_tools_logger } from "../utils/structured-logger";
 
 const TOOL_NAME = 'evaluator';
 
@@ -640,6 +641,20 @@ export async function evaluateAnswer(
   allKnowledge: KnowledgeItem[],
   schemaGen: Schemas
 ): Promise<EvaluationResponse> {
+  const logger = get_tools_logger();
+  const startTime = Date.now();
+
+  logger.info("Starting answer evaluation", {
+    verification_id: trackers.verification_id,
+    operation: "evaluate_answer",
+    status: "STARTED",
+    metadata: {
+      evaluationTypes: evaluationTypes.join(","),
+      answerLength: action.answer?.length || 0,
+      hasReferences: (action.references?.length || 0) > 0,
+    }
+  });
+
   let result;
 
 
@@ -680,6 +695,19 @@ export async function evaluateAnswer(
     }
   }
 
-  return result?.object as EvaluationResponse;
+  const finalResult = result?.object as EvaluationResponse;
+
+  logger.info("Completed answer evaluation", {
+    verification_id: trackers.verification_id,
+    operation: "evaluate_answer",
+    status: finalResult?.pass ? "PASSED" : "FAILED",
+    duration_ms: Date.now() - startTime,
+    metadata: {
+      evaluationType: finalResult?.type || "unknown",
+      evaluationReason: finalResult?.think?.substring(0, 100) + (finalResult?.think && finalResult.think.length > 100 ? "..." : ""),
+    }
+  });
+
+  return finalResult;
 
 }

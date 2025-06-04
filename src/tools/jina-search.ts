@@ -2,12 +2,26 @@ import { TokenTracker } from "../utils/token-tracker";
 import { SearchResponse, SERPQuery } from "../types";
 import { JINA_API_KEY } from "../config";
 import axiosClient from '../utils/axios-client';
+import { get_search_logger } from "../utils/structured-logger";
 
 export async function search(
   query: SERPQuery,
   tracker?: TokenTracker
 ): Promise<{ response: SearchResponse }> {
+  const logger = get_search_logger();
+  const startTime = Date.now();
+
   try {
+    logger.external_service_call(
+      "jina-search",
+      "search",
+      undefined,
+      query,
+      undefined,
+      undefined,
+      "STARTED"
+    );
+
     const { data } = await axiosClient.post<SearchResponse>(
       `https://s.jina.ai/`,
       query,
@@ -41,8 +55,28 @@ export async function search(
       completionTokens: totalTokens,
     });
 
+    logger.external_service_call(
+      "jina-search",
+      "search",
+      undefined,
+      query,
+      { resultCount: data.data.length, totalTokens },
+      Date.now() - startTime,
+      "SUCCESS"
+    );
+
     return { response: data };
   } catch (error) {
+    logger.external_service_call(
+      "jina-search",
+      "search",
+      undefined,
+      query,
+      undefined,
+      Date.now() - startTime,
+      "ERROR",
+      error as Error
+    );
     console.error('Error in jina search:', error);
     throw error;
   }

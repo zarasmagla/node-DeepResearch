@@ -63,6 +63,7 @@ import { formatDateBasedOnType, formatDateRange } from "./utils/date-tools";
 import { repairUnknownChars } from "./tools/broken-ch-fixer";
 import { reviseAnswer } from "./tools/md-fixer";
 import { buildReferences } from "./tools/build-ref";
+import { get_agent_logger } from "./utils/structured-logger";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -341,6 +342,14 @@ async function executeSearchQueries(
   context.actionTracker.trackThink("search_for", SchemaGen.languageCode, {
     keywords: uniqQOnly.join(", "),
   });
+
+  // Log search operation start
+  context.logger.search_operation(
+    uniqQOnly.join(", "),
+    context.verification_id || "unknown",
+    SEARCH_PROVIDER,
+    "STARTED"
+  );
   let utilityScore = 0;
   for (const query of keywordsQueries) {
     let results: UnNormalizedSearchSnippet[] = [];
@@ -455,6 +464,15 @@ async function executeSearchQueries(
         `So many queries??? ${searchedQueries.map((q) => `"${q}"`).join(", ")}`
       );
     }
+
+    // Log successful search completion
+    context.logger.search_operation(
+      uniqQOnly.join(", "),
+      context.verification_id || "unknown",
+      SEARCH_PROVIDER,
+      "SUCCESS",
+      searchedQueries.length
+    );
   }
   return {
     newKnowledge,
@@ -521,7 +539,23 @@ export async function getResponse(
     tokenTracker:
       existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker(),
+    logger: existingContext?.logger || get_agent_logger(),
+    verification_id: existingContext?.verification_id,
   };
+
+  // Log the start of agent processing
+  context.logger.agent_step(
+    "start_processing",
+    context.verification_id || "unknown",
+    "STARTED",
+    undefined,
+    {
+      question: question?.substring(0, 100) + (question && question.length > 100 ? "..." : ""),
+      tokenBudget,
+      maxBadAttempts,
+      hasMessages: !!messages?.length,
+    }
+  );
 
   const generator = new ObjectGeneratorSafe(context.tokenTracker);
 
@@ -1251,6 +1285,26 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   }
 
   console.log(thisStep);
+
+  // Log completion of agent processing
+  context.logger.agent_step(
+    "completed_processing",
+    context.verification_id || "unknown",
+    "SUCCESS",
+    {
+      finalAction: thisStep.action,
+      isFinal: (thisStep as AnswerAction).isFinal,
+      answerLength: (thisStep as AnswerAction).answer?.length || 0,
+      referencesCount: (thisStep as AnswerAction).references?.length || 0,
+      visitedURLsCount: visitedURLs.length,
+      totalTokens: context.tokenTracker.getTotalUsage().totalTokens,
+    },
+    {
+      question: question?.substring(0, 100) + (question && question.length > 100 ? "..." : ""),
+      totalSteps: totalStep,
+      trivialQuestion,
+    }
+  );
 
   // max return 300 urls
   const returnedURLs = weightedURLs.slice(0, numReturnedURLs).map((r) => r.url);

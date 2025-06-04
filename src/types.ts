@@ -234,6 +234,7 @@ export interface ChatCompletionRequest {
 
   budget_tokens?: number;
   max_attempts?: number;
+  verification_id?: string;
 
   response_format?: ResponseFormat;
   no_direct_answer?: boolean;
@@ -307,10 +308,13 @@ export interface ChatCompletionChunk {
 // Tracker Types
 import { TokenTracker } from './utils/token-tracker';
 import { ActionTracker } from './utils/action-tracker';
+import { StructuredLogger } from './utils/structured-logger';
 
 export interface TrackerContext {
   tokenTracker: TokenTracker;
   actionTracker: ActionTracker;
+  logger: StructuredLogger;
+  verification_id?: string;
 }
 
 
