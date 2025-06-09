@@ -201,8 +201,7 @@ export class ObjectGeneratorSafe {
     }
 
     try {
-      // Primary attempt with main model
-      const result = await generateObject({
+      const opts = {
         model: getModel(model),
         schema,
         prompt,
@@ -211,7 +210,17 @@ export class ObjectGeneratorSafe {
         maxTokens: getToolConfig(model).maxTokens,
         temperature: getToolConfig(model).temperature,
         providerOptions,
-      });
+      }
+      logger.info("opts", JSON.stringify({
+        model: getModel(model),
+        schema,
+        messagesLength: messages?.length,
+        charactersLength: messages?.reduce((acc, message) => acc + message.content.length, 0),
+        maxTokens: getToolConfig(model).maxTokens,
+        temperature: getToolConfig(model).temperature,
+      }, null, 2));
+      // Primary attempt with main model
+      const result = await generateObject(opts);
       logger.info("finish reason result", result.finishReason);
       this.tokenTracker.trackUsage(model, result.usage);
       return result;
