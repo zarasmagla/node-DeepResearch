@@ -211,15 +211,6 @@ export class ObjectGeneratorSafe {
         maxTokens: getToolConfig(model).maxTokens,
         temperature: getToolConfig(model).temperature,
         providerOptions,
-        experimental_telemetry: {
-          isEnabled: true,
-          metadata: {
-            toolName: model,
-            model: getToolConfig(model).model,
-            maxTokens: getToolConfig(model).maxTokens,
-            temperature: getToolConfig(model).temperature,
-          },
-        },
       });
       logger.info("finish reason result", result.finishReason);
       this.tokenTracker.trackUsage(model, result.usage);
