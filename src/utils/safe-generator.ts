@@ -260,9 +260,9 @@ export class ObjectGeneratorSafe {
               model: getModel("fallback"),
               schema: distilledSchema,
               prompt: `Following the given JSON schema, extract the field from below: \n\n ${failedOutput}`,
-              maxTokens: getToolConfig("fallback").maxTokens,
-              temperature: getToolConfig("fallback").temperature,
+              temperature: getToolConfig('fallback').temperature,
               providerOptions,
+
             });
 
             this.tokenTracker.trackUsage("fallback", fallbackResult.usage); // Track against fallback model
