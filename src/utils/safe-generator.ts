@@ -210,6 +210,13 @@ export class ObjectGeneratorSafe {
         maxTokens: getToolConfig(model).maxTokens,
         temperature: getToolConfig(model).temperature,
         providerOptions,
+        experimental_telemetry: {
+          isEnabled: true,
+          metadata: {
+            query: 'weather',
+            location: 'San Francisco',
+          },
+        },
       }
       logger.info("generateObject opts" + JSON.stringify({
         model: getModel(model),
@@ -302,6 +309,7 @@ export class ObjectGeneratorSafe {
       logger.error(
         "Object not generated according to schema, fallback to manual parsing"
       );
+      logger.error("error", error.text);
       try {
         // First try standard JSON parsing
         const partialResponse = JSON.parse((error as any).text);
