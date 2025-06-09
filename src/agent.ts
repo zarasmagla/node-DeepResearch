@@ -517,6 +517,7 @@ export async function getResponse(question?: string,
           question: currentQuestion,
           boostHostnames
         }, context);
+
       // improve diversity by keep top 2 urls of each hostname
       weightedURLs = keepKPerHostname(weightedURLs, 2);
       console.log('Weighted URLs:', weightedURLs.length);
