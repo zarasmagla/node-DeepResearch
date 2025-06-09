@@ -211,7 +211,7 @@ export class ObjectGeneratorSafe {
         temperature: getToolConfig(model).temperature,
         providerOptions,
       }
-      logger.info("opts", JSON.stringify({
+      logger.info("generateObject opts" + JSON.stringify({
         model: getModel(model),
         schema,
         messagesLength: messages?.length,
