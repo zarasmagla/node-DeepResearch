@@ -276,7 +276,8 @@ async function executeSearchQueries(
   allURLs: Record<string, SearchSnippet>,
   SchemaGen: Schemas,
   webContents: Record<string, WebContent>,
-  onlyHostnames?: string[]
+  onlyHostnames?: string[],
+  searchProvider?: string
 ): Promise<{
   newKnowledge: KnowledgeItem[],
   searchedQueries: string[]
@@ -295,7 +296,7 @@ async function executeSearchQueries(
 
     try {
       console.log('Search query:', query);
-      switch (SEARCH_PROVIDER) {
+      switch (searchProvider || SEARCH_PROVIDER) {
         case 'jina':
           results = (await search(query, context.tokenTracker)).response?.data || [];
           break;
@@ -392,7 +393,8 @@ export async function getResponse(question?: string,
   onlyHostnames: string[] = [],
   maxRef: number = 10,
   minRelScore: number = 0.75,
-  languageCode: string | undefined = undefined
+  languageCode: string | undefined = undefined,
+  searchProvider?: string
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
   let step = 0;
@@ -765,7 +767,9 @@ But then you realized you have asked them before. You decided to to think out of
         context,
         allURLs,
         SchemaGen,
-        allWebContents
+        allWebContents,
+        undefined,
+        searchProvider
       );
 
       allKeywords.push(...searchedQueries);
@@ -794,7 +798,8 @@ But then you realized you have asked them before. You decided to to think out of
             allURLs,
             SchemaGen,
             allWebContents,
-            onlyHostnames
+            onlyHostnames,
+            searchProvider
           );
 
         if (searchedQueries.length > 0) {

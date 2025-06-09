@@ -260,6 +260,7 @@ export interface ChatCompletionRequest {
   max_annotations?: number;
   min_annotation_relevance?: number;
   language_code?: string;
+  search_provider?: string;
 }
 
 export interface URLAnnotation {
