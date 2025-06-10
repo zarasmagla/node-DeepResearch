@@ -221,7 +221,7 @@ export class ObjectGeneratorSafe {
 
   private async handleGenerateObjectError<T>(error: unknown): Promise<GenerateObjectResult<T>> {
     if (NoObjectGeneratedError.isInstance(error)) {
-      logWarning('Object not generated according to schema, fallback to manual parsing');
+      logWarning('Object not generated according to schema, fallback to manual parsing', { error });
       try {
         // First try standard JSON parsing
         const partialResponse = JSON.parse((error as any).text);

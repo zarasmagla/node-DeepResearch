@@ -573,7 +573,7 @@ export async function evaluateQuestion(
       prompt: prompt.user
     });
 
-    logInfo('Question Evaluation:', result.object);
+    
 
     // Always include definitive in types
     const types: EvaluationType[] = [];
@@ -582,7 +582,7 @@ export async function evaluateQuestion(
     if (result.object.needsPlurality) types.push('plurality');
     if (result.object.needsCompleteness) types.push('completeness');
 
-    logInfo('Question Metrics:', { question, types });
+    logInfo(TOOL_NAME, { question, types });
     trackers?.actionTracker.trackThink(result.object.think);
 
     // Always evaluate definitive first, then freshness (if needed), then plurality (if needed)

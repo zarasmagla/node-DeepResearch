@@ -694,9 +694,12 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         relatedImages,
       };
 
-      logInfo('[chat/completions] Response:', {
+      logInfo(`[chat/completions] Completed!`, {
         model: body.model,
-        usage: context.tokenTracker.getTotalUsageSnakeCase()
+        usage: context.tokenTracker.getTotalUsageSnakeCase(),
+        visitedURLs,
+        readURLs,
+        numURLs: allURLs.length,
       });
 
       res.json(response);

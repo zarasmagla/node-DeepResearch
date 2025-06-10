@@ -9,7 +9,7 @@ import { classifyText } from "../tools/jina-classify-spam";
 import { processImage } from "./image-tools";
 import { segmentText } from "../tools/segment";
 import axiosClient from "./axios-client";
-import { logInfo, logError, logDebug, logWarning } from '../logging';
+import { logError, logDebug, logWarning } from '../logging';
 
 export function normalizeUrl(urlString: string, debug = false, options = {
   removeAnchors: true,
@@ -601,7 +601,7 @@ export async function processURLs(
             logError('Error parsing URL for hostname:', { url, error: e });
           }
           badHostnames.push(hostname);
-          logInfo(`Added ${hostname} to bad hostnames list`);
+          logDebug(`Added ${hostname} to bad hostnames list`);
         }
         return null;
       } finally {
@@ -630,7 +630,7 @@ export async function processURLs(
     Object.keys(allURLs).forEach(url => {
       if (badHostnames.includes(extractUrlParts(url).hostname)) {
         delete allURLs[url];
-        logInfo(`Removed ${url} from allURLs`);
+        logWarning(`Removed ${url} from allURLs because of bad hostname`);
       }
     }
     )
