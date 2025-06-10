@@ -959,6 +959,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     logInfo(`Beast mode!!! budget ${(context.tokenTracker.getTotalUsage().totalTokens / tokenBudget * 100).toFixed(2)}%`, {
       usage: context.tokenTracker.getTotalUsageSnakeCase(),
       evaluationMetrics,
+      maxBadAttempts,
     });
     // any answer is better than no answer, humanity last resort
     step++;
