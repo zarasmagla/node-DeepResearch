@@ -267,7 +267,7 @@ async function updateReferences(thisStep: AnswerAction, allURLs: Record<string, 
       ref.dateTime = await getLastModified(ref.url) || '';
     }));
 
-  console.log('Updated references:', thisStep.references);
+  logDebug('Updated references:', { references: thisStep.references });
 }
 
 async function executeSearchQueries(

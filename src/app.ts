@@ -313,7 +313,7 @@ if (secret) {
   app.use((req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
-      console.log('[chat/completions] Unauthorized request');
+      logError('[chat/completions] Unauthorized request');
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -380,7 +380,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   if (secret) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
-      console.log('[chat/completions] Unauthorized request');
+      logError('[chat/completions] Unauthorized request');
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
@@ -392,7 +392,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     req.socket.remoteAddress ||
     'unknown';
   // Log request details (excluding sensitive data)
-  console.log('[chat/completions] Request:', {
+  logInfo('[chat/completions] Request:', {
     model: req.body.model,
     stream: req.body.stream,
     messageCount: req.body.messages?.length,
@@ -410,7 +410,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Last message must be from user' });
   }
 
-  console.log('messages', JSON.stringify(body.messages));
+  logDebug('Input messages', { messages: body.messages });
 
   // clean <think> from all assistant messages
   body.messages = body.messages?.filter(message => {
