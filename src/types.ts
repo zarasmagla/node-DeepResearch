@@ -75,7 +75,7 @@ export interface TokenUsage {
   usage: LanguageModelUsage;
 }
 
-export interface ArxivSearchResponse {
+export interface JinaSearchResponse {
   results: Array<{
     title: string;
     snippet: string;

@@ -42,7 +42,6 @@ import { MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas 
 import { formatDateBasedOnType, formatDateRange } from "./utils/date-tools";
 import { reviseAnswer } from "./tools/md-fixer";
 import { buildReferences } from "./tools/build-ref";
-import { arxivSearch } from './tools/arxiv-search';
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -297,16 +296,14 @@ async function executeSearchQueries(
       console.log('Search query:', query);
       switch (searchProvider || SEARCH_PROVIDER) {
         case 'jina':
-          results = (await search(query, context.tokenTracker)).response?.data || [];
+        case 'arxiv':
+          results = (await search(query, searchProvider, 30, context.tokenTracker)).response.results || [];
           break;
         case 'duck':
           results = (await duckSearch(query.q, { safeSearch: SafeSearchType.STRICT })).results;
           break;
         case 'brave':
           results = (await braveSearch(query.q)).response.web?.results || [];
-          break;
-        case 'arxiv':
-          results = (await arxivSearch(query)).response.results || [];
           break;
         case 'serper':
           results = (await serperSearch(query)).response.organic || [];
