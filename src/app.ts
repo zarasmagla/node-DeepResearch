@@ -7,7 +7,7 @@ import {
   ChatCompletionResponse,
   ChatCompletionChunk,
   AnswerAction,
-  Model, StepAction, VisitAction
+  Model, StepAction, VisitAction,
 } from './types';
 import { TokenTracker } from "./utils/token-tracker";
 import { ActionTracker } from "./utils/action-tracker";
@@ -522,7 +522,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       // Add content to queue for both thinking steps and final answer
       if (step.action === 'visit') {
         // emit every url in the visit action in url field
-        ((step as VisitAction).URLTargets as string[]).forEach((url) => {
+        ((step as VisitAction).URLTargets as string[])?.forEach((url) => {
           const chunk: ChatCompletionChunk = {
             id: requestId,
             object: 'chat.completion.chunk',
@@ -568,7 +568,9 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       result: finalStep,
       visitedURLs,
       readURLs,
-      allURLs
+      allURLs,
+      allImages,
+      relatedImages,
     } = await getResponse(undefined,
       tokenBudget,
       maxBadAttempts,
@@ -583,7 +585,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       body.min_annotation_relevance,
       body.language_code,
       body.search_language_code,
-      body.search_provider
+      body.search_provider,
+      body.with_images
     )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
 
@@ -656,7 +659,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         usage,
         visitedURLs,
         readURLs,
-        numURLs: allURLs.length
+        numURLs: allURLs.length,
+        relatedImages
       };
       res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
       res.end();
@@ -682,7 +686,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         usage,
         visitedURLs,
         readURLs,
-        numURLs: allURLs.length
+        numURLs: allURLs.length,
+        relatedImages,
       };
 
       // Log final response (excluding full content for brevity)
@@ -693,7 +698,9 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         usage: response.usage,
         visitedURLs: response.visitedURLs,
         readURLs: response.readURLs,
-        numURLs: allURLs.length
+        numURLs: allURLs.length,
+        allImages: allImages?.length,
+        relatedImages: relatedImages?.length,
       });
 
       res.json(response);

@@ -27,6 +27,14 @@ export type Reference = {
   answerChunkPosition?: number[];
 }
 
+export type ImageReference = {
+  url: string;
+  dateTime?: string;
+  relevanceScore?: number;
+  answerChunk?: string;
+  answerChunkPosition?: number[];
+}
+
 export type AnswerAction = BaseAction & {
   action: "answer";
   answer: string;
@@ -53,6 +61,7 @@ export type ReflectAction = BaseAction & {
 export type VisitAction = BaseAction & {
   action: "visit";
   URLTargets: number[] | string[];
+  image?: ImageObject;
 };
 
 export type CodingAction = BaseAction & {
@@ -155,6 +164,7 @@ export interface ReadResponse {
     content: string;
     usage: { tokens: number; };
     links: Array<[string, string]>; // [anchor, url]
+    images: Record<string, string>; // { image: url }
   };
   name?: string;
   message?: string;
@@ -259,6 +269,8 @@ export interface ChatCompletionRequest {
 
   max_annotations?: number;
   min_annotation_relevance?: number;
+
+  with_images?: boolean;
   language_code?: string;
   search_language_code?: string;
   search_provider?: string;
@@ -294,6 +306,8 @@ export interface ChatCompletionResponse {
   visitedURLs?: string[];
   readURLs?: string[];
   numURLs?: number;
+  allImages?: string[];
+  relatedImages?: string[];
 }
 
 export interface ChatCompletionChunk {
@@ -318,6 +332,8 @@ export interface ChatCompletionChunk {
   visitedURLs?: string[];
   readURLs?: string[];
   numURLs?: number;
+  allImages?: string[];
+  relatedImages?: string[];
 }
 
 // Tracker Types
@@ -336,11 +352,11 @@ export interface TrackerContext {
 // Interface definitions for Jina API
 export interface JinaEmbeddingRequest {
   model: string;
-  task: string;
+  task?: string;
   late_chunking?: boolean;
   dimensions?: number;
   embedding_type?: string;
-  input: string[];
+  input: string[] | Record<string, string>[];
   truncate?: boolean;
 }
 
@@ -356,4 +372,10 @@ export interface JinaEmbeddingResponse {
     index: number;
     embedding: number[];
   }>;
+}
+
+export type ImageObject = {
+  url: string;
+  alt?: string;
+  embedding: number[][];
 }

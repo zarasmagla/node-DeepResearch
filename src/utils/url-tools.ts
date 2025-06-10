@@ -1,12 +1,13 @@
-import { BoostedSearchSnippet, KnowledgeItem, SearchSnippet, TrackerContext, VisitAction, WebContent } from "../types";
-import { getI18nText, smartMergeStrings } from "./text-tools";
-import { rerankDocuments } from "../tools/jina-rerank";
-import { readUrl } from "../tools/read";
-import { Schemas } from "./schemas";
-import { cherryPick } from "../tools/jina-latechunk";
-import { formatDateBasedOnType } from "./date-tools";
-import { classifyText } from "../tools/jina-classify-spam";
-import { segmentText } from "../tools/segment";
+import {BoostedSearchSnippet, ImageObject, KnowledgeItem, SearchSnippet, TrackerContext, VisitAction, WebContent} from "../types";
+import {getI18nText, smartMergeStrings} from "./text-tools";
+import {rerankDocuments} from "../tools/jina-rerank";
+import {readUrl} from "../tools/read";
+import {Schemas} from "./schemas";
+import {cherryPick} from "../tools/jina-latechunk";
+import {formatDateBasedOnType} from "./date-tools";
+import {classifyText} from "../tools/jina-classify-spam";
+import { processImage } from "./image-tools";
+import {segmentText} from "../tools/segment";
 import axiosClient from "./axios-client";
 
 export function normalizeUrl(urlString: string, debug = false, options = {
@@ -460,9 +461,11 @@ export async function processURLs(
   allURLs: Record<string, SearchSnippet>,
   visitedURLs: string[],
   badURLs: string[],
+  imageObjects: ImageObject[],
   schemaGen: Schemas,
   question: string,
-  webContents: Record<string, WebContent>
+  webContents: Record<string, WebContent>,
+  withImages: boolean = false,
 ): Promise<{ urlResults: any[], success: boolean }> {
   // Skip if no URLs to process
   if (urls.length === 0) {
@@ -491,8 +494,8 @@ export async function processURLs(
         // Store normalized URL for consistent reference
         url = normalizedUrl;
 
-        const { response } = await readUrl(url, true, context.tokenTracker);
-        const { data } = response;
+        const {response} = await readUrl(url, true, context.tokenTracker, withImages);
+        const {data} = response;
         const guessedTime = await getLastModified(url);
         if (guessedTime) {
           console.log('Guessed time for', url, guessedTime);
@@ -554,7 +557,18 @@ export async function processURLs(
           }
         });
 
-        return { url, result: response };
+        // Process images
+        if (withImages && data.images) {
+          const imageEntries = Object.entries(data.images || {});
+          imageEntries.forEach(async ([alt, url]) => {
+            const imageObject = await processImage(url, context.tokenTracker);
+            if (imageObject && !imageObjects.find(i => i.url === imageObject.url)) {
+              imageObjects.push(imageObject);
+            }
+          });
+        }
+
+        return {url, result: response};
       } catch (error: any) {
         console.error('Error reading URL:', url, error);
         badURLs.push(url);

@@ -16,7 +16,9 @@ import {
   KnowledgeItem,
   EvaluationType,
   BoostedSearchSnippet,
-  SearchSnippet, EvaluationResponse, Reference, SERPQuery, RepeatEvaluationType, UnNormalizedSearchSnippet, WebContent
+  SearchSnippet, EvaluationResponse, Reference, SERPQuery, RepeatEvaluationType, UnNormalizedSearchSnippet, WebContent,
+  ImageObject,
+  ImageReference
 } from "./types";
 import { TrackerContext } from "./types";
 import { search } from "./tools/jina-search";
@@ -41,7 +43,7 @@ import {
 import { MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas } from "./utils/schemas";
 import { formatDateBasedOnType, formatDateRange } from "./utils/date-tools";
 import { reviseAnswer } from "./tools/md-fixer";
-import { buildReferences } from "./tools/build-ref";
+import { buildImageReferences, buildReferences } from "./tools/build-ref";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -391,8 +393,9 @@ export async function getResponse(question?: string,
   minRelScore: number = 0.85,
   languageCode: string | undefined = undefined,
   searchLanguageCode?: string,
-  searchProvider?: string
-): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
+  searchProvider?: string,
+  with_images: boolean = false
+): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[], allImages?: string[], relatedImages?: string[] }> {
 
   let step = 0;
   let totalStep = 0;
@@ -451,6 +454,7 @@ export async function getResponse(question?: string,
   const allWebContents: Record<string, WebContent> = {};
   const visitedURLs: string[] = [];
   const badURLs: string[] = [];
+  const imageObjects: ImageObject[] = [];
   const evaluationMetrics: Record<string, RepeatEvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
   const regularBudget = tokenBudget * 0.85;
@@ -859,9 +863,11 @@ You decided to think out of the box or cut from a completely different angle.
           allURLs,
           visitedURLs,
           badURLs,
+          imageObjects,
           SchemaGen,
           currentQuestion,
-          allWebContents
+          allWebContents,
+          with_images
         );
 
         diaryContext.push(success
@@ -1017,7 +1023,16 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     answerStep.mdAnswer = buildMdFromAnswer(answerStep);
   }
 
-  console.log(thisStep)
+  let imageReferences: ImageReference[] = [];
+  if(imageObjects.length && with_images) {
+    try {
+      imageReferences = await buildImageReferences(answerStep.answer, imageObjects, context, SchemaGen);
+      console.log('Image references built:', imageReferences);
+    } catch (error) {
+      console.error('Error building image references:', error);
+      imageReferences = [];
+    }
+  }
 
   // max return 300 urls
   const returnedURLs = weightedURLs.slice(0, numReturnedURLs).map(r => r.url);
@@ -1026,7 +1041,9 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     context,
     visitedURLs: returnedURLs,
     readURLs: visitedURLs.filter(url => !badURLs.includes(url)),
-    allURLs: weightedURLs.map(r => r.url)
+    allURLs: weightedURLs.map(r => r.url),
+    allImages: with_images ? imageObjects.map(i => i.url) : undefined,
+    relatedImages: with_images ? imageReferences.map(i => i.url) : undefined,
   };
 }
 
