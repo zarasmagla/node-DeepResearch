@@ -443,7 +443,7 @@ export async function buildImageReferences(
       //  const embeddingsResult = await getEmbeddings(validAnswerChunks, context.tokenTracker, embeddingOptions); //  No embeddingOptions needed here
       //   answerEmbeddings.push(...embeddingsResult.embeddings);
       const embeddingsResult = await getEmbeddings(validAnswerChunks, context.tokenTracker, {
-          dimensions: 1024,
+          dimensions: 512,
           model: 'jina-clip-v2',
       });
       answerEmbeddings.push(...embeddingsResult.embeddings);

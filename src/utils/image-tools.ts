@@ -122,7 +122,7 @@ export const processImage = async (url: string, tracker: TokenTracker): Promise<
     const base64Data = (await canvasToDataUrl(canvas)).split(',')[1];
 
     const {embeddings} = await getEmbeddings([{ image: base64Data }], tracker, {
-      dimensions: 1024,
+      dimensions: 512,
       model: 'jina-clip-v2',
     });
 
