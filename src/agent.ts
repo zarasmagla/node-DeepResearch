@@ -40,7 +40,6 @@ import {
 } from "./utils/text-tools";
 import { MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas } from "./utils/schemas";
 import { formatDateBasedOnType, formatDateRange } from "./utils/date-tools";
-import { repairUnknownChars } from "./tools/broken-ch-fixer";
 import { reviseAnswer } from "./tools/md-fixer";
 import { buildReferences } from "./tools/build-ref";
 import { arxivSearch } from './tools/arxiv-search';
@@ -988,13 +987,13 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
         fixBadURLMdLinks(
           fixCodeBlockIndentation(
             repairMarkdownFootnotesOuter(
-              await repairUnknownChars(
-                await reviseAnswer(
-                  answerStep.answer,
-                  allKnowledge,
-                  context,
-                  SchemaGen),
-                context))
+              await reviseAnswer(
+                answerStep.answer,
+                allKnowledge,
+                context,
+                SchemaGen
+              )
+            )
           ),
           allURLs)));
 
