@@ -9,12 +9,26 @@ interface LogEntry {
 }
 
 function createLogEntry(severity: string, message: string, context: Record<string, any> = {}): LogEntry {
+  // Handle error objects specially
+  const processedContext = Object.entries(context).reduce((acc, [key, value]) => {
+    if (value instanceof Error) {
+      acc[key] = {
+        message: value.message,
+        stack: value.stack,
+        name: value.name
+      };
+    } else {
+      acc[key] = value;
+    }
+    return acc;
+  }, {} as Record<string, any>);
+
   const entry: LogEntry = {
     severity,
     message,
     component: 'deepsearch',
     timestamp: new Date().toISOString(),
-    ...context
+    ...processedContext
   };
 
   // Add trace context if available

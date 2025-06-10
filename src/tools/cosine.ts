@@ -23,7 +23,7 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
 
 // Fallback similarity ranking using Jaccard
 export async function jaccardRank(query: string, documents: string[]): Promise<{ results: { index: number, relevance_score: number }[] }> {
-  logInfo(`[fallback] Using Jaccard similarity for ${documents.length} documents`);
+  logWarning(`[fallback] Using Jaccard similarity for ${documents.length} documents`);
   // Convert texts to lowercase and tokenize by splitting on non-alphanumeric characters
   const queryTokens = new Set(query.toLowerCase().split(/\W+/).filter(t => t.length > 0));
 

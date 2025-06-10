@@ -230,7 +230,6 @@ export async function buildReferences(
 
   } catch (error) {
     logError('Embedding failed, falling back to Jaccard similarity', { error });
-    logDebug(`[buildReferences] Fallback: Using Jaccard similarity instead of embeddings`);
 
     // Process all chunks with Jaccard fallback
     const allMatches = [];
