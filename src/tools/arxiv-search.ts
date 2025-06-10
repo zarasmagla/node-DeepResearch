@@ -11,7 +11,7 @@ export async function arxivSearch(
     const { data } = await axiosClient.post<ArxivSearchResponse>(
       `https://svip.jina.ai/`,
       {
-        q: query.q,
+        ...query,
         domain: 'arxiv',
       },
       {
