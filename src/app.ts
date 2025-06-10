@@ -582,6 +582,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       body.max_annotations,
       body.min_annotation_relevance,
       body.language_code,
+      body.search_language_code,
       body.search_provider
     )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;

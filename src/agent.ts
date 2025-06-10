@@ -388,8 +388,9 @@ export async function getResponse(question?: string,
   badHostnames: string[] = [],
   onlyHostnames: string[] = [],
   maxRef: number = 10,
-  minRelScore: number = 0.75,
+  minRelScore: number = 0.85,
   languageCode: string | undefined = undefined,
+  searchLanguageCode?: string,
   searchProvider?: string
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[] }> {
 
@@ -420,6 +421,9 @@ export async function getResponse(question?: string,
 
   const SchemaGen = new Schemas();
   await SchemaGen.setLanguage(languageCode || question)
+  if (searchLanguageCode) {
+    SchemaGen.searchLanguageCode = searchLanguageCode;
+  }
   const context: TrackerContext = {
     tokenTracker: existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker()
