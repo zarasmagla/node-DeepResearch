@@ -3,7 +3,7 @@ import { getKnowledgeStr } from "../utils/text-tools";
 import { getModel } from "../config";
 import { generateText } from "ai";
 import { Schemas } from "../utils/schemas";
-import { logInfo, logError, logDebug, logWarning } from '../logging';
+import { logInfo, logError, logDebug } from '../logging';
 
 
 function getPrompt(mdContent: string, allKnowledge: KnowledgeItem[], schema: Schemas): PromptPair {
@@ -22,6 +22,7 @@ Your task is to revise the provided markdown content (written by your junior int
 - Write section headers as single phrases without colons (##, ###) to organize long content. Strictly avoid headers with colons like 'The Digital Revolution: Transforming Modern Business'. Instead use 'Digital Transformation in Business'.
 - Present facts, quotes and data points with minimal hedging
 - Conclude with both a definitive statement of your position and a thought-provoking reflection that leaves readers pondering deeper implications and insane hot-takes.
+- Remove all disclaimer and copyright notices at the end of the content.
 </structure>
 
 

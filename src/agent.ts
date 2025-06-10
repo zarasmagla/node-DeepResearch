@@ -563,8 +563,7 @@ export async function getResponse(question?: string,
     } as StepAction;
     // print allowed and chose action
     const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect, allowCoding].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
-    logDebug(`${currentQuestion}: ${thisStep.action} <- [${actionsStr}]`);
-    logDebug('Step details:', thisStep);
+    logDebug(`Step decision: ${thisStep.action} <- [${actionsStr}]`, { thisStep, currentQuestion });
 
     context.actionTracker.trackAction({ totalStep, thisStep, gaps });
 
