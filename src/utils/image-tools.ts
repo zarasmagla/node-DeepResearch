@@ -51,13 +51,11 @@ const _loadImage = async (input: string | Buffer) => {
   }
 
   const img = await canvas.loadImage(buff).catch((err) => {
-    throw new Error('Loading image failed: ' + err.message);
+    console.error('Error loading image:', err);
+    return undefined;
   });
-  Reflect.set(img, 'contentType', contentType);
-
-  return {
-    img,
-  };
+  
+  return img;
 }
 
 export const loadImage = async (uri: string | Buffer) => {
@@ -105,7 +103,7 @@ export const canvasToBuffer = (canvas: canvas.Canvas, mimeType?: 'image/png' | '
 
 export const processImage = async (url: string, tracker: TokenTracker): Promise<ImageObject | undefined> => {
   try {
-    const { img } = await loadImage(url);
+    const img = await loadImage(url);
     if (!img) {
       return;
     }
@@ -117,6 +115,7 @@ export const processImage = async (url: string, tracker: TokenTracker): Promise<
 
     const canvas = fitImageToSquareBox(img, 256);
     const base64Data = (await canvasToDataUrl(canvas)).split(',')[1];
+    img.src = ''; // Clear the image source to free memory
 
     const {embeddings} = await getEmbeddings([{ image: base64Data }], tracker, {
       dimensions: 512,

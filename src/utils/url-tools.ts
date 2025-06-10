@@ -560,8 +560,9 @@ export async function processURLs(
         // Process images
         if (withImages && data.images) {
           const imageEntries = Object.entries(data.images || {});
+          let imageObject: any;
           imageEntries.forEach(async ([alt, url]) => {
-            const imageObject = await processImage(url, context.tokenTracker);
+            imageObject = await processImage(url, context.tokenTracker);
             if (imageObject && !imageObjects.find(i => i.url === imageObject.url)) {
               imageObjects.push(imageObject);
             }
