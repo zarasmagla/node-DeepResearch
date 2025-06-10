@@ -225,10 +225,10 @@ function getTokenBudgetAndMaxAttempts(
     case 'low':
       return { tokenBudget: 100000, maxBadAttempts: 1 };
     case 'high':
-      return { tokenBudget: 1000000, maxBadAttempts: 2 };
+      return { tokenBudget: 1000000, maxBadAttempts: 4 };
     case 'medium':
     default:
-      return { tokenBudget: 500000, maxBadAttempts: 1 };
+      return { tokenBudget: 500000, maxBadAttempts: 2 };
   }
 }
 

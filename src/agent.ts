@@ -393,7 +393,7 @@ export async function getResponse(question?: string,
   badHostnames: string[] = [],
   onlyHostnames: string[] = [],
   maxRef: number = 10,
-  minRelScore: number = 0.85,
+  minRelScore: number = 0.80,
   languageCode: string | undefined = undefined,
   searchLanguageCode?: string,
   searchProvider?: string,
@@ -956,7 +956,10 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   }
 
   if (!(thisStep as AnswerAction).isFinal) {
-    logWarning('Enter Beast mode!!!');
+    logInfo(`Beast mode!!! budget ${(context.tokenTracker.getTotalUsage().totalTokens / tokenBudget * 100).toFixed(2)}%`, {
+      usage: context.tokenTracker.getTotalUsageSnakeCase(),
+      evaluationMetrics,
+    });
     // any answer is better than no answer, humanity last resort
     step++;
     totalStep++;
