@@ -1,7 +1,6 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 import {
   CoreMessage,
-  generateObject,
   LanguageModelUsage,
   NoObjectGeneratedError,
   Schema,
@@ -10,6 +9,9 @@ import { TokenTracker } from "./token-tracker";
 import { getModel, ToolName, getToolConfig } from "../config";
 import Hjson from "hjson"; // Import Hjson library
 import { logger } from "../winston-logger";
+import { GoogleGenAIHelper } from "./google-genai-helper";
+import { ContentListUnion } from "@google/genai";
+
 interface GenerateObjectResult<T> {
   object: T;
   usage: LanguageModelUsage;
@@ -17,7 +19,7 @@ interface GenerateObjectResult<T> {
 
 interface GenerateOptions<T> {
   model: ToolName;
-  schema: z.ZodType<T> | Schema<T>;
+  schema: any;
   prompt?: string;
   system?: string;
   messages?: CoreMessage[];
@@ -41,7 +43,7 @@ export class ObjectGeneratorSafe {
   ): z.ZodType<T> | Schema<T> {
     // For zod schemas
     if (schema instanceof z.ZodType) {
-      return this.stripZodDescriptions(schema);
+      return schema
     }
 
     // For AI SDK Schema objects
@@ -51,95 +53,6 @@ export class ObjectGeneratorSafe {
 
     // If we can't determine the schema type, return as is
     return schema;
-  }
-
-  /**
-   * Recursively strips descriptions from Zod schemas
-   */
-  private stripZodDescriptions<T>(zodSchema: z.ZodType<T>): z.ZodType<T> {
-    if (zodSchema instanceof z.ZodObject) {
-      const shape = zodSchema._def.shape();
-      const newShape: Record<string, any> = {};
-
-      for (const key in shape) {
-        if (Object.prototype.hasOwnProperty.call(shape, key)) {
-          // Recursively strip descriptions from nested schemas
-          newShape[key] = this.stripZodDescriptions(shape[key]);
-        }
-      }
-
-      return z.object(newShape) as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodArray) {
-      return z.array(
-        this.stripZodDescriptions(zodSchema._def.type)
-      ) as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodString) {
-      // Create a new string schema without any describe() metadata
-      return z.string() as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodNumber) {
-      return z.number() as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodBoolean) {
-      return z.boolean() as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodOptional) {
-      return z.optional(
-        this.stripZodDescriptions(zodSchema._def.innerType)
-      ) as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodNullable) {
-      return z.nullable(
-        this.stripZodDescriptions(zodSchema._def.innerType)
-      ) as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodEnum) {
-      return z.enum(zodSchema._def.values) as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodLiteral) {
-      return z.literal(zodSchema._def.value) as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodUnion) {
-      const options = zodSchema._def.options.map((option: any) =>
-        this.stripZodDescriptions(option)
-      );
-      return z.union(options as any) as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodIntersection) {
-      const left = this.stripZodDescriptions(zodSchema._def.left);
-      const right = this.stripZodDescriptions(zodSchema._def.right);
-      return z.intersection(left, right) as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodRecord) {
-      const valueType = zodSchema._def.valueType;
-      return z.record(
-        this.stripZodDescriptions(valueType)
-      ) as unknown as z.ZodType<T>;
-    }
-
-    if (zodSchema instanceof z.ZodTuple) {
-      const items = zodSchema._def.items.map((item: any) =>
-        this.stripZodDescriptions(item)
-      );
-      return z.tuple(items) as unknown as z.ZodType<T>;
-    }
-
-    // For other primitive types or complex types we're not handling specifically,
-    // return as is
-    return zodSchema;
   }
 
   /**
@@ -201,36 +114,22 @@ export class ObjectGeneratorSafe {
     }
 
     try {
-      const opts = {
-        model: getModel(model),
-        schema,
-        prompt,
-        system,
-        messages,
-        maxTokens: getToolConfig(model).maxTokens,
-        temperature: getToolConfig(model).temperature,
-        providerOptions,
-        experimental_telemetry: {
-          isEnabled: true,
-          metadata: {
-            query: 'weather',
-            location: 'San Francisco',
-          },
-        },
-      }
-      logger.info("generateObject opts" + JSON.stringify({
-        model: getModel(model),
-        schema,
-        messagesLength: messages?.length,
-        charactersLength: messages?.reduce((acc, message) => acc + message.content.length, 0),
-        maxTokens: getToolConfig(model).maxTokens,
-        temperature: getToolConfig(model).temperature,
-      }, null, 2));
       // Primary attempt with main model
-      const result = await generateObject(opts);
-      logger.info("finish reason result", result.finishReason);
+      console.log('==============================');
+      const result = await GoogleGenAIHelper.generateObject({
+        model: getModel(model),
+        schema,
+        prompt: prompt ? prompt : messages?.map((message) => ({
+          role: message.role === "assistant" ? "model" : message.role,
+          parts: [{
+            text: message.content,
+          }],
+        })) as ContentListUnion,
+        systemInstruction: system,
+        maxOutputTokens: getToolConfig(model).maxTokens,
+      });
       this.tokenTracker.trackUsage(model, result.usage);
-      return result;
+      return result as unknown as GenerateObjectResult<T>;
     } catch (error) {
       // First fallback: Try manual parsing of the error response
       try {
@@ -272,18 +171,16 @@ export class ObjectGeneratorSafe {
             // Create a distilled version of the schema without descriptions
             const distilledSchema = this.createDistilledSchema(schema);
 
-            const fallbackResult = await generateObject({
+            const fallbackResult = await GoogleGenAIHelper.generateObject({
               model: getModel("fallback"),
               schema: distilledSchema,
               prompt: `Following the given JSON schema, extract the field from below: \n\n ${failedOutput}`,
               temperature: getToolConfig('fallback').temperature,
-              providerOptions,
-
             });
 
             this.tokenTracker.trackUsage("fallback", fallbackResult.usage); // Track against fallback model
             console.log("Distilled schema parse success!");
-            return fallbackResult;
+            return fallbackResult as unknown as GenerateObjectResult<T>;
           } catch (fallbackError) {
             // If fallback model also fails, try parsing its error response
             try {
@@ -291,7 +188,7 @@ export class ObjectGeneratorSafe {
                 fallbackError
               );
               this.tokenTracker.trackUsage("fallback", lastChanceResult.usage);
-              return lastChanceResult;
+              return lastChanceResult as unknown as GenerateObjectResult<T>;
             } catch (finalError) {
               logger.error(`All recovery mechanisms failed`);
               throw error; // Throw original error for better debugging

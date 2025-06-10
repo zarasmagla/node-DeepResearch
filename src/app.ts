@@ -14,7 +14,6 @@ import {
 import { TokenTracker } from "./utils/token-tracker";
 import { ActionTracker } from "./utils/action-tracker";
 import { ObjectGeneratorSafe } from "./utils/safe-generator";
-import { jsonSchema } from "ai";
 import { normalizeHostName } from "./utils/url-tools";
 import { get_api_logger } from "./utils/structured-logger";
 import { logger } from "./winston-logger";
@@ -505,8 +504,8 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     // Convert JSON schema to Zod schema using a proper converter
     try {
       console.log(body.response_format);
-      responseSchema = jsonSchema(body.response_format);
-      const jsonString = JSON.stringify(responseSchema);
+      responseSchema = body.response_format
+      const jsonString = responseSchema
       logger.info("responseSchema", jsonString);
     } catch (error: any) {
       return res
@@ -660,6 +659,7 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     if (responseSchema) {
       try {
         const generator = new ObjectGeneratorSafe(context?.tokenTracker);
+        console.log('responseSchema', responseSchema);
         const result = await generator.generateObject({
           model: "agent",
           schema: responseSchema,

@@ -220,10 +220,7 @@ export interface Model {
 
 export type PromptPair = { system: string, user: string };
 
-export type ResponseFormat = {
-  type: 'json_schema' | 'json_object';
-  json_schema?: any;
-}
+export type ResponseFormat = any
 
 export interface ChatCompletionRequest {
   model: string;

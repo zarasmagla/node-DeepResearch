@@ -2,12 +2,10 @@ import fs from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { getResponse } from '../agent';
-import { generateObject } from 'ai';
-import { GEMINI_API_KEY } from '../config';
-import { z } from 'zod';
 import { AnswerAction, TrackerContext } from "../types";
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { logger } from "../winston-logger";
+import { GoogleGenAIHelper } from "../utils/google-genai-helper";
+import { z } from 'zod/v4';
 
 const execAsync = promisify(exec);
 
@@ -101,25 +99,20 @@ Actual answer: ${actualAnswer}
 
 Minor wording differences are acceptable as long as the core information of the expected answer is preserved in the actual answer.'`;
 
-  const schema = z.object({
-    pass: z.boolean().describe('Whether the actual answer matches the expected answer'),
-    reason: z.string().describe('Detailed explanation of why the evaluation passed or failed')
-  });
-
   try {
-    const result = await generateObject({
-      model: createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })('gemini-2.5-flash-preview-05-20'),  // fix to gemini-2.0-flash for evaluation
-      schema,
+    const schema = z.object({
+      pass: z.boolean().describe('Whether the actual answer matches the expected answer'),
+      reason: z.string().describe('Detailed explanation of why the evaluation passed or failed')
+    });
+    const schemaToBeProcessed = z.toJSONSchema(schema)
+
+    logger.info("==========================", JSON.stringify(schemaToBeProcessed));
+    const result = await GoogleGenAIHelper.generateObject<{ pass: boolean; reason: string }>({
+      model: "gemini-2.5-flash-preview-05-20",
       prompt,
-      maxTokens: 1000,
-      temperature: 0,  // Setting temperature to 0 for deterministic output
-      providerOptions: {
-        google: {
-          thinkingConfig: {
-            thinkingBudget: 0, // Added thinkingBudget for Google
-          },
-        },
-      },
+      schema: schemaToBeProcessed,
+      maxOutputTokens: 1000,
+      temperature: 0,
     });
 
     return result.object;

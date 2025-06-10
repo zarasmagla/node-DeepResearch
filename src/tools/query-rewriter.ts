@@ -253,7 +253,7 @@ export async function rewriteQuery(action: SearchAction, context: string, tracke
     const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
     const queryPromises = action.searchRequests.map(async (req) => {
       const prompt = getPrompt(req, action.think, context);
-      const result = await generator.generateObject({
+      const result = await generator.generateObject<{ queries: SERPQuery[], think: string }>({
         model: TOOL_NAME,
         schema: schemaGen.getQueryRewriterSchema(),
         system: prompt.system,

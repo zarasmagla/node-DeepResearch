@@ -1,9 +1,9 @@
 import { KnowledgeItem, PromptPair, TrackerContext } from "../types";
 import { getKnowledgeStr } from "../utils/text-tools";
 import { getModel } from "../config";
-import { generateText } from "ai";
 import { Schemas } from "../utils/schemas";
 import { logger } from "../winston-logger";
+import { GoogleGenAIHelper } from "../utils/google-genai-helper";
 
 function getPrompt(
   mdContent: string,
@@ -64,9 +64,9 @@ export async function reviseAnswer(
     const prompt = getPrompt(mdContent, knowledgeItems, schema);
     trackers?.actionTracker.trackThink("final_answer", schema.languageCode);
 
-    const result = await generateText({
+    const result = await GoogleGenAIHelper.generateText({
       model: getModel("agent"),
-      system: prompt.system,
+      systemInstruction: prompt.system,
       prompt: prompt.user,
     });
 

@@ -100,9 +100,9 @@ export async function analyzeSteps(
     const generator = new ObjectGeneratorSafe(trackers?.tokenTracker);
     const prompt = getPrompt(diaryContext);
 
-    const result = await generator.generateObject({
+    const result = await generator.generateObject<ErrorAnalysisResponse>({
       model: TOOL_NAME,
-      schema: schemaGen.getErrorAnalysisSchema(),
+      schema: schemaGen.getErrorAnalysisJsonSchema(),
       system: prompt.system,
       prompt: prompt.user,
       providerOptions: {

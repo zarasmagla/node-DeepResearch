@@ -1,4 +1,4 @@
-import { ZodObject } from "zod";
+import { z } from "zod/v4";
 import { CoreMessage } from "ai";
 import { SEARCH_PROVIDER, STEP_SLEEP } from "./config";
 import fs from "fs/promises";
@@ -27,7 +27,6 @@ import {
 import { TrackerContext } from "./types";
 import { search } from "./tools/jina-search";
 // import {grounding} from "./tools/grounding";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { ObjectGeneratorSafe } from "./utils/safe-generator";
 import { CodeSandbox } from "./tools/code-sandbox";
 import { serperSearch } from "./tools/serper-search";
@@ -559,7 +558,7 @@ export async function getResponse(
 
   const generator = new ObjectGeneratorSafe(context.tokenTracker);
 
-  let schema: ZodObject<any> = SchemaGen.getAgentSchema(
+  let schema: any = SchemaGen.getAgentSchema(
     true,
     true,
     true,
@@ -707,7 +706,7 @@ export async function getResponse(
       currentQuestion,
       currentQuestion === question ? finalAnswerPIP : undefined
     );
-    const result = await generator.generateObject({
+    const result = await generator.generateObject<StepAction>({
       model: "agent",
       schema,
       system,
@@ -724,7 +723,7 @@ export async function getResponse(
     thisStep = {
       action: result.object.action,
       think: result.object.think,
-      ...result.object[result.object.action],
+      ...(result.object as any)[result.object.action],
     } as StepAction;
     // print allowed and chose action
     const actionsStr = [
@@ -738,7 +737,6 @@ export async function getResponse(
       .filter((a) => a)
       .join(", ");
     console.log(`${currentQuestion}: ${thisStep.action} <- [${actionsStr}]`);
-    console.log(thisStep);
 
     context.actionTracker.trackAction({ totalStep, thisStep, gaps });
 
@@ -786,7 +784,6 @@ export async function getResponse(
         ...thisStep,
       });
 
-      console.log(currentQuestion, evaluationMetrics[currentQuestion]);
       let evaluation: EvaluationResponse = { pass: true, think: "" };
       if (evaluationMetrics[currentQuestion].length > 0) {
         context.actionTracker.trackThink("eval_first", SchemaGen.languageCode);
@@ -1075,7 +1072,6 @@ You decided to think out of the box or cut from a completely different angle.
       ].slice(0, MAX_URLS_PER_STEP);
 
       const uniqueURLs = thisStep.URLTargets;
-      console.log(uniqueURLs);
 
       if (uniqueURLs.length > 0) {
         const { urlResults, success } = await processURLs(
@@ -1215,7 +1211,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       question,
       finalAnswerPIP
     );
-    const result = await generator.generateObject({
+    const result = await generator.generateObject<StepAction>({
       model: "agentBeastMode",
       schema,
       system,
@@ -1232,7 +1228,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     thisStep = {
       action: result.object.action,
       think: result.object.think,
-      ...result.object[result.object.action],
+      ...(result.object as any)[result.object.action],
     } as AnswerAction;
     // await updateReferences(thisStep, allURLs);
     (thisStep as AnswerAction).isFinal = true;
@@ -1284,7 +1280,6 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     answerStep.mdAnswer = buildMdFromAnswer(answerStep);
   }
 
-  console.log(thisStep);
 
   // Log completion of agent processing
   context.logger.agent_step(
@@ -1352,10 +1347,7 @@ async function storeContext(
   }
 
   try {
-    await fs.writeFile(
-      `prompt-${step}.txt`,
-      `\nPrompt:\n${prompt}\n\nJSONSchema:\n${JSON.stringify(zodToJsonSchema(schema), null, 2)}\n`
-    );
+
     await fs.writeFile("context.json", JSON.stringify(allContext, null, 2));
     await fs.writeFile("queries.json", JSON.stringify(allKeywords, null, 2));
     await fs.writeFile("questions.json", JSON.stringify(allQuestions, null, 2));

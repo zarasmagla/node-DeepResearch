@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "zod/v4";
 import { ObjectGeneratorSafe } from "./safe-generator";
 import { EvaluationType, PromptPair } from "../types";
 
@@ -121,7 +121,7 @@ export class Schemas {
 
     const result = await generator.generateObject({
       model: 'evaluator',
-      schema: this.getLanguageSchema(),
+      schema: this.getLanguageJsonSchema(),
       system: prompt.system,
       prompt: prompt.user,
       providerOptions: {
@@ -133,15 +133,13 @@ export class Schemas {
       },
     });
 
-    this.languageCode = result.object.langCode;
-    this.languageStyle = result.object.langStyle;
-    console.log(`langauge`, result.object);
+    this.languageCode = (result.object as any).langCode;
+    this.languageStyle = (result.object as any).langStyle;
   }
 
   getLanguagePrompt() {
     return `Must in the first-person in "lang:${this.languageCode}"; in the style of "${this.languageStyle}".`
   }
-
   getLanguageSchema() {
     return z.object({
       langCode: z.string().describe('ISO 639-1 language code. Maximum 10 characters.'),
@@ -149,24 +147,32 @@ export class Schemas {
     });
   }
 
-  getQuestionEvaluateSchema(): z.ZodObject<any> {
-    return z.object({
-      think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()} Maximum 500 characters.`),
-      needsDefinitive: z.boolean(),
-      needsFreshness: z.boolean(),
-      needsPlurality: z.boolean(),
-      needsCompleteness: z.boolean(),
-    });
+  getLanguageJsonSchema() {
+    return z.toJSONSchema(this.getLanguageSchema());
   }
 
-  getCodeGeneratorSchema(): z.ZodObject<any> {
+  getQuestionEvaluateSchema() {
+    return z.toJSONSchema(z.object({
+      think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()} Maximum 500 characters.`),
+      needsDefinitive: z.boolean().describe('If the answer needs to be definitive'),
+      needsFreshness: z.boolean().describe('If the answer needs to be fresh'),
+      needsPlurality: z.boolean().describe('If the answer needs to be plural'),
+      needsCompleteness: z.boolean().describe('If the answer needs to be complete'),
+    }))
+  }
+
+  getCodeGeneratorSchema() {
     return z.object({
       think: z.string().describe(`Short explain or comments on the thought process behind the code. ${this.getLanguagePrompt()} Maximum 200 characters.`),
       code: z.string().describe('The JavaScript code that solves the problem and always use \'return\' statement to return the result. Focus on solving the core problem; No need for error handling or try-catch blocks or code comments. No need to declare variables that are already available, especially big long strings or arrays.'),
     });
   }
 
-  getErrorAnalysisSchema(): z.ZodObject<any> {
+  getCodeGeneratorJsonSchema() {
+    return z.toJSONSchema(this.getCodeGeneratorSchema());
+  }
+
+  getErrorAnalysisSchema() {
     return z.object({
       recap: z.string().describe(`Recap of the actions taken and the steps conducted in first person narrative. Maximum 500 characters.`),
       blame: z.string().describe(`Which action or the step was the root cause of the answer rejection. ${this.getLanguagePrompt()} Maximum 500 characters.`),
@@ -174,36 +180,42 @@ export class Schemas {
     });
   }
 
-  getQueryRewriterSchema(): z.ZodObject<any> {
-    return z.object({
+  getErrorAnalysisJsonSchema() {
+    return z.toJSONSchema(this.getErrorAnalysisSchema());
+  }
+
+  getQueryRewriterSchema() {
+    const schema = z.object({
       think: z.string().describe(`Explain why you choose those search queries. ${this.getLanguagePrompt()} Maximum 500 characters.`),
       queries: z.array(
         z.object({
           tbs: z.enum(['qdr:h', 'qdr:d', 'qdr:w', 'qdr:m', 'qdr:y']).describe('time-based search filter, must use this field if the search request asks for latest info. qdr:h for past hour, qdr:d for past 24 hours, qdr:w for past week, qdr:m for past month, qdr:y for past year. Choose exactly one.'),
-          location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the city level in order to simulate a real user’s search.').optional(),
+          location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the city level in order to simulate a real user search.').optional(),
           q: z.string().describe('keyword-based search query, 2-3 words preferred. Maximum 80 characters.'),
         }))
         .describe(`'Array of search keywords queries, orthogonal to each other. Maximum ${MAX_QUERIES_PER_STEP} queries allowed.'`)
     });
+    return z.toJSONSchema(schema);
   }
 
-  getEvaluatorSchema(evalType: EvaluationType): z.ZodObject<any> {
+  getEvaluatorSchema(evalType: EvaluationType) {
     const baseSchemaBefore = {
       think: z.string().describe(`Explanation the thought process why the answer does not pass the evaluation, ${this.getLanguagePrompt()} Maximum 500 characters.`),
     };
     const baseSchemaAfter = {
       pass: z.boolean().describe('If the answer passes the test defined by the evaluator')
     };
+
+    let schema;
     switch (evalType) {
       case "definitive":
-        return z.object({
-          type: z.literal('definitive'),
+        schema = z.object({
           ...baseSchemaBefore,
           ...baseSchemaAfter
         });
+        break;
       case "freshness":
-        return z.object({
-          type: z.literal('freshness'),
+        schema = z.object({
           ...baseSchemaBefore,
           freshness_analysis: z.object({
             days_ago: z.number().describe(`datetime of the **answer** and relative to ${new Date().toISOString().slice(0, 10)}.`).min(0),
@@ -211,9 +223,9 @@ export class Schemas {
           }),
           pass: z.boolean().describe('If "days_ago" <= "max_age_days" then pass!')
         });
+        break;
       case "plurality":
-        return z.object({
-          type: z.literal('plurality'),
+        schema = z.object({
           ...baseSchemaBefore,
           plurality_analysis: z.object({
             minimum_count_required: z.number().describe('Minimum required number of items from the **question**'),
@@ -221,16 +233,16 @@ export class Schemas {
           }),
           pass: z.boolean().describe('If count_provided >= count_expected then pass!')
         });
+        break;
       case "attribution":
-        return z.object({
-          type: z.literal('attribution'),
+        schema = z.object({
           ...baseSchemaBefore,
           exactQuote: z.string().describe('Exact relevant quote and evidence from the source that strongly support the answer and justify this question-answer pair. Maximum 200 characters.').optional(),
           ...baseSchemaAfter
         });
+        break;
       case "completeness":
-        return z.object({
-          type: z.literal('completeness'),
+        schema = z.object({
           ...baseSchemaBefore,
           completeness_analysis: z.object({
             aspects_expected: z.string().describe('Comma-separated list of all aspects or dimensions that the question explicitly asks for. Maximum 100 characters.'),
@@ -238,20 +250,22 @@ export class Schemas {
           }),
           ...baseSchemaAfter
         });
+        break;
       case 'strict':
-        return z.object({
-          type: z.literal('strict'),
+        schema = z.object({
           ...baseSchemaBefore,
           improvement_plan: z.string().describe('Explain how a perfect answer should look like and what are needed to improve the current answer. Starts with "For the best answer, you must..." Maximum 1000 characters.'),
           ...baseSchemaAfter
         });
+        break;
       default:
         throw new Error(`Unknown evaluation type: ${evalType}`);
     }
+    return z.toJSONSchema(schema);
   }
 
   getAgentSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean,
-    currentQuestion?: string): z.ZodObject<any> {
+    currentQuestion?: string) {
     const actionSchemas: Record<string, z.ZodOptional<any>> = {};
 
     if (allowSearch) {
@@ -307,11 +321,12 @@ Ensure each reflection question:
     }
 
     // Create an object with action as a string literal and exactly one action property
-    return z.object({
+    const schema = z.object({
       think: z.string().describe(`Concisely explain your reasoning process in ${this.getLanguagePrompt()}. Maximum 600 characters.`),
       action: z.enum(Object.keys(actionSchemas).map(key => key) as [string, ...string[]])
         .describe("Choose exactly one best action from the available actions, fill in the corresponding action schema required. Keep the reasons in mind: (1) What specific information is still needed? (2) Why is this action most likely to provide that information? (3) What alternatives did you consider and why were they rejected? (4) How will this action advance toward the complete answer?"),
       ...actionSchemas,
     });
+    return z.toJSONSchema(schema);
   }
 }

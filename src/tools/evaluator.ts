@@ -567,7 +567,7 @@ export async function evaluateQuestion(
     const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
     const prompt = getQuestionEvaluationPrompt(question);
 
-    const result = await generator.generateObject({
+    const result = await generator.generateObject<{ needsDefinitive: boolean, needsFreshness: boolean, needsPlurality: boolean, needsCompleteness: boolean, think: string }>({
       model: TOOL_NAME,
       schema: schemaGen.getQuestionEvaluateSchema(),
       system: prompt.system,
@@ -611,7 +611,7 @@ async function performEvaluation<T>(
   schemaGen: Schemas
 ): Promise<GenerateObjectResult<T>> {
   const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
-  const result = await generator.generateObject({
+  const result = await generator.generateObject<{ type: EvaluationType, think: string, pass: boolean }>({
     model: TOOL_NAME,
     schema: schemaGen.getEvaluatorSchema(evaluationType),
     system: prompt.system,
@@ -629,7 +629,13 @@ async function performEvaluation<T>(
 
   console.log(`${evaluationType} ${TOOL_NAME}`, result.object);
 
-  return result;
+  return {
+    ...result,
+    object: {
+      type: evaluationType,
+      ...result.object
+    },
+  };
 }
 
 

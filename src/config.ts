@@ -126,7 +126,7 @@ export function getModel(toolName: ToolName) {
   if (toolName === 'searchGrounding') {
     return createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })(config.model, { useSearchGrounding: true });
   }
-  return createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })(config.model);
+  return config.model
 }
 
 // Validate required environment variables

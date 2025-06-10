@@ -1,6 +1,6 @@
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {CodeGenResponse, PromptPair, TrackerContext} from "../types";
-import {Schemas} from "../utils/schemas";
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import { CodeGenResponse, PromptPair, TrackerContext } from "../types";
+import { Schemas } from "../utils/schemas";
 
 
 interface SandboxResult {
@@ -51,7 +51,7 @@ Response:
 
   console.log('Coding prompt', prompt)
 
-  return {system: prompt, user: problem };
+  return { system: prompt, user: problem };
 }
 
 export class CodeSandbox {
@@ -80,9 +80,9 @@ export class CodeSandbox {
   ): Promise<CodeGenResponse> {
     const prompt = getPrompt(problem, analyzeStructure(this.context), previousAttempts);
 
-    const result = await this.generator.generateObject({
+    const result = await this.generator.generateObject<CodeGenResponse>({
       model: 'coder',
-      schema: this.schemaGen.getCodeGeneratorSchema(),
+      schema: this.schemaGen.getCodeGeneratorJsonSchema(),
       system: prompt.system,
       prompt: prompt.user
     });
@@ -134,7 +134,7 @@ export class CodeSandbox {
     for (let i = 0; i < this.maxAttempts; i++) {
       // Generate code
       const generation = await this.generateCode(problem, attempts);
-      const {code} = generation;
+      const { code } = generation;
 
       console.log(`Coding attempt ${i + 1}:`, code);
       // Evaluate the code

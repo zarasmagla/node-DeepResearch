@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { TokenTracker } from "../utils/token-tracker";
 import { ObjectGeneratorSafe } from "../utils/safe-generator";
 
@@ -73,9 +73,9 @@ export async function dedupQueries(
     const generator = new ObjectGeneratorSafe(tracker);
     const prompt = getPrompt(newQueries, existingQueries);
 
-    const result = await generator.generateObject({
+    const result = await generator.generateObject<{ unique_queries: string[] }>({
       model: TOOL_NAME,
-      schema: responseSchema,
+      schema: z.toJSONSchema(responseSchema),
       prompt,
       providerOptions: {
         google: {
@@ -86,7 +86,6 @@ export async function dedupQueries(
       },
     });
 
-    console.log(TOOL_NAME, result.object.unique_queries);
     return { unique_queries: result.object.unique_queries };
 
   } catch (error) {
