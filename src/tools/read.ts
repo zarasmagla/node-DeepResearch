@@ -51,11 +51,7 @@ export async function readUrl(
       throw new Error('Invalid response data');
     }
 
-    logInfo('Read:', {
-      title: data.data.title,
-      url: data.data.url,
-      tokens: data.data.usage?.tokens || 0
-    });
+    logDebug(`Read: ${data.data.title} (${data.data.url})`);
 
     const tokens = data.data.usage?.tokens || 0;
     const tokenTracker = tracker || new TokenTracker();

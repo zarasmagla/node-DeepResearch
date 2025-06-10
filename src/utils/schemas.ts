@@ -118,7 +118,7 @@ export class Schemas {
 
     this.languageCode = result.object.langCode;
     this.languageStyle = result.object.langStyle;
-    logInfo(`language`, { object: result.object });
+    logDebug(`language: ${this.languageCode} -> ${this.languageStyle}`);
   }
 
   getLanguagePrompt() {

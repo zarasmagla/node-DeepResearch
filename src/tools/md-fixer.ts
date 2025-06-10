@@ -82,7 +82,7 @@ export async function reviseAnswer(
 
 
     logInfo(TOOL_NAME, { text: result.text });
-    logInfo('repaired before/after', { before: mdContent.length, after: result.text.length });
+    logDebug(`repaired before/after: ${mdContent.length} -> ${result.text.length}`);
 
     if (result.text.length < mdContent.length * 0.85) {
       logError(`repaired content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`);

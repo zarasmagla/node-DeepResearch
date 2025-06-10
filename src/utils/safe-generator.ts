@@ -9,7 +9,7 @@ import {
 import { TokenTracker } from "./token-tracker";
 import { getModel, ToolName, getToolConfig } from "../config";
 import Hjson from 'hjson'; // Import Hjson library
-import { logInfo, logError, logDebug, logWarning } from '../logging';
+import { logError, logDebug, logWarning } from '../logging';
 
 interface GenerateObjectResult<T> {
   object: T;
@@ -169,7 +169,7 @@ export class ObjectGeneratorSafe {
       } catch (parseError) {
 
         if (numRetries > 0) {
-          logError(`${model} failed on object generation -> manual parsing failed -> retry with ${numRetries - 1} retries remaining`);
+          logWarning(`${model} failed on object generation -> manual parsing failed -> retry with ${numRetries - 1} retries remaining`);
           return this.generateObject({
             model,
             schema,
@@ -180,7 +180,7 @@ export class ObjectGeneratorSafe {
           });
         } else {
           // Second fallback: Try with fallback model if provided
-          logError(`${model} failed on object generation -> manual parsing failed -> trying fallback with distilled schema`);
+          logWarning(`${model} failed on object generation -> manual parsing failed -> trying fallback with distilled schema`);
           try {
             let failedOutput = '';
 
@@ -201,7 +201,7 @@ export class ObjectGeneratorSafe {
             });
 
             this.tokenTracker.trackUsage('fallback', fallbackResult.usage); // Track against fallback model
-            logInfo('Distilled schema parse success!');
+            logDebug('Distilled schema parse success!');
             return fallbackResult;
           } catch (fallbackError) {
             // If fallback model also fails, try parsing its error response
@@ -221,11 +221,11 @@ export class ObjectGeneratorSafe {
 
   private async handleGenerateObjectError<T>(error: unknown): Promise<GenerateObjectResult<T>> {
     if (NoObjectGeneratedError.isInstance(error)) {
-      logError('Object not generated according to schema, fallback to manual parsing');
+      logWarning('Object not generated according to schema, fallback to manual parsing');
       try {
         // First try standard JSON parsing
         const partialResponse = JSON.parse((error as any).text);
-        logInfo('JSON parse success!');
+        logDebug('JSON parse success!');
         return {
           object: partialResponse as T,
           usage: (error as any).usage
@@ -234,7 +234,7 @@ export class ObjectGeneratorSafe {
         // Use Hjson to parse the error response for more lenient parsing
         try {
           const hjsonResponse = Hjson.parse((error as any).text);
-          logInfo('Hjson parse success!');
+          logDebug('Hjson parse success!');
           return {
             object: hjsonResponse as T,
             usage: (error as any).usage

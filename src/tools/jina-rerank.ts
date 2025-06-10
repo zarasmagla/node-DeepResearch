@@ -44,7 +44,7 @@ export async function rerankDocuments(
       batches.push(documents.slice(i, i + batchSize));
     }
 
-    logInfo(`Processing ${documents.length} documents in ${batches.length} batches`);
+    logDebug(`Reranking ${documents.length} documents in ${batches.length} batches`);
 
     // Process all batches in parallel
     const batchResults = await Promise.all(

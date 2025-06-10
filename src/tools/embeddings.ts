@@ -38,7 +38,7 @@ export async function getEmbeddings(
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batchTexts = texts.slice(i, i + BATCH_SIZE);
     const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
-    logDebug(`[embeddings] Processing batch ${currentBatch}/${batchCount} (${batchTexts.length} texts)`);
+    logDebug(`Embedding batch ${currentBatch}/${batchCount} (${batchTexts.length} texts)`);
 
     // Get embeddings for the batch with retry logic for missing indices
     const { batchEmbeddings, batchTokens } = await getBatchEmbeddingsWithRetry(

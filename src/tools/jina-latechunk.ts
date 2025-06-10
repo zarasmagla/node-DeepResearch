@@ -14,7 +14,7 @@ export async function cherryPick(question: string, longContext: string, options:
 
   if (longContext.length < snippetLength * 2) {
     // If the context is shorter than the snippet length, return the whole context
-    logInfo('content is too short, dont bother');
+    logDebug('content is too short, dont bother');
     return longContext;
   }
 
@@ -24,7 +24,7 @@ export async function cherryPick(question: string, longContext: string, options:
     chunks.push(longContext.substring(i, Math.min(i + chunkSize, longContext.length)));
   }
 
-  logInfo('late chunking enabled! num chunks:', { count: chunks.length });
+  logDebug(`late chunking enabled! num chunks: ${chunks.length}`);
 
   trackers.actionTracker.trackThink('late_chunk', schemaGen.languageCode, { url });
 

@@ -270,7 +270,7 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
     // Step 2: Rerank only the unique contents
     const uniqueContents = Object.keys(uniqueContentMap);
     const uniqueIndicesMap = Object.values(uniqueContentMap);
-    logInfo(`rerank URLs: ${urlItems.length}->${uniqueContents.length}`);
+    logDebug(`unique URLs: ${urlItems.length}->${uniqueContents.length}`);
     rerankDocuments(question, uniqueContents, trackers.tokenTracker)
       .then(({ results }) => {
         // Step 3: Map the scores back to all original items
@@ -507,7 +507,7 @@ export async function processURLs(
         const { data } = response;
         const guessedTime = await getLastModified(url);
         if (guessedTime) {
-          logInfo('Guessed time for', { url, guessedTime });
+          logDebug(`Guessed time for ${url}: ${guessedTime}`);
         }
 
         // Early return if no valid data
@@ -520,7 +520,7 @@ export async function processURLs(
         const spamDetectLength = 300;
         const isGoodContent = data.content.length > spamDetectLength || !await classifyText(data.content);
         if (!isGoodContent) {
-          logError(`Blocked content ${data.content.length}:`, {
+          logWarning(`Blocked content ${data.content.length}:`, {
             url,
             content: data.content.slice(0, spamDetectLength)
           });

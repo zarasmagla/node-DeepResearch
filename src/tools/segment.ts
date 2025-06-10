@@ -25,7 +25,7 @@ export async function segmentText(
 
   // Split content into batches
   const batches = splitTextIntoBatches(content, MAX_BATCH_SIZE);
-  logDebug(`Processing ${batches.length} batches`);
+  logDebug(`Segmenting ${batches.length} batches`);
 
   // Calculate offsets for each batch upfront
   const batchOffsets: number[] = [];

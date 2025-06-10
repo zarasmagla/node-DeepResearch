@@ -36,7 +36,7 @@ export async function search(
       throw new Error('Invalid response format');
     }
 
-    logInfo('Search results metadata:', { metadata: data.meta });
+    logDebug('Search results metadata:', { metadata: data.meta });
 
     const tokenTracker = tracker || new TokenTracker();
     tokenTracker.trackUsage('search', {
