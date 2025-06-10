@@ -4,8 +4,6 @@ import { TokenTracker } from './token-tracker';
 import { ImageObject } from '../types';
 import { cosineSimilarity } from '../tools/cosine';
 export type { Canvas, Image } from '@napi-rs/canvas';
-import { Storage } from '@google-cloud/storage';
-import { randomUUID } from 'crypto';
 
 export const downloadFile = async (uri: string) => {
     const resp = await fetch(uri);
@@ -52,13 +50,13 @@ const _loadImage = async (input: string | Buffer) => {
       throw new Error('Invalid input');
   }
 
-  const img = await canvas.loadImage(buff);
+  const img = await canvas.loadImage(buff).catch((err) => {
+    throw new Error('Loading image failed: ' + err.message);
+  });
   Reflect.set(img, 'contentType', contentType);
 
   return {
     img,
-    buff,
-    contentType,
   };
 }
 
@@ -107,7 +105,7 @@ export const canvasToBuffer = (canvas: canvas.Canvas, mimeType?: 'image/png' | '
 
 export const processImage = async (url: string, tracker: TokenTracker): Promise<ImageObject | undefined> => {
   try {
-    const { img, buff, contentType } = await loadImage(url);
+    const { img } = await loadImage(url);
     if (!img) {
       return;
     }
@@ -117,7 +115,6 @@ export const processImage = async (url: string, tracker: TokenTracker): Promise<
       return;
     }
 
-    const newUrl = await saveImageToFirebase(buff, contentType);
     const canvas = fitImageToSquareBox(img, 256);
     const base64Data = (await canvasToDataUrl(canvas)).split(',')[1];
 
@@ -127,7 +124,7 @@ export const processImage = async (url: string, tracker: TokenTracker): Promise<
     });
 
     return {
-      url: newUrl ?? url,
+      url,
       embedding: embeddings,
     };
 
@@ -195,39 +192,3 @@ export const dedupImagesWithEmbeddings = (
     return newImages;
   }
 }
-
-export const saveImageToFirebase = async (
-  buffer: Buffer,
-  mimeType?: string | null,
-): Promise<string | undefined> => {
-  if (!process.env.GCLOUD_PROJECT) {
-    console.error('GCLOUD_PROJECT environment variable is not set');
-    return;
-  }
-  const firebaseDefaultBucket = new Storage().bucket(`${process.env.GCLOUD_PROJECT}.appspot.com`);
-
-  try {
-    let extension = 'png';
-    const finalMimeType = mimeType || 'image/png';
-
-    if (!finalMimeType.startsWith('image/')) {
-      return;
-    } else {
-      extension = finalMimeType?.split('/')[1] || 'png';
-    }
-
-    const fileName = `readImages/${randomUUID()}.${extension}`;
-    
-    const file = firebaseDefaultBucket.file(fileName);
-    
-    await file.save(buffer, {
-      contentType: finalMimeType,
-      public: true,
-    });
-    
-    return file.publicUrl();
-  } catch (error) {
-    console.error('Error saving image to Firebase Storage:', error);
-    return;
-  }
-};
