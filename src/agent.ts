@@ -44,11 +44,11 @@ import { MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas 
 import { formatDateBasedOnType, formatDateRange } from "./utils/date-tools";
 import { reviseAnswer } from "./tools/md-fixer";
 import { buildImageReferences, buildReferences } from "./tools/build-ref";
+import { logInfo, logError, logDebug, logWarning } from './logging';
 
-async function sleep(ms: number) {
-  const seconds = Math.ceil(ms / 1000);
-  console.log(`Waiting ${seconds}s...`);
-  return new Promise(resolve => setTimeout(resolve, ms));
+async function wait(seconds: number) {
+  logDebug(`Waiting ${seconds}s...`);
+  await new Promise(resolve => setTimeout(resolve, seconds * 1000));
 }
 
 function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
@@ -295,7 +295,7 @@ async function executeSearchQueries(
     }
 
     try {
-      console.log('Search query:', query);
+      logDebug('Search query:', { query });
       switch (searchProvider || SEARCH_PROVIDER) {
         case 'jina':
         case 'arxiv':
@@ -318,10 +318,13 @@ async function executeSearchQueries(
         throw new Error('No results found');
       }
     } catch (error) {
-      console.error(`${SEARCH_PROVIDER} search failed for query:`, query, error);
+      logError(`${SEARCH_PROVIDER} search failed for query:`, {
+        query,
+        error: error instanceof Error ? error.message : String(error)
+      });
       continue;
     } finally {
-      await sleep(STEP_SLEEP);
+      await wait(STEP_SLEEP);
     }
 
     const minResults: SearchSnippet[] = results
@@ -360,13 +363,13 @@ async function executeSearchQueries(
   }
   if (searchedQueries.length === 0) {
     if (onlyHostnames && onlyHostnames.length > 0) {
-      console.log(`No results found for queries: ${uniqQOnly.join(', ')} on hostnames: ${onlyHostnames.join(', ')}`);
+      logWarning(`No results found for queries: ${uniqQOnly.join(', ')} on hostnames: ${onlyHostnames.join(', ')}`);
       context.actionTracker.trackThink('hostnames_no_results', SchemaGen.languageCode, { hostnames: onlyHostnames.join(', ') });
     }
   } else {
-    console.log(`Utility/Queries: ${utilityScore}/${searchedQueries.length}`);
+    logDebug(`Utility/Queries: ${utilityScore}/${searchedQueries.length}`);
     if (searchedQueries.length > MAX_QUERIES_PER_STEP) {
-      console.log(`So many queries??? ${searchedQueries.map(q => `"${q}"`).join(', ')}`)
+      logDebug(`So many queries??? ${searchedQueries.map(q => `"${q}"`).join(', ')}`)
     }
   }
   return {
@@ -482,8 +485,8 @@ export async function getResponse(question?: string,
     step++;
     totalStep++;
     const budgetPercentage = (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget * 100).toFixed(2);
-    console.log(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
-    console.log('Gaps:', gaps);
+    logDebug(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
+    logDebug('Gaps:', { gaps });
     allowReflect = allowReflect && (gaps.length <= MAX_REFLECT_PER_STEP);
     // rotating question from gaps
     const currentQuestion: string = gaps[totalStep % gaps.length];
@@ -524,7 +527,7 @@ export async function getResponse(question?: string,
 
       // improve diversity by keep top 2 urls of each hostname
       weightedURLs = keepKPerHostname(weightedURLs, 2);
-      console.log('Weighted URLs:', weightedURLs.length);
+      logDebug('Weighted URLs:', { count: weightedURLs.length });
     }
     allowRead = allowRead && (weightedURLs.length > 0);
 
@@ -560,8 +563,8 @@ export async function getResponse(question?: string,
     } as StepAction;
     // print allowed and chose action
     const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect, allowCoding].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
-    console.log(`${currentQuestion}: ${thisStep.action} <- [${actionsStr}]`);
-    console.log(thisStep)
+    logDebug(`${currentQuestion}: ${thisStep.action} <- [${actionsStr}]`);
+    logDebug('Step details:', thisStep);
 
     context.actionTracker.trackAction({ totalStep, thisStep, gaps });
 
@@ -609,7 +612,10 @@ export async function getResponse(question?: string,
         ...thisStep,
       });
 
-      console.log(currentQuestion, evaluationMetrics[currentQuestion])
+      logDebug('Current question evaluation:', {
+        question: currentQuestion,
+        metrics: evaluationMetrics[currentQuestion]
+      });
       let evaluation: EvaluationResponse = { pass: true, think: '' };
       if (evaluationMetrics[currentQuestion].length > 0) {
         context.actionTracker.trackThink('eval_first', SchemaGen.languageCode)
@@ -853,7 +859,7 @@ You decided to think out of the box or cut from a completely different angle.
       thisStep.URLTargets = [...new Set([...thisStep.URLTargets, ...weightedURLs.map(r => r.url!)])].slice(0, MAX_URLS_PER_STEP);
 
       const uniqueURLs = thisStep.URLTargets;
-      console.log(uniqueURLs)
+      logDebug('Unique URLs:', { urls: uniqueURLs });
 
       if (uniqueURLs.length > 0) {
         const { urlResults, success } = await processURLs(
@@ -921,7 +927,9 @@ You found the solution and add it to your knowledge for future reference.
           result: result
         });
       } catch (error) {
-        console.error('Error solving coding issue:', error);
+        logError('Error solving coding issue:', {
+          error: error instanceof Error ? error.message : String(error)
+        });
         diaryContext.push(`
 At step ${step}, you took the **coding** action and try to solve the coding issue: ${thisStep.codingIssue}.
 But unfortunately, you failed to solve the issue. You need to think out of the box or cut from a completely different angle.
@@ -944,11 +952,11 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       weightedURLs,
       msgWithKnowledge
     }, totalStep);
-    await sleep(STEP_SLEEP);
+    await wait(STEP_SLEEP);
   }
 
   if (!(thisStep as AnswerAction).isFinal) {
-    console.log('Enter Beast mode!!!')
+    logWarning('Enter Beast mode!!!');
     // any answer is better than no answer, humanity last resort
     step++;
     totalStep++;
@@ -1024,12 +1032,14 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   }
 
   let imageReferences: ImageReference[] = [];
-  if(imageObjects.length && with_images) {
+  if (imageObjects.length && with_images) {
     try {
       imageReferences = await buildImageReferences(answerStep.answer, imageObjects, context, SchemaGen);
-      console.log('Image references built:', imageReferences);
+      logDebug('Image references built:', { count: imageReferences.length });
     } catch (error) {
-      console.error('Error building image references:', error);
+      logError('Error building image references:', {
+        error: error instanceof Error ? error.message : String(error)
+      });
       imageReferences = [];
     }
   }
@@ -1087,7 +1097,9 @@ ${JSON.stringify(zodToJsonSchema(schema), null, 2)}
     await fs.writeFile('urls.json', JSON.stringify(weightedURLs, null, 2));
     await fs.writeFile('messages.json', JSON.stringify(msgWithKnowledge, null, 2));
   } catch (error) {
-    console.error('Context storage failed:', error);
+    logError('Context storage failed:', {
+      error: error instanceof Error ? error.message : String(error)
+    });
   }
 }
 
@@ -1098,12 +1110,16 @@ export async function main() {
     context: tracker,
     visitedURLs: visitedURLs
   } = await getResponse(question) as { result: AnswerAction; context: TrackerContext; visitedURLs: string[] };
-  console.log('Final Answer:', finalStep.answer);
-  console.log('Visited URLs:', visitedURLs);
+  logInfo('Final Answer:', { answer: finalStep.answer });
+  logInfo('Visited URLs:', { urls: visitedURLs });
 
   tracker.tokenTracker.printSummary();
 }
 
 if (require.main === module) {
-  main().catch(console.error);
+  main().catch(error => {
+    logError('Main execution error:', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
 }

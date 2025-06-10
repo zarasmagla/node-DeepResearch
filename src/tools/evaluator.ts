@@ -1,8 +1,9 @@
-import {GenerateObjectResult} from 'ai';
-import {AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, PromptPair, TrackerContext} from '../types';
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {Schemas} from "../utils/schemas";
-import {getKnowledgeStr} from "../utils/text-tools";
+import { GenerateObjectResult } from 'ai';
+import { AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, PromptPair, TrackerContext } from '../types';
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import { Schemas } from "../utils/schemas";
+import { getKnowledgeStr } from "../utils/text-tools";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 const TOOL_NAME = 'evaluator';
 
@@ -572,7 +573,7 @@ export async function evaluateQuestion(
       prompt: prompt.user
     });
 
-    console.log('Question Evaluation:', result.object);
+    logInfo('Question Evaluation:', result.object);
 
     // Always include definitive in types
     const types: EvaluationType[] = [];
@@ -581,14 +582,14 @@ export async function evaluateQuestion(
     if (result.object.needsPlurality) types.push('plurality');
     if (result.object.needsCompleteness) types.push('completeness');
 
-    console.log('Question Metrics:', question, types);
+    logInfo('Question Metrics:', { question, types });
     trackers?.actionTracker.trackThink(result.object.think);
 
     // Always evaluate definitive first, then freshness (if needed), then plurality (if needed)
     return types;
 
   } catch (error) {
-    console.error('Error in question evaluation:', error);
+    logError('Error in question evaluation:', { error });
     // Default to no check
     return [];
   }
@@ -611,7 +612,7 @@ async function performEvaluation<T>(
 
   trackers.actionTracker.trackThink(result.object.think)
 
-  console.log(`${evaluationType} ${TOOL_NAME}`, result.object);
+  logInfo(`${evaluationType} ${TOOL_NAME}`, result.object);
 
   return result;
 }
@@ -649,7 +650,7 @@ export async function evaluateAnswer(
         prompt = getRejectAllAnswersPrompt(question, action, allKnowledge);
         break;
       default:
-        console.error(`Unknown evaluation type: ${evaluationType}`);
+        logError(`Unknown evaluation type: ${evaluationType}`);
     }
     if (prompt) {
       result = await performEvaluation(

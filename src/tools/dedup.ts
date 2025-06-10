@@ -1,6 +1,7 @@
-import {z} from 'zod';
-import {TokenTracker} from "../utils/token-tracker";
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
+import { z } from 'zod';
+import { TokenTracker } from "../utils/token-tracker";
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 const responseSchema = z.object({
@@ -79,11 +80,11 @@ export async function dedupQueries(
       prompt,
     });
 
-    console.log(TOOL_NAME, result.object.unique_queries);
-    return {unique_queries: result.object.unique_queries};
+    logInfo(TOOL_NAME, { unique_queries: result.object.unique_queries });
+    return { unique_queries: result.object.unique_queries };
 
   } catch (error) {
-    console.error(`Error in ${TOOL_NAME}`, error);
+    logError(`Error in ${TOOL_NAME}`, { error });
     throw error;
   }
 }

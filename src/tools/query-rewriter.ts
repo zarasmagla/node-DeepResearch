@@ -1,6 +1,7 @@
-import {PromptPair, SearchAction, SERPQuery, TrackerContext} from '../types';
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {Schemas} from "../utils/schemas";
+import { PromptPair, SearchAction, SERPQuery, TrackerContext } from '../types';
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import { Schemas } from "../utils/schemas";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 function getPrompt(query: string, think: string, context: string): PromptPair {
@@ -200,7 +201,7 @@ Given those info, now please generate the best effective queries that follow JSO
 }
 const TOOL_NAME = 'queryRewriter';
 
-export async function rewriteQuery(action: SearchAction, context: string,  trackers: TrackerContext, schemaGen: Schemas): Promise<SERPQuery[] > {
+export async function rewriteQuery(action: SearchAction, context: string, trackers: TrackerContext, schemaGen: Schemas): Promise<SERPQuery[]> {
   try {
     const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
     const queryPromises = action.searchRequests.map(async (req) => {
@@ -217,10 +218,10 @@ export async function rewriteQuery(action: SearchAction, context: string,  track
 
     const queryResults = await Promise.all(queryPromises);
     const allQueries: SERPQuery[] = queryResults.flat();
-    console.log(TOOL_NAME, allQueries);
+    logInfo(TOOL_NAME, { queries: allQueries });
     return allQueries;
   } catch (error) {
-    console.error(`Error in ${TOOL_NAME}`, error);
+    logError('Query rewrite error:', { error });
     throw error;
   }
 }

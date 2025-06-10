@@ -12,7 +12,7 @@
   "defaults": {
     "search_provider": "jina",
     "llm_provider": "vertex",
-    "step_sleep": 500
+    "step_sleep": 0.5
   },
   "providers": {
     "vertex": {

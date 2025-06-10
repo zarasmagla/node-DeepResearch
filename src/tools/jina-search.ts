@@ -2,6 +2,7 @@ import { TokenTracker } from "../utils/token-tracker";
 import { JinaSearchResponse, SERPQuery } from '../types';
 import { JINA_API_KEY } from "../config";
 import axiosClient from '../utils/axios-client';
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 export async function search(
   query: SERPQuery,
@@ -35,7 +36,7 @@ export async function search(
       throw new Error('Invalid response format');
     }
 
-    console.log('Search results meta:', data.meta);
+    logInfo('Search results metadata:', { metadata: data.meta });
 
     const tokenTracker = tracker || new TokenTracker();
     tokenTracker.trackUsage('search', {
@@ -46,7 +47,7 @@ export async function search(
 
     return { response: data };
   } catch (error) {
-    console.error('Error in jina search:', error);
+    logError('Search error:', { error });
     throw error;
   }
 }

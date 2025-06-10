@@ -2,6 +2,7 @@ import { TokenTracker } from "../utils/token-tracker";
 import { ReadResponse } from '../types';
 import { JINA_API_KEY } from "../config";
 import axiosClient from "../utils/axios-client";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 export async function readUrl(
   url: string,
@@ -50,7 +51,7 @@ export async function readUrl(
       throw new Error('Invalid response data');
     }
 
-    console.log('Read:', {
+    logInfo('Read:', {
       title: data.data.title,
       url: data.data.url,
       tokens: data.data.usage?.tokens || 0
@@ -66,7 +67,7 @@ export async function readUrl(
 
     return { response: data };
   } catch (error: any) {
-    console.error(`Error reading URL: ${error.message}`);
+    logError(`Error reading URL: ${error.message}`);
     throw error;
   }
 }

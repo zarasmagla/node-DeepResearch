@@ -1,6 +1,7 @@
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {CodeGenResponse, PromptPair, TrackerContext} from "../types";
-import {Schemas} from "../utils/schemas";
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import { CodeGenResponse, PromptPair, TrackerContext } from "../types";
+import { Schemas } from "../utils/schemas";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 interface SandboxResult {
@@ -49,9 +50,9 @@ Response:
 }
 </example>`;
 
-  console.log('Coding prompt', prompt)
+  logDebug('Coding prompt', { prompt });
 
-  return {system: prompt, user: problem };
+  return { system: prompt, user: problem };
 }
 
 export class CodeSandbox {
@@ -101,7 +102,7 @@ export class CodeSandbox {
         }
       `);
 
-      console.log('Context:', this.context);
+      logDebug('Context:', { context: this.context });
 
       // Execute the code with the context and get the return value
       const output = evalInContext(this.context);
@@ -134,12 +135,12 @@ export class CodeSandbox {
     for (let i = 0; i < this.maxAttempts; i++) {
       // Generate code
       const generation = await this.generateCode(problem, attempts);
-      const {code} = generation;
+      const { code } = generation;
 
-      console.log(`Coding attempt ${i + 1}:`, code);
+      logDebug(`Coding attempt ${i + 1}:`, { code });
       // Evaluate the code
       const result = this.evaluateCode(code);
-      console.log(`Coding attempt ${i + 1} success:`, result);
+      logDebug(`Coding attempt ${i + 1} success:`, { result });
 
       if (result.success) {
         return {
@@ -151,7 +152,7 @@ export class CodeSandbox {
         };
       }
 
-      console.error('Coding error:', result.error);
+      logError('Coding error:', { error: result.error });
 
       // Store the failed attempt
       attempts.push({

@@ -1,6 +1,7 @@
-import {ErrorAnalysisResponse, PromptPair, TrackerContext} from '../types';
-import {ObjectGeneratorSafe} from "../utils/safe-generator";
-import {Schemas} from "../utils/schemas";
+import { ErrorAnalysisResponse, PromptPair, TrackerContext } from '../types';
+import { ObjectGeneratorSafe } from "../utils/safe-generator";
+import { Schemas } from "../utils/schemas";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 function getPrompt(diaryContext: string[]): PromptPair {
@@ -81,7 +82,6 @@ The answer is not definitive and fails to provide the requested information.  La
   "blame": "The root cause of failure was getting stuck in a repetitive search pattern without adapting the strategy. Steps 4-5 repeated the same search, and step 6 deviated to less reliable entertainment sources instead of exploring business journals, news articles, or professional databases. Additionally, the process didn't attempt to triangulate age through indirect information like education history or career milestones.",
   
   "improvement": "1. Avoid repeating identical searches and implement a strategy to track previously searched terms. 2. When direct age/birthdate searches fail, try indirect approaches like: searching for earliest career mentions, finding university graduation years, or identifying first company founding dates. 3. Focus on high-quality business sources and avoid entertainment websites for professional information. 4. Consider using industry event appearances or conference presentations where age-related context might be mentioned. 5. If exact age cannot be determined, provide an estimated range based on career timeline and professional achievements.",
- 
 }
 </output>
 </example>`,
@@ -107,14 +107,14 @@ export async function analyzeSteps(
       prompt: prompt.user
     });
 
-    console.log(TOOL_NAME, result.object);
+    logInfo(TOOL_NAME, { object: result.object });
     trackers?.actionTracker.trackThink(result.object.blame);
     trackers?.actionTracker.trackThink(result.object.improvement);
 
     return result.object as ErrorAnalysisResponse;
 
   } catch (error) {
-    console.error(`Error in ${TOOL_NAME}`, error);
+    logError(`Error in ${TOOL_NAME}`, { error });
     throw error;
   }
 }

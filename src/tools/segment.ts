@@ -1,7 +1,8 @@
-import {TokenTracker} from "../utils/token-tracker";
-import {JINA_API_KEY} from "../config";
-import {TrackerContext} from "../types";
+import { TokenTracker } from "../utils/token-tracker";
+import { JINA_API_KEY } from "../config";
+import { TrackerContext } from "../types";
 import axiosClient from "../utils/axios-client";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 export async function segmentText(
   content: string,
@@ -24,7 +25,7 @@ export async function segmentText(
 
   // Split content into batches
   const batches = splitTextIntoBatches(content, MAX_BATCH_SIZE);
-  console.log(`Split content into ${batches.length} batches`);
+  logDebug(`Processing ${batches.length} batches`);
 
   // Calculate offsets for each batch upfront
   const batchOffsets: number[] = [];
@@ -36,10 +37,10 @@ export async function segmentText(
 
   // Process all batches in parallel
   const batchPromises = batches.map(async (batch, i) => {
-    console.log(`[Segment] Processing batch ${i + 1}/${batches.length} (size: ${batch.length})`);
+    logDebug(`[Segment] Processing batch ${i + 1}/${batches.length} (size: ${batch.length})`);
 
     try {
-      const {data} = await axiosClient.post(
+      const { data } = await axiosClient.post(
         'https://api.jina.ai/v1/segment',
         {
           content: batch,
@@ -60,7 +61,7 @@ export async function segmentText(
         throw new Error('Invalid response data');
       }
 
-      console.log(`Batch ${i + 1} result:`, {
+      logDebug(`Batch ${i + 1} result:`, {
         numChunks: data.num_chunks,
         numTokens: data.num_tokens,
         tokenizer: data.tokenizer
@@ -72,11 +73,11 @@ export async function segmentText(
       // Adjust chunk positions to account for the offset of this batch
       const adjustedPositions = data.chunk_positions
         ? data.chunk_positions.map((position: [number, number]) => {
-            return [
-              position[0] + offset,
-              position[1] + offset
-            ] as [number, number];
-          })
+          return [
+            position[0] + offset,
+            position[1] + offset
+          ] as [number, number];
+        })
         : [];
 
       return {
@@ -85,7 +86,7 @@ export async function segmentText(
         tokens: data.usage?.tokens || 0
       };
     } catch (error: any) {
-      console.error(`Error processing batch ${i + 1}: ${error.message}`);
+      logError(`Error processing batch ${i + 1}: ${error.message}`);
       throw error;
     }
   });

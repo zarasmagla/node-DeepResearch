@@ -1,10 +1,11 @@
-import {segmentText} from './segment';
-import {ImageObject, ImageReference, Reference, TrackerContext, WebContent} from "../types";
-import {Schemas} from "../utils/schemas";
-import {cosineSimilarity, jaccardRank} from "./cosine";
-import {getEmbeddings} from "./embeddings";
+import { segmentText } from './segment';
+import { ImageObject, ImageReference, Reference, TrackerContext, WebContent } from "../types";
+import { Schemas } from "../utils/schemas";
+import { cosineSimilarity, jaccardRank } from "./cosine";
+import { getEmbeddings } from "./embeddings";
 import { dedupImagesWithEmbeddings } from '../utils/image-tools';
-import {normalizeHostName} from '../utils/url-tools';
+import { normalizeHostName } from '../utils/url-tools';
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 export async function buildReferences(
   answer: string,
@@ -16,16 +17,16 @@ export async function buildReferences(
   minRelScore: number = 0.7,
   onlyHostnames: string[] = []
 ): Promise<{ answer: string, references: Array<Reference> }> {
-  console.log(`[buildReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);
-  console.log(`[buildReferences] Answer length: ${answer.length} chars, Web content sources: ${Object.keys(webContents).length}`);
+  logDebug(`[buildReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);
+  logDebug(`[buildReferences] Answer length: ${answer.length} chars, Web content sources: ${Object.keys(webContents).length}`);
 
   // Step 1: Chunk the answer
-  console.log(`[buildReferences] Step 1: Chunking answer text`);
-  const {chunks: answerChunks, chunk_positions: answerChunkPositions} = await segmentText(answer, context);
-  console.log(`[buildReferences] Answer segmented into ${answerChunks.length} chunks`);
+  logDebug(`[buildReferences] Step 1: Chunking answer text`);
+  const { chunks: answerChunks, chunk_positions: answerChunkPositions } = await segmentText(answer, context);
+  logDebug(`[buildReferences] Answer segmented into ${answerChunks.length} chunks`);
 
   // Step 2: Prepare all web content chunks, filtering out those below minimum length
-  console.log(`[buildReferences] Step 2: Preparing web content chunks and filtering by minimum length (${minChunkLength} chars)`);
+  logDebug(`[buildReferences] Step 2: Preparing web content chunks and filtering by minimum length (${minChunkLength} chars)`);
   const allWebContentChunks: string[] = [];
   const chunkToSourceMap: any = {};  // Maps chunk index to source information
   const validWebChunkIndices = new Set<number>(); // Tracks indices of valid web chunks (those above minimum length)
@@ -53,15 +54,15 @@ export async function buildReferences(
     }
   }
 
-  console.log(`[buildReferences] Collected ${allWebContentChunks.length} web chunks, ${validWebChunkIndices.size} above minimum length`);
+  logDebug(`[buildReferences] Collected ${allWebContentChunks.length} web chunks, ${validWebChunkIndices.size} above minimum length`);
 
   if (allWebContentChunks.length === 0) {
-    console.log(`[buildReferences] No web content chunks available, returning without references`);
-    return {answer, references: []};
+    logDebug(`[buildReferences] No web content chunks available, returning without references`);
+    return { answer, references: [] };
   }
 
   // Step 3: Filter answer chunks by minimum length
-  console.log(`[buildReferences] Step 3: Filtering answer chunks by minimum length`);
+  logDebug(`[buildReferences] Step 3: Filtering answer chunks by minimum length`);
   const validAnswerChunks: string[] = [];
   const validAnswerChunkIndices: number[] = [];
   const validAnswerChunkPositions: [number, number][] = [];
@@ -80,15 +81,15 @@ export async function buildReferences(
     validAnswerChunkPositions.push(answerChunkPosition);
   }
 
-  console.log(`[buildReferences] Found ${validAnswerChunks.length}/${answerChunks.length} valid answer chunks above minimum length`);
+  logDebug(`[buildReferences] Found ${validAnswerChunks.length}/${answerChunks.length} valid answer chunks above minimum length`);
 
   if (validAnswerChunks.length === 0) {
-    console.log(`[buildReferences] No valid answer chunks, returning without references`);
-    return {answer, references: []};
+    logDebug(`[buildReferences] No valid answer chunks, returning without references`);
+    return { answer, references: [] };
   }
 
   // Step 4: Get embeddings for BOTH answer chunks and valid web chunks in a single request
-  console.log(`[buildReferences] Step 4: Getting embeddings for all chunks in a single request (only including web chunks above min length)`);
+  logDebug(`[buildReferences] Step 4: Getting embeddings for all chunks in a single request (only including web chunks above min length)`);
 
   // Create maps to track the original indices
   const chunkIndexMap = new Map<number, { type: 'answer' | 'web', originalIndex: number }>();
@@ -99,7 +100,7 @@ export async function buildReferences(
   // Add answer chunks first
   validAnswerChunks.forEach((chunk, index) => {
     allChunks.push(chunk);
-    chunkIndexMap.set(allChunks.length - 1, {type: 'answer', originalIndex: index});
+    chunkIndexMap.set(allChunks.length - 1, { type: 'answer', originalIndex: index });
   });
 
   // Then add web chunks that meet minimum length requirement
@@ -107,11 +108,11 @@ export async function buildReferences(
     // Only include valid web chunks (those above minimum length)
     if (validWebChunkIndices.has(i)) {
       allChunks.push(allWebContentChunks[i]);
-      chunkIndexMap.set(allChunks.length - 1, {type: 'web', originalIndex: i});
+      chunkIndexMap.set(allChunks.length - 1, { type: 'web', originalIndex: i });
     }
   }
 
-  console.log(`[buildReferences] Requesting embeddings for ${allChunks.length} total chunks (${validAnswerChunks.length} answer + ${validWebChunkIndices.size} web)`);
+  logDebug(`[buildReferences] Requesting embeddings for ${allChunks.length} total chunks (${validAnswerChunks.length} answer + ${validWebChunkIndices.size} web)`);
 
   try {
     // Get embeddings for all chunks in one request
@@ -136,10 +137,10 @@ export async function buildReferences(
       }
     }
 
-    console.log(`[buildReferences] Successfully generated and separated embeddings: ${answerEmbeddings.length} answer, ${webEmbeddingMap.size} web`);
+    logDebug(`[buildReferences] Successfully generated and separated embeddings: ${answerEmbeddings.length} answer, ${webEmbeddingMap.size} web`);
 
     // Step 5: Compute pairwise cosine similarity
-    console.log(`[buildReferences] Step 5: Computing pairwise cosine similarity between answer and web chunks`);
+    logDebug(`[buildReferences] Step 5: Computing pairwise cosine similarity between answer and web chunks`);
     const allMatches = [];
 
     for (let i = 0; i < validAnswerChunks.length; i++) {
@@ -179,7 +180,7 @@ export async function buildReferences(
         });
       }
 
-      console.log(`[buildReferences] Processed answer chunk ${i + 1}/${validAnswerChunks.length}, top score: ${matchesForChunk[0]?.relevanceScore.toFixed(4)}`);
+      logDebug(`[buildReferences] Processed answer chunk ${i + 1}/${validAnswerChunks.length}, top score: ${matchesForChunk[0]?.relevanceScore.toFixed(4)}`);
     }
 
     // Log statistics about relevance scores
@@ -190,20 +191,22 @@ export async function buildReferences(
       const sumRelevance = relevanceScores.reduce((sum, score) => sum + score, 0);
       const meanRelevance = sumRelevance / relevanceScores.length;
 
-      console.log('Reference relevance statistics:', {
+      const stats = {
         min: minRelevance.toFixed(4),
         max: maxRelevance.toFixed(4),
         mean: meanRelevance.toFixed(4),
         count: relevanceScores.length
-      });
+      };
+
+      logDebug('Reference relevance statistics:', stats);
     }
 
     // Step 6: Sort all matches by relevance
     allMatches.sort((a, b) => b.relevanceScore - a.relevanceScore);
-    console.log(`[buildReferences] Step 6: Sorted ${allMatches.length} potential matches by relevance score`);
+    logDebug(`[buildReferences] Step 6: Sorted ${allMatches.length} potential matches by relevance score`);
 
     // Step 7: Filter matches as before
-    console.log(`[buildReferences] Step 7: Filtering matches to ensure uniqueness and threshold (min: ${minRelScore})`);
+    logDebug(`[buildReferences] Step 7: Filtering matches to ensure uniqueness and threshold (min: ${minRelScore})`);
     const usedWebChunks = new Set();
     const usedAnswerChunks = new Set();
     const filteredMatches = [];
@@ -222,12 +225,12 @@ export async function buildReferences(
       }
     }
 
-    console.log(`[buildReferences] Selected ${filteredMatches.length}/${allMatches.length} references after filtering`);
+    logDebug(`[buildReferences] Selected ${filteredMatches.length}/${allMatches.length} references after filtering`);
     return buildFinalResult(answer, filteredMatches, chunkToSourceMap);
 
   } catch (error) {
-    console.error('Embedding failed, falling back to Jaccard similarity', error);
-    console.log(`[buildReferences] Fallback: Using Jaccard similarity instead of embeddings`);
+    logError('Embedding failed, falling back to Jaccard similarity', { error });
+    logDebug(`[buildReferences] Fallback: Using Jaccard similarity instead of embeddings`);
 
     // Process all chunks with Jaccard fallback
     const allMatches = [];
@@ -237,7 +240,7 @@ export async function buildReferences(
       const answerChunkIndex = validAnswerChunkIndices[i];
       const answerChunkPosition = validAnswerChunkPositions[i];
 
-      console.log(`[buildReferences] Processing answer chunk ${i + 1}/${validAnswerChunks.length} with Jaccard similarity`);
+      logDebug(`[buildReferences] Processing answer chunk ${i + 1}/${validAnswerChunks.length} with Jaccard similarity`);
       const fallbackResult = await jaccardRank(answerChunk, allWebContentChunks);
 
       for (const match of fallbackResult.results) {
@@ -255,7 +258,7 @@ export async function buildReferences(
 
     // Sort all matches by relevance and continue with the rest of the function
     allMatches.sort((a, b) => b.relevanceScore - a.relevanceScore);
-    console.log(`[buildReferences] Fallback complete. Found ${allMatches.length} potential matches`);
+    logDebug(`[buildReferences] Fallback complete. Found ${allMatches.length} potential matches`);
 
     // Filter matches as before
     const usedWebChunks = new Set();
@@ -276,7 +279,7 @@ export async function buildReferences(
       }
     }
 
-    console.log(`[buildReferences] Selected ${filteredMatches.length} references using fallback method`);
+    logDebug(`[buildReferences] Selected ${filteredMatches.length} references using fallback method`);
     return buildFinalResult(answer, filteredMatches, chunkToSourceMap);
   }
 }
@@ -287,7 +290,7 @@ function buildFinalResult(
   filteredMatches: any[],
   chunkToSourceMap: any
 ): { answer: string, references: Array<Reference> } {
-  console.log(`[buildFinalResult] Building final result with ${filteredMatches.length} references`);
+  logDebug(`[buildFinalResult] Building final result with ${filteredMatches.length} references`);
 
   // Build reference objects
   const references: Reference[] = filteredMatches.map((match) => {
@@ -310,7 +313,7 @@ function buildFinalResult(
   const referencesByPosition = [...references]
     .sort((a, b) => a.answerChunkPosition![0] - b.answerChunkPosition![0]);
 
-  console.log(`[buildFinalResult] Injecting reference markers into answer`);
+  logDebug(`[buildFinalResult] Injecting reference markers into answer`);
 
   // Insert markers from beginning to end, tracking offset
   let offset = 0;
@@ -362,7 +365,7 @@ function buildFinalResult(
     offset += marker.length;
   }
 
-  console.log(`[buildFinalResult] Complete. Generated ${references.length} references`);
+  logDebug(`[buildFinalResult] Complete. Generated ${references.length} references`);
   return {
     answer: modifiedAnswer,
     references
@@ -378,39 +381,39 @@ export async function buildImageReferences(
   maxRef: number = 10,
   minRelScore: number = 0.35
 ): Promise<Array<ImageReference>> {
-  console.log(`[buildImageReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);
-  console.log(`[buildImageReferences] Answer length: ${answer.length} chars, Image sources: ${imageObjects.length}`);
+  logDebug(`[buildImageReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);
+  logDebug(`[buildImageReferences] Answer length: ${answer.length} chars, Image sources: ${imageObjects.length}`);
 
   // Step 1: Chunk the answer
-  console.log(`[buildImageReferences] Step 1: Chunking answer text`);
-  const {chunks: answerChunks, chunk_positions: answerChunkPositions} = await segmentText(answer, context);
-  console.log(`[buildImageReferences] Answer segmented into ${answerChunks.length} chunks`);
+  logDebug(`[buildImageReferences] Step 1: Chunking answer text`);
+  const { chunks: answerChunks, chunk_positions: answerChunkPositions } = await segmentText(answer, context);
+  logDebug(`[buildImageReferences] Answer segmented into ${answerChunks.length} chunks`);
 
   // Step 2: Prepare image content
-  console.log(`[buildImageReferences] Step 2: Preparing image content`);
+  logDebug(`[buildImageReferences] Step 2: Preparing image content`);
   const dudupImages = dedupImagesWithEmbeddings(imageObjects, []);
   const allImageEmbeddings: number[][] = dudupImages.map(img => img.embedding[0]); // Extract embedding
   const imageToSourceMap: any = {};
   const validImageIndices = new Set<number>();
 
   dudupImages.forEach((img, index) => {
-      imageToSourceMap[index] = {
-          url: img.url,
-          altText: img.alt,
-          embedding: img.embedding[0] // Store extracted embedding
-      };
-      validImageIndices.add(index);
+    imageToSourceMap[index] = {
+      url: img.url,
+      altText: img.alt,
+      embedding: img.embedding[0] // Store extracted embedding
+    };
+    validImageIndices.add(index);
   });
 
-  console.log(`[buildImageReferences] Collected ${allImageEmbeddings.length} image embeddings`);
+  logDebug(`[buildImageReferences] Collected ${allImageEmbeddings.length} image embeddings`);
 
   if (allImageEmbeddings.length === 0) {
-      console.log(`[buildImageReferences] No image data available, returning empty array`);
-      return [];
+    logDebug(`[buildImageReferences] No image data available, returning empty array`);
+    return [];
   }
 
   // Step 3: Filter answer chunks by minimum length
-  console.log(`[buildImageReferences] Step 3: Filtering answer chunks by minimum length`);
+  logDebug(`[buildImageReferences] Step 3: Filtering answer chunks by minimum length`);
   const validAnswerChunks: string[] = [];
   const validAnswerChunkIndices: number[] = [];
   const validAnswerChunkPositions: [number, number][] = [];
@@ -418,133 +421,135 @@ export async function buildImageReferences(
   context.actionTracker.trackThink('cross_reference', schema.languageCode);
 
   for (let i = 0; i < answerChunks.length; i++) {
-      const answerChunk = answerChunks[i];
-      const answerChunkPosition = answerChunkPositions[i];
+    const answerChunk = answerChunks[i];
+    const answerChunkPosition = answerChunkPositions[i];
 
-      if (!answerChunk.trim() || answerChunk.length < minChunkLength) continue;
+    if (!answerChunk.trim() || answerChunk.length < minChunkLength) continue;
 
-      validAnswerChunks.push(answerChunk);
-      validAnswerChunkIndices.push(i);
-      validAnswerChunkPositions.push(answerChunkPosition);
+    validAnswerChunks.push(answerChunk);
+    validAnswerChunkIndices.push(i);
+    validAnswerChunkPositions.push(answerChunkPosition);
   }
 
-  console.log(`[buildImageReferences] Found ${validAnswerChunks.length}/${answerChunks.length} valid answer chunks above minimum length`);
+  logDebug(`[buildImageReferences] Found ${validAnswerChunks.length}/${answerChunks.length} valid answer chunks above minimum length`);
 
   if (validAnswerChunks.length === 0) {
-      console.log(`[buildImageReferences] No valid answer chunks, returning empty array`);
-      return [];
+    logDebug(`[buildImageReferences] No valid answer chunks, returning empty array`);
+    return [];
   }
 
   // Step 4: Get embeddings for answer chunks
-  console.log(`[buildImageReferences] Step 4: Getting embeddings for answer chunks`);
+  logDebug(`[buildImageReferences] Step 4: Getting embeddings for answer chunks`);
   const answerEmbeddings: number[][] = [];
 
   try {
-      //  const embeddingsResult = await getEmbeddings(validAnswerChunks, context.tokenTracker, embeddingOptions); //  No embeddingOptions needed here
-      //   answerEmbeddings.push(...embeddingsResult.embeddings);
-      const embeddingsResult = await getEmbeddings(validAnswerChunks, context.tokenTracker, {
-          dimensions: 512,
-          model: 'jina-clip-v2',
-      });
-      answerEmbeddings.push(...embeddingsResult.embeddings);
+    //  const embeddingsResult = await getEmbeddings(validAnswerChunks, context.tokenTracker, embeddingOptions); //  No embeddingOptions needed here
+    //   answerEmbeddings.push(...embeddingsResult.embeddings);
+    const embeddingsResult = await getEmbeddings(validAnswerChunks, context.tokenTracker, {
+      dimensions: 512,
+      model: 'jina-clip-v2',
+    });
+    answerEmbeddings.push(...embeddingsResult.embeddings);
 
-      console.log(`[buildImageReferences] Got embeddings for ${answerEmbeddings.length} answer chunks`);
+    logDebug(`[buildImageReferences] Got embeddings for ${answerEmbeddings.length} answer chunks`);
 
-      // Step 5: Compute pairwise cosine similarity
-      console.log(`[buildImageReferences] Step 5: Computing pairwise cosine similarity between answer and image embeddings`);
-      const allMatches = [];
+    // Step 5: Compute pairwise cosine similarity
+    logDebug(`[buildImageReferences] Step 5: Computing pairwise cosine similarity between answer and image embeddings`);
+    const allMatches = [];
 
-      for (let i = 0; i < validAnswerChunks.length; i++) {
-          const answerChunkIndex = validAnswerChunkIndices[i];
-          const answerChunk = validAnswerChunks[i];
-          const answerChunkPosition = answerChunkPositions[i];
-          const answerEmbedding = answerEmbeddings[i];
+    for (let i = 0; i < validAnswerChunks.length; i++) {
+      const answerChunkIndex = validAnswerChunkIndices[i];
+      const answerChunk = validAnswerChunks[i];
+      const answerChunkPosition = answerChunkPositions[i];
+      const answerEmbedding = answerEmbeddings[i];
 
-          const matchesForChunk = [];
+      const matchesForChunk = [];
 
-          for (const imageIndex of validImageIndices) {
-              const imageEmbedding = allImageEmbeddings[imageIndex];
+      for (const imageIndex of validImageIndices) {
+        const imageEmbedding = allImageEmbeddings[imageIndex];
 
-              if (imageEmbedding) {
-                  const score = cosineSimilarity(answerEmbedding, imageEmbedding);
+        if (imageEmbedding) {
+          const score = cosineSimilarity(answerEmbedding, imageEmbedding);
 
-                  matchesForChunk.push({
-                      imageIndex,
-                      relevanceScore: score
-                  });
-              }
-          }
-
-          matchesForChunk.sort((a, b) => b.relevanceScore - a.relevanceScore);
-
-          for (const match of matchesForChunk) {
-              allMatches.push({
-                  imageIndex: match.imageIndex,
-                  answerChunkIndex: answerChunkIndex,
-                  relevanceScore: match.relevanceScore,
-                  answerChunk: answerChunk,
-                  answerChunkPosition: answerChunkPosition
-              });
-          }
-
-          console.log(`[buildImageReferences] Processed answer chunk ${i + 1}/${validAnswerChunks.length}, top score: ${matchesForChunk[0]?.relevanceScore.toFixed(4)}`);
-      }
-
-      // Log statistics about relevance scores
-      if (allMatches.length > 0) {
-          const relevanceScores = allMatches.map(match => match.relevanceScore);
-          const minRelevance = Math.min(...relevanceScores);
-          const maxRelevance = Math.max(...relevanceScores);
-          const sumRelevance = relevanceScores.reduce((sum, score) => sum + score, 0);
-          const meanRelevance = sumRelevance / relevanceScores.length;
-
-          console.log('Reference relevance statistics:', {
-              min: minRelevance.toFixed(4),
-              max: maxRelevance.toFixed(4),
-              mean: meanRelevance.toFixed(4),
-              count: relevanceScores.length
+          matchesForChunk.push({
+            imageIndex,
+            relevanceScore: score
           });
+        }
       }
 
+      matchesForChunk.sort((a, b) => b.relevanceScore - a.relevanceScore);
 
-      // Step 6: Sort all matches by relevance
-      allMatches.sort((a, b) => b.relevanceScore - a.relevanceScore);
-      console.log(`[buildImageReferences] Step 6: Sorted ${allMatches.length} potential matches by relevance score`);
-
-      // Step 7: Filter matches
-      console.log(`[buildImageReferences] Step 7: Filtering matches to ensure uniqueness and threshold (min: ${minRelScore})`);
-      const usedImages = new Set();
-      const usedAnswerChunks = new Set();
-      const filteredMatches = [];
-
-      for (const match of allMatches) {
-          if (match.relevanceScore < minRelScore) continue;
-
-          if (!usedImages.has(match.imageIndex) && !usedAnswerChunks.has(match.answerChunkIndex)) {
-              filteredMatches.push(match);
-              usedImages.add(match.imageIndex);
-              usedAnswerChunks.add(match.answerChunkIndex);
-
-              if (filteredMatches.length >= maxRef) break;
-          }
+      for (const match of matchesForChunk) {
+        allMatches.push({
+          imageIndex: match.imageIndex,
+          answerChunkIndex: answerChunkIndex,
+          relevanceScore: match.relevanceScore,
+          answerChunk: answerChunk,
+          answerChunkPosition: answerChunkPosition
+        });
       }
 
-      console.log(`[buildImageReferences] Selected ${filteredMatches.length}/${allMatches.length} references after filtering`);
+      logDebug(`[buildImageReferences] Processed answer chunk ${i + 1}/${validAnswerChunks.length}, top score: ${matchesForChunk[0]?.relevanceScore.toFixed(4)}`);
+    }
 
-      const references: ImageReference[] = filteredMatches.map((match) => {
-          const source = imageToSourceMap[match.imageIndex];
-          return {
-              url: source.url,
-              relevanceScore: match.relevanceScore,
-              answerChunk: match.answerChunk,
-              answerChunkPosition: match.answerChunkPosition
-          };
-      });
+    // Log statistics about relevance scores
+    if (allMatches.length > 0) {
+      const relevanceScores = allMatches.map(match => match.relevanceScore);
+      const minRelevance = Math.min(...relevanceScores);
+      const maxRelevance = Math.max(...relevanceScores);
+      const sumRelevance = relevanceScores.reduce((sum, score) => sum + score, 0);
+      const meanRelevance = sumRelevance / relevanceScores.length;
 
-      return references;
+      const stats = {
+        min: minRelevance.toFixed(4),
+        max: maxRelevance.toFixed(4),
+        mean: meanRelevance.toFixed(4),
+        count: relevanceScores.length
+      };
+
+      logDebug('Reference relevance statistics:', stats);
+    }
+
+
+    // Step 6: Sort all matches by relevance
+    allMatches.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    logDebug(`[buildImageReferences] Step 6: Sorted ${allMatches.length} potential matches by relevance score`);
+
+    // Step 7: Filter matches
+    logDebug(`[buildImageReferences] Step 7: Filtering matches to ensure uniqueness and threshold (min: ${minRelScore})`);
+    const usedImages = new Set();
+    const usedAnswerChunks = new Set();
+    const filteredMatches = [];
+
+    for (const match of allMatches) {
+      if (match.relevanceScore < minRelScore) continue;
+
+      if (!usedImages.has(match.imageIndex) && !usedAnswerChunks.has(match.answerChunkIndex)) {
+        filteredMatches.push(match);
+        usedImages.add(match.imageIndex);
+        usedAnswerChunks.add(match.answerChunkIndex);
+
+        if (filteredMatches.length >= maxRef) break;
+      }
+    }
+
+    logDebug(`[buildImageReferences] Selected ${filteredMatches.length}/${allMatches.length} references after filtering`);
+
+    const references: ImageReference[] = filteredMatches.map((match) => {
+      const source = imageToSourceMap[match.imageIndex];
+      return {
+        url: source.url,
+        relevanceScore: match.relevanceScore,
+        answerChunk: match.answerChunk,
+        answerChunkPosition: match.answerChunkPosition
+      };
+    });
+
+    return references;
 
   } catch (error) {
-      console.error('Embedding failed', error);
-      return [];
+    logError('Embedding failed', { error });
+    return [];
   }
 }

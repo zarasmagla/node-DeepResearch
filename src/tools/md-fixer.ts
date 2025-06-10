@@ -3,6 +3,7 @@ import { getKnowledgeStr } from "../utils/text-tools";
 import { getModel } from "../config";
 import { generateText } from "ai";
 import { Schemas } from "../utils/schemas";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 function getPrompt(mdContent: string, allKnowledge: KnowledgeItem[], schema: Schemas): PromptPair {
@@ -80,18 +81,18 @@ export async function reviseAnswer(
     trackers.tokenTracker.trackUsage(TOOL_NAME, result.usage)
 
 
-    console.log(TOOL_NAME, result.text);
-    console.log('repaired before/after', mdContent.length, result.text.length);
+    logInfo(TOOL_NAME, { text: result.text });
+    logInfo('repaired before/after', { before: mdContent.length, after: result.text.length });
 
     if (result.text.length < mdContent.length * 0.85) {
-      console.error(`repaired content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`);
+      logError(`repaired content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`);
       return mdContent;
     }
 
     return result.text;
 
   } catch (error) {
-    console.error(`Error in ${TOOL_NAME}`, error);
+    logError(`Error in ${TOOL_NAME}`, { error });
     return mdContent;
   }
 }

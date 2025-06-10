@@ -1,6 +1,7 @@
-import {TokenTracker} from "../utils/token-tracker";
-import {cosineSimilarity} from "./cosine";
-import {getEmbeddings} from "./embeddings";
+import { TokenTracker } from "../utils/token-tracker";
+import { cosineSimilarity } from "./cosine";
+import { getEmbeddings } from "./embeddings";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 const SIMILARITY_THRESHOLD = 0.86; // Adjustable threshold for cosine similarity
 
@@ -20,7 +21,7 @@ export async function dedupQueries(
 
     // Get embeddings for all queries in one batch
     const allQueries = [...newQueries, ...existingQueries];
-    const {embeddings: allEmbeddings} = await getEmbeddings(allQueries, tracker);
+    const { embeddings: allEmbeddings } = await getEmbeddings(allQueries, tracker);
 
     // If embeddings is empty (due to 402 error), return all new queries
     if (!allEmbeddings.length) {
@@ -66,12 +67,12 @@ export async function dedupQueries(
         usedIndices.add(i);
       }
     }
-    console.log('Dedup:', uniqueQueries);
+    logInfo('Unique queries:', { queries: uniqueQueries });
     return {
       unique_queries: uniqueQueries,
     };
   } catch (error) {
-    console.error('Error in deduplication analysis:', error);
+    logError('Deduplication error:', { error });
 
     // return all new queries if there is an error
     return {

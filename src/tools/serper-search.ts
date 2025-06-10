@@ -1,7 +1,8 @@
-import {SERPER_API_KEY} from "../config";
+import { SERPER_API_KEY } from "../config";
 import axiosClient from "../utils/axios-client";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
-import {SerperSearchResponse, SERPQuery} from '../types';
+import { SerperSearchResponse, SERPQuery } from '../types';
 
 
 export async function serperSearch(query: SERPQuery): Promise<{ response: SerperSearchResponse }> {
@@ -21,7 +22,7 @@ export async function serperSearch(query: SERPQuery): Promise<{ response: Serper
   }
 
   // Maintain the same return structure as the original code
-  return {response: response.data};
+  return { response: response.data };
 }
 
 
@@ -42,5 +43,5 @@ export async function serperSearchOld(query: string): Promise<{ response: Serper
   }
 
   // Maintain the same return structure as the original code
-  return {response: response.data};
+  return { response: response.data };
 }

@@ -3,6 +3,7 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI, OpenAIProviderSettings } from '@ai-sdk/openai';
 import configJson from '../config.json';
+import { logInfo, logError, logDebug, logWarning } from './logging';
 // Load environment variables
 dotenv.config();
 
@@ -33,7 +34,7 @@ if (env.https_proxy) {
     const dispatcher = new ProxyAgent({ uri: proxyUrl });
     setGlobalDispatcher(dispatcher);
   } catch (error) {
-    console.error('Failed to set proxy:', error);
+    logError('Failed to set proxy:', { error });
   }
 }
 
@@ -157,4 +158,4 @@ const configSummary = {
   }
 };
 
-console.log('Configuration Summary:', JSON.stringify(configSummary, null, 2));
+logInfo('Configuration Summary:', { summary: configSummary });

@@ -1,7 +1,8 @@
-import {AnswerAction, KnowledgeItem, Reference} from "../types";
+import { AnswerAction, KnowledgeItem, Reference } from "../types";
 import i18nJSON from './i18n.json';
-import {JSDOM} from 'jsdom';
+import { JSDOM } from 'jsdom';
 import fs from "fs/promises";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 export function buildMdFromAnswer(answer: AnswerAction): string {
@@ -96,7 +97,7 @@ export function repairMarkdownFootnotes(
   // No footnotes in answer but we have references - append them at the end
   if (validFootnotes.length === 0) {
     const appendedCitations = Array.from(
-      {length: references.length},
+      { length: references.length },
       (_, i) => `[^${i + 1}]`
     ).join('');
 
@@ -124,7 +125,7 @@ ${formattedReferences}
 
     // Create citations for unused references
     const unusedReferences = Array.from(
-      {length: references.length},
+      { length: references.length },
       (_, i) => !usedIndices.has(i + 1) ? `[^${i + 1}]` : ''
     ).join('');
 
@@ -260,7 +261,7 @@ export function getI18nText(key: string, lang = 'en', params: Record<string, str
   const i18nData = i18nJSON as Record<string, any>;
   // 确保语言代码存在，如果不存在则使用英语作为后备
   if (!i18nData[lang]) {
-    console.error(`Language '${lang}' not found, falling back to English.`);
+    logError(`Language '${lang}' not found, falling back to English.`);
     lang = 'en';
   }
 
@@ -269,12 +270,12 @@ export function getI18nText(key: string, lang = 'en', params: Record<string, str
 
   // 如果文本不存在，则使用英语作为后备
   if (!text) {
-    console.error(`Key '${key}' not found for language '${lang}', falling back to English.`);
+    logError(`Key '${key}' not found for language '${lang}', falling back to English.`);
     text = i18nData['en'][key];
 
     // 如果英语版本也不存在，则返回键名
     if (!text) {
-      console.error(`Key '${key}' not found for English either.`);
+      logError(`Key '${key}' not found for English either.`);
       return key;
     }
   }
@@ -363,7 +364,7 @@ export function fixCodeBlockIndentation(markdownText: string): string {
           }
         }
 
-        codeBlockStack.push({indent, language: restOfLine, listIndent});
+        codeBlockStack.push({ indent, language: restOfLine, listIndent });
         result.push(line);
       } else {
         // This is a closing code fence
@@ -484,7 +485,7 @@ export function convertHtmlTablesToMd(mdString: string): string {
 
     return result;
   } catch (error) {
-    console.error('Error converting HTML tables to Markdown:', error);
+    logError('Error converting HTML tables to Markdown:', { error });
     return mdString; // Return original string if conversion fails
   }
 }
@@ -625,7 +626,7 @@ function convertSingleHtmlTableToMd(htmlTable: string): string | null {
 
     return mdTable;
   } catch (error) {
-    console.error('Error converting single HTML table:', error);
+    logError('Error converting single HTML table:', { error });
     return null;
   }
 }
@@ -661,7 +662,7 @@ function sanitizeCell(content: string): string {
 if (typeof window === 'undefined') {
   global.DOMParser = class DOMParser {
     parseFromString(htmlString: string, mimeType: string) {
-      const dom = new JSDOM(htmlString, {contentType: mimeType});
+      const dom = new JSDOM(htmlString, { contentType: mimeType });
       return dom.window.document;
     }
   };
@@ -821,5 +822,5 @@ export async function detectBrokenUnicodeViaFileIO(str: string) {
   await fs.unlink(tempFilePath);
 
   // Now check for the visible replacement character
-  return {broken: readStr.includes('�'), readStr};
+  return { broken: readStr.includes('�'), readStr };
 }

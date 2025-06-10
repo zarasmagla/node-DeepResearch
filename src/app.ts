@@ -14,6 +14,7 @@ import { ActionTracker } from "./utils/action-tracker";
 import { ObjectGeneratorSafe } from "./utils/safe-generator";
 import { jsonSchema } from "ai"; // or another converter library
 import { normalizeHostName } from "./utils/url-tools";
+import { logInfo, logError, logDebug, logWarning } from './logging';
 
 const app = express();
 
@@ -472,7 +473,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     // Convert JSON schema to Zod schema using a proper converter
     try {
       responseSchema = jsonSchema(body.response_format.json_schema);
-      console.log(responseSchema)
+      logDebug('Response schema', { schema: responseSchema });
     } catch (error: any) {
       return res.status(400).json({ error: `Invalid JSON schema: ${error.message}` });
     }
@@ -613,9 +614,12 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
 
         // Use the generated object as the response content
         finalAnswer = JSON.stringify(result.object, null, 2);
-        console.log('Generated object:', finalAnswer)
+        logInfo('Generated object:', { answer: finalAnswer });
       } catch (error) {
-        console.error('Error processing response with schema:', error);
+        logError('Error processing response with schema:', {
+          error: error instanceof Error ? error.message : String(error),
+          schema: responseSchema
+        });
       }
     }
 
@@ -690,28 +694,17 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         relatedImages,
       };
 
-      // Log final response (excluding full content for brevity)
-      console.log('[chat/completions] Response:', {
-        id: response.id,
-        status: 200,
-        contentLength: response.choices[0].message.content.length,
-        usage: response.usage,
-        visitedURLs: response.visitedURLs,
-        readURLs: response.readURLs,
-        numURLs: allURLs.length,
-        allImages: allImages?.length,
-        relatedImages: relatedImages?.length,
+      logInfo('[chat/completions] Response:', {
+        model: body.model,
+        usage: context.tokenTracker.getTotalUsageSnakeCase()
       });
 
       res.json(response);
     }
   } catch (error: any) {
-    // Log error details
-    console.error('[chat/completions] Error:', {
-      message: error?.message || 'An error occurred',
-      stack: error?.stack,
-      type: error?.constructor?.name,
-      requestId
+    logError('[chat/completions] Error:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
 
     // Track error as rejected tokens with Vercel token counting
