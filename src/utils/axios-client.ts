@@ -56,7 +56,6 @@ axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.code === 'ECONNABORTED') {
-      logError('Request timed out:', { error: error.message });
       error.request?.destroy?.();
     }
     if (axios.isAxiosError(error)) {

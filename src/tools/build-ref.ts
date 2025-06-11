@@ -5,7 +5,7 @@ import { cosineSimilarity, jaccardRank } from "./cosine";
 import { getEmbeddings } from "./embeddings";
 import { dedupImagesWithEmbeddings } from '../utils/image-tools';
 import { normalizeHostName } from '../utils/url-tools';
-import { logInfo, logError, logDebug, logWarning } from '../logging';
+import { logError, logDebug } from '../logging';
 
 export async function buildReferences(
   answer: string,

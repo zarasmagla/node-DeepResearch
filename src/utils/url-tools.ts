@@ -430,7 +430,7 @@ export async function getLastModified(url: string): Promise<string | undefined> 
 
     return undefined;
   } catch (error) {
-    logError('Failed to fetch last modified date:');
+    logError('Failed to fetch last modified date', { error });
     return undefined;
   }
 }

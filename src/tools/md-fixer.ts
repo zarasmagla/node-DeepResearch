@@ -3,7 +3,7 @@ import { getKnowledgeStr } from "../utils/text-tools";
 import { getModel } from "../config";
 import { generateText } from "ai";
 import { Schemas } from "../utils/schemas";
-import { logInfo, logError, logDebug } from '../logging';
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 function getPrompt(mdContent: string, allKnowledge: KnowledgeItem[], schema: Schemas): PromptPair {
@@ -86,7 +86,10 @@ export async function reviseAnswer(
     logDebug(`repaired before/after: ${mdContent.length} -> ${result.text.length}`);
 
     if (result.text.length < mdContent.length * 0.85) {
-      logError(`repaired content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`);
+      logWarning(`repaired content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`, {
+        originalContent: mdContent,
+        repairedContent: result.text
+      });
       return mdContent;
     }
 
