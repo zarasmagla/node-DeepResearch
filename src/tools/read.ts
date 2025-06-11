@@ -2,7 +2,7 @@ import { TokenTracker } from "../utils/token-tracker";
 import { ReadResponse } from '../types';
 import { JINA_API_KEY } from "../config";
 import axiosClient from "../utils/axios-client";
-import { logInfo, logError, logDebug, logWarning } from '../logging';
+import { logDebug } from '../logging';
 
 export async function readUrl(
   url: string,
@@ -63,7 +63,6 @@ export async function readUrl(
 
     return { response: data };
   } catch (error: any) {
-    logError(`Error reading URL: ${error.message}`);
     throw error;
   }
 }

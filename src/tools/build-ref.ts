@@ -1,4 +1,4 @@
-import { segmentText } from './segment';
+import { chunkText } from '../tools/segment';
 import { ImageObject, ImageReference, Reference, TrackerContext, WebContent } from "../types";
 import { Schemas } from "../utils/schemas";
 import { cosineSimilarity, jaccardRank } from "./cosine";
@@ -22,7 +22,7 @@ export async function buildReferences(
 
   // Step 1: Chunk the answer
   logDebug(`[buildReferences] Step 1: Chunking answer text`);
-  const { chunks: answerChunks, chunk_positions: answerChunkPositions } = await segmentText(answer, context);
+  const { chunks: answerChunks, chunk_positions: answerChunkPositions } = chunkText(answer);
   logDebug(`[buildReferences] Answer segmented into ${answerChunks.length} chunks`);
 
   // Step 2: Prepare all web content chunks, filtering out those below minimum length
@@ -385,7 +385,7 @@ export async function buildImageReferences(
 
   // Step 1: Chunk the answer
   logDebug(`[buildImageReferences] Step 1: Chunking answer text`);
-  const { chunks: answerChunks, chunk_positions: answerChunkPositions } = await segmentText(answer, context);
+  const { chunks: answerChunks, chunk_positions: answerChunkPositions } = chunkText(answer);
   logDebug(`[buildImageReferences] Answer segmented into ${answerChunks.length} chunks`);
 
   // Step 2: Prepare image content

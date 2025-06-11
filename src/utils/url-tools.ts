@@ -7,7 +7,7 @@ import { cherryPick } from "../tools/jina-latechunk";
 import { formatDateBasedOnType } from "./date-tools";
 import { classifyText } from "../tools/jina-classify-spam";
 import { processImage } from "./image-tools";
-import { segmentText } from "../tools/segment";
+import { chunkText } from "../tools/segment";
 import axiosClient from "./axios-client";
 import { logError, logDebug, logWarning } from '../logging';
 
@@ -528,22 +528,12 @@ export async function processURLs(
         }
 
         // add to web contents
-        const { chunks, chunk_positions } = await segmentText(data.content, context);
-        // filter out the chunks that are too short, minChunkLength is 80
-        const minChunkLength = 80;
-        for (let i = 0; i < chunks.length; i++) {
-          if (chunks[i].length < minChunkLength) {
-            chunks.splice(i, 1);
-            chunk_positions.splice(i, 1);
-            i--;
-          }
-        }
+        const { chunks, chunk_positions } = chunkText(data.content);
         webContents[data.url] = {
-          // full: data.content,
           chunks,
           chunk_positions,
           title: data.title
-        }
+        };
 
         // Add to knowledge base
         allKnowledge.push({
