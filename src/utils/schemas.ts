@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { ObjectGeneratorSafe } from "./safe-generator";
 import { EvaluationType, PromptPair } from "../types";
-import { logInfo, logError, logDebug, logWarning } from '../logging';
+import { logDebug } from '../logging';
 
 export const MAX_URLS_PER_STEP = 5
 export const MAX_QUERIES_PER_STEP = 5
@@ -154,6 +154,22 @@ export class Schemas {
       recap: z.string().describe('Recap of the actions taken and the steps conducted in first person narrative.').max(500),
       blame: z.string().describe(`Which action or the step was the root cause of the answer rejection. ${this.getLanguagePrompt()}`).max(500),
       improvement: z.string().describe(`Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe. ${this.getLanguagePrompt()}`).max(500)
+    });
+  }
+
+  getResearchPlanSchema(teamSize: number = 3): z.ZodObject<any> {
+    return z.object({
+      think: z.string()
+        .describe('Explain your decomposition strategy and how you ensured orthogonality between subproblems')
+        .max(300),
+
+      subproblems: z.array(
+        z.string()
+          .describe('Complete research plan containing: title, scope, key questions, methodology')
+          .max(500)
+      )
+        .length(teamSize)
+        .describe(`Array of exactly ${teamSize} orthogonal research plans, each focusing on a different fundamental dimension of the main topic`)
     });
   }
 

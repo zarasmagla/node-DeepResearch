@@ -41,6 +41,7 @@ export type AnswerAction = BaseAction & {
   references: Array<Reference>;
   isFinal?: boolean;
   mdAnswer?: string;
+  isAggregated?: boolean;
 };
 
 
@@ -274,6 +275,7 @@ export interface ChatCompletionRequest {
   language_code?: string;
   search_language_code?: string;
   search_provider?: string;
+  team_size?: number;
 }
 
 export interface URLAnnotation {

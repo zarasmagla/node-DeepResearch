@@ -44,7 +44,6 @@
           "model": "gemini-2.0-flash-lite"
         },
         "searchGrounding": {},
-        "dedup": {},
         "evaluator": {
           "maxTokens": 2000
         },
@@ -75,9 +74,6 @@
         },
         "searchGrounding": {
           "temperature": 0
-        },
-        "dedup": {
-          "temperature": 0.1
         },
         "evaluator": {},
         "errorAnalyzer": {},

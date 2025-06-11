@@ -45,6 +45,7 @@ import { formatDateBasedOnType, formatDateRange } from "./utils/date-tools";
 import { reviseAnswer } from "./tools/md-fixer";
 import { buildImageReferences, buildReferences } from "./tools/build-ref";
 import { logInfo, logError, logDebug, logWarning } from './logging';
+import { researchPlan } from './tools/research-planner';
 
 async function wait(seconds: number) {
   logDebug(`Waiting ${seconds}s...`);
@@ -397,7 +398,8 @@ export async function getResponse(question?: string,
   languageCode: string | undefined = undefined,
   searchLanguageCode?: string,
   searchProvider?: string,
-  with_images: boolean = false
+  withImages: boolean = false,
+  teamSize: number = 2
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[], allImages?: string[], relatedImages?: string[] }> {
 
   let step = 0;
@@ -458,6 +460,7 @@ export async function getResponse(question?: string,
   const visitedURLs: string[] = [];
   const badURLs: string[] = [];
   const imageObjects: ImageObject[] = [];
+  let imageReferences: ImageReference[] = [];
   const evaluationMetrics: Record<string, RepeatEvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
   const regularBudget = tokenBudget * 0.85;
@@ -479,14 +482,12 @@ export async function getResponse(question?: string,
     });
   })
 
-
   while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget) {
     // add 1s delay to avoid rate limiting
     step++;
     totalStep++;
     const budgetPercentage = (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget * 100).toFixed(2);
-    logDebug(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
-    logDebug('Gaps:', { gaps });
+    logDebug(`Step ${totalStep} / Budget used ${budgetPercentage}%`, { gaps });
     allowReflect = allowReflect && (gaps.length <= MAX_REFLECT_PER_STEP);
     // rotating question from gaps
     const currentQuestion: string = gaps[totalStep % gaps.length];
@@ -787,6 +788,37 @@ But then you realized you have asked them before. You decided to to think out of
 
       const soundBites = newKnowledge.map(k => k.answer).join(' ');
 
+      if (teamSize > 1) {
+        const subproblems = await researchPlan(question, teamSize, soundBites, context, SchemaGen);
+        // parallel call getResponse for each subproblem with exact same parameters from the current step, but their teamSize is 1
+        const subproblemResponses = await Promise.all(subproblems.map(subproblem => getResponse(subproblem,
+          tokenBudget,
+          maxBadAttempts,
+          context,
+          messages,
+          numReturnedURLs,
+          noDirectAnswer,
+          boostHostnames,
+          badHostnames,
+          onlyHostnames,
+          maxRef,
+          minRelScore, languageCode, searchLanguageCode, searchProvider, withImages, 1)));
+        // convert current step to AnswerAction
+        thisStep = {
+          action: 'answer',
+          think: thisStep.think,
+          answer: subproblemResponses.map(r => (r.result as AnswerAction).answer).join('\n\n'),
+          mdAnswer: subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).join('\n\n'),
+          references: subproblemResponses.map(r => (r.result as AnswerAction).references).flat(),
+          isFinal: true,
+          isAggregated: true
+        } as AnswerAction;
+
+
+        // break the loop, move to final boxing
+        break;
+      }
+
       // rewrite queries with initial soundbites
       let keywordsQueries = await rewriteQuery(thisStep, soundBites, context, SchemaGen);
       const qOnly = keywordsQueries.filter(q => q.q).map(q => q.q)
@@ -872,7 +904,7 @@ You decided to think out of the box or cut from a completely different angle.
           SchemaGen,
           currentQuestion,
           allWebContents,
-          with_images
+          withImages
         );
 
         diaryContext.push(success
@@ -998,8 +1030,9 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
   const answerStep = thisStep as AnswerAction;
 
-  if (!trivialQuestion) {
-
+  if (trivialQuestion) {
+    answerStep.mdAnswer = buildMdFromAnswer(answerStep);
+  } else if (!answerStep.isAggregated) {
     answerStep.answer = repairMarkdownFinal(
       convertHtmlTablesToMd(
         fixBadURLMdLinks(
@@ -1030,20 +1063,15 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     answerStep.references = references;
     await updateReferences(answerStep, allURLs)
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
-  } else {
-    answerStep.mdAnswer = buildMdFromAnswer(answerStep);
-  }
 
-  let imageReferences: ImageReference[] = [];
-  if (imageObjects.length && with_images) {
-    try {
-      imageReferences = await buildImageReferences(answerStep.answer, imageObjects, context, SchemaGen);
-      logDebug('Image references built:', { count: imageReferences.length });
-    } catch (error) {
-      logError('Error building image references:', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      imageReferences = [];
+    if (imageObjects.length && withImages) {
+      try {
+        imageReferences = await buildImageReferences(answerStep.answer, imageObjects, context, SchemaGen);
+        logDebug('Image references built:', { imageReferences });
+      } catch (error) {
+        logError('Error building image references:', { error });
+        imageReferences = [];
+      }
     }
   }
 
@@ -1055,8 +1083,8 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     visitedURLs: returnedURLs,
     readURLs: visitedURLs.filter(url => !badURLs.includes(url)),
     allURLs: weightedURLs.map(r => r.url),
-    allImages: with_images ? imageObjects.map(i => i.url) : undefined,
-    relatedImages: with_images ? imageReferences.map(i => i.url) : undefined,
+    allImages: withImages ? imageObjects.map(i => i.url) : undefined,
+    relatedImages: withImages ? imageReferences.map(i => i.url) : undefined,
   };
 }
 

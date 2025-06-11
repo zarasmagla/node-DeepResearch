@@ -587,7 +587,8 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       body.language_code,
       body.search_language_code,
       body.search_provider,
-      body.with_images
+      body.with_images,
+      body.team_size
     )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
 
