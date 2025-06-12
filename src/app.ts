@@ -402,18 +402,11 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
   });
 
   const body = req.body as ChatCompletionRequest;
-  if (!body.messages?.length) {
-    return res.status(400).json({ error: 'Messages array is required and must not be empty' });
-  }
-  const lastMessage = body.messages[body.messages.length - 1];
-  if (lastMessage.role !== 'user') {
-    return res.status(400).json({ error: 'Last message must be from user' });
-  }
-
-  logDebug('Input messages', { messages: body.messages });
 
   // clean <think> from all assistant messages
   body.messages = body.messages?.filter(message => {
+    if (!message || !message.content) return false;
+
     if (message.role === 'assistant') {
       // 2 cases message.content can be a string or an array
       if (typeof message.content === 'string') {
@@ -455,6 +448,18 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     }
     return true; // Keep other messages
   });
+
+  if (!body.messages?.length) {
+    logError('[chat/completions] Messages array is required and must not be empty', { messages: body.messages });
+    return res.status(400).json({ error: 'Messages array is required and must not be empty' });
+  }
+  const lastMessage = body.messages[body.messages.length - 1];
+  if (lastMessage.role !== 'user') {
+    logError('[chat/completions] Last message must be from user', { messages: body.messages });
+    return res.status(400).json({ error: 'Last message must be from user' });
+  }
+
+  logDebug('Input messages', { messages: body.messages });
 
   let { tokenBudget, maxBadAttempts } = getTokenBudgetAndMaxAttempts(
     body.reasoning_effort,
