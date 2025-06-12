@@ -592,7 +592,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
     )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
 
-    const annotations = (finalStep as AnswerAction).references?.map(ref => ({
+    const annotations = (finalStep as AnswerAction).references.filter(ref => ref?.url && ref?.title && ref?.exactQuote && ref?.dateTime).map(ref => ({
       type: 'url_citation' as const,
       url_citation: {
         title: ref.title,

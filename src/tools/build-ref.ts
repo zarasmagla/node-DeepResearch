@@ -290,10 +290,10 @@ function buildFinalResult(
   chunkToSourceMap: any
 ): { answer: string, references: Array<Reference> } {
   logDebug(`[buildFinalResult] Building final result with ${filteredMatches.length} references`);
-
   // Build reference objects
-  const references: Reference[] = filteredMatches.map((match) => {
+  const references = filteredMatches.map((match) => {
     const source = chunkToSourceMap[match.webChunkIndex];
+    if (!source.text || !source.url || !source.title) return null;
     return {
       exactQuote: source.text,
       url: source.url,
@@ -303,7 +303,7 @@ function buildFinalResult(
       answerChunk: match.answerChunk,
       answerChunkPosition: match.answerChunkPosition
     };
-  });
+  }).filter(Boolean) as Reference[];
 
   // Inject reference markers ([^1], [^2], etc.) into the answer
   let modifiedAnswer = answer;

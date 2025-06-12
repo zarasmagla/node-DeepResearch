@@ -223,11 +223,13 @@ export function repairMarkdownFootnotesOuter(markdownString: string): string {
     }
 
     // Add to references array
-    references.push({
-      exactQuote: content,
-      url,
-      title
-    });
+    if (content && title && url) {
+      references.push({
+        exactQuote: content,
+        url,
+        title,
+      });
+    }
   }
 
   // Only process if we found valid references
