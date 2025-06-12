@@ -6,7 +6,7 @@ import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 export function buildMdFromAnswer(answer: AnswerAction): string {
-  return repairMarkdownFootnotes(answer.answer, answer.references);
+  return repairMarkdownFootnotes(answer.answer || answer.mdAnswer || '', answer.references);
 }
 
 export function repairMarkdownFootnotes(
