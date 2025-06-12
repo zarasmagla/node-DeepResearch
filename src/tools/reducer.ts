@@ -73,8 +73,10 @@ export async function reduceAnswers(
     trackers.tokenTracker.trackUsage(TOOL_NAME, result.usage)
 
 
-    logInfo(TOOL_NAME, { text: result.text });
-    logDebug(`reduce before/after: ${mdContent.length} -> ${result.text.length}`);
+    logDebug(`${TOOL_NAME} before/after: ${mdContent.length} -> ${result.text.length}`, {
+      originalContent: mdContent,
+      reducedContent: result.text
+    });
 
     if (result.text.length < mdContent.length * 0.5) {
       logWarning(`reduce content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`, {
