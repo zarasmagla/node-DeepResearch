@@ -573,7 +573,7 @@ export async function evaluateQuestion(
       prompt: prompt.user
     });
 
-    
+
 
     // Always include definitive in types
     const types: EvaluationType[] = [];
@@ -653,12 +653,17 @@ export async function evaluateAnswer(
         logError(`Unknown evaluation type: ${evaluationType}`);
     }
     if (prompt) {
-      result = await performEvaluation(
-        evaluationType,
-        prompt,
-        trackers,
-        schemaGen
-      );
+      try {
+        result = await performEvaluation(
+          evaluationType,
+          prompt,
+          trackers,
+          schemaGen
+        );
+      } catch (error) {
+        logError(`Error performing ${evaluationType} evaluation`, { error });
+        return { pass: false, think: `Error ${evaluationType} immedidately return false, probably due to bad prompt?`, type: evaluationType } as EvaluationResponse
+      }
 
       // fail one, return immediately
       if (!(result?.object as EvaluationResponse)?.pass) {
