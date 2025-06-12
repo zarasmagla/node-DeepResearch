@@ -46,6 +46,7 @@ import { buildImageReferences, buildReferences } from "./tools/build-ref";
 import { logInfo, logError, logDebug, logWarning } from './logging';
 import { researchPlan } from './tools/research-planner';
 import { reduceAnswers } from './tools/reducer';
+import { AxiosError } from 'axios';
 
 async function wait(seconds: number) {
   logDebug(`Waiting ${seconds}s...`);
@@ -323,6 +324,10 @@ async function executeSearchQueries(
         query,
         error: error instanceof Error ? error.message : String(error)
       });
+      // check if the error is 401
+      if (error instanceof AxiosError && error.response?.status === 401 && (searchProvider === 'jina' || searchProvider === 'arxiv')) {
+        throw new Error('Unauthorized Jina API key');
+      }
       continue;
     } finally {
       await wait(STEP_SLEEP);
