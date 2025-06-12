@@ -92,7 +92,8 @@
     "finalize_answer": "Voy a finalizar la respuesta.",
     "reduce_answer": "Voy a finalizar la respuesta.",
     "blocked_content": "¡Oh no! Estoy bloqueado por ${url}, ¡no es genial!",
-    "hostnames_no_results": "No se encontraron resultados de ${hostnames}."
+    "hostnames_no_results": "No se encontraron resultados de ${hostnames}.",
+    "cross_reference": "Voy a cruzar las informaciones en la web para verificar la respuesta."
   },
   "it": {
     "eval_first": "Un attimo, valuterò prima la risposta.",
