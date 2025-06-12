@@ -41,10 +41,11 @@ import {
 } from "./utils/text-tools";
 import { MAX_QUERIES_PER_STEP, MAX_REFLECT_PER_STEP, MAX_URLS_PER_STEP, Schemas } from "./utils/schemas";
 import { formatDateBasedOnType, formatDateRange } from "./utils/date-tools";
-import { reviseAnswer } from "./tools/md-fixer";
+import { finalizeAnswer } from "./tools/finalizer";
 import { buildImageReferences, buildReferences } from "./tools/build-ref";
 import { logInfo, logError, logDebug, logWarning } from './logging';
 import { researchPlan } from './tools/research-planner';
+import { reduceAnswers } from './tools/reducer';
 
 async function wait(seconds: number) {
   logDebug(`Waiting ${seconds}s...`);
@@ -813,8 +814,13 @@ But then you realized you have asked them before. You decided to to think out of
           isAggregated: true
         } as AnswerAction;
 
+        // aggregate urls
+        visitedURLs.push(...subproblemResponses.map(r => r.readURLs).flat());
+        weightedURLs = subproblemResponses.map(r => r.allURLs.map(url => ({ url, title: '' } as BoostedSearchSnippet))).flat();
 
-        // break the loop, move to final boxing
+        // TODO aggregate images @shazhou2015
+
+        // break the loop, jump directly final boxing
         break;
       }
 
@@ -1037,7 +1043,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
         fixBadURLMdLinks(
           fixCodeBlockIndentation(
             repairMarkdownFootnotesOuter(
-              await reviseAnswer(
+              await finalizeAnswer(
                 answerStep.answer,
                 allKnowledge,
                 context,
@@ -1072,6 +1078,9 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
         imageReferences = [];
       }
     }
+  } else if (answerStep.isAggregated) {
+    answerStep.answer = await reduceAnswers(answerStep.answer, context, SchemaGen);
+    answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
   }
 
   // max return 300 urls
@@ -1079,7 +1088,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   return {
     result: thisStep,
     context,
-    visitedURLs: returnedURLs,
+    visitedURLs: returnedURLs, // deprecated
     readURLs: visitedURLs.filter(url => !badURLs.includes(url)),
     allURLs: weightedURLs.map(r => r.url),
     allImages: withImages ? imageObjects.map(i => i.url) : undefined,

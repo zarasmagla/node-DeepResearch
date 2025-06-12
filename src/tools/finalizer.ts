@@ -61,9 +61,9 @@ IMPORTANT: Do not begin your response with phrases like "Sure", "Here is", "Belo
   }
 }
 
-const TOOL_NAME = 'mdFixer';
+const TOOL_NAME = 'finalizer';
 
-export async function reviseAnswer(
+export async function finalizeAnswer(
   mdContent: string,
   knowledgeItems: KnowledgeItem[],
   trackers: TrackerContext,
@@ -71,7 +71,7 @@ export async function reviseAnswer(
 ): Promise<string> {
   try {
     const prompt = getPrompt(mdContent, knowledgeItems, schema);
-    trackers?.actionTracker.trackThink('final_answer', schema.languageCode)
+    trackers?.actionTracker.trackThink('finalize_answer', schema.languageCode)
 
     const result = await generateText({
       model: getModel(TOOL_NAME),
@@ -83,10 +83,10 @@ export async function reviseAnswer(
 
 
     logInfo(TOOL_NAME, { text: result.text });
-    logDebug(`repaired before/after: ${mdContent.length} -> ${result.text.length}`);
+    logDebug(`finalized answer before/after: ${mdContent.length} -> ${result.text.length}`);
 
     if (result.text.length < mdContent.length * 0.85) {
-      logWarning(`repaired content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`, {
+      logWarning(`finalized answer length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`, {
         originalContent: mdContent,
         repairedContent: result.text
       });
@@ -96,7 +96,7 @@ export async function reviseAnswer(
     return result.text;
 
   } catch (error) {
-    logError(`Error in ${TOOL_NAME}`, { error });
+    logError(TOOL_NAME, { error });
     return mdContent;
   }
 }

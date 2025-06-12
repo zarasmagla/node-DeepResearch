@@ -59,7 +59,8 @@
           "maxTokens": 8000,
           "model": "gemini-2.0-flash-lite"
         },
-        "mdFixer": {}
+        "finalizer": {},
+        "reducer": {"maxTokens": 16000}
       }
     },
     "openai": {
@@ -87,7 +88,8 @@
         "fallback": {
           "temperature": 0
         },
-        "mdFixer": {}
+        "finalizer": {},
+        "reducer": {"maxTokens": 16000}
       }
     }
   }

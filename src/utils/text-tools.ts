@@ -824,3 +824,111 @@ export async function detectBrokenUnicodeViaFileIO(str: string) {
   // Now check for the visible replacement character
   return { broken: readStr.includes('�'), readStr };
 }
+
+interface NgramResult {
+  ngram: string;
+  freq: number;
+  pmi?: number;  // Added PMI score
+}
+
+function calculatePMI(
+  ngram: string,
+  ngramFreq: number,
+  wordFreqs: Map<string, number>,
+  totalNgrams: number
+): number {
+  const words = ngram.split(' ');
+  if (words.length < 2) return 0;
+
+  // Calculate joint probability
+  const jointProb = ngramFreq / totalNgrams;
+
+  // Calculate individual probabilities
+  const wordProbs = words.map(word => (wordFreqs.get(word) || 0) / totalNgrams);
+
+  // Calculate PMI
+  const pmi = Math.log2(jointProb / wordProbs.reduce((a, b) => a * b, 1));
+  return pmi;
+}
+
+function isCJK(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 0x4E00 && code <= 0x9FFF) || // CJK Unified Ideographs
+    (code >= 0x3040 && code <= 0x309F) || // Hiragana
+    (code >= 0x30A0 && code <= 0x30FF) || // Katakana
+    (code >= 0xAC00 && code <= 0xD7AF)    // Hangul
+  );
+}
+
+function isCJKText(text: string): boolean {
+  return Array.from(text).some(char => isCJK(char));
+}
+
+export function extractNgrams(
+  text: string,
+  n: number,
+  minFreq: number = 2,
+  minPMI: number = 1.0  // Added minimum PMI threshold
+): NgramResult[] {
+  // Split text into chunks by newlines
+  const chunks = text.split('\n').filter(chunk => chunk.trim().length > 0);
+
+  // Maps to store frequencies
+  const ngramFreq: Map<string, number> = new Map();
+  const wordFreq: Map<string, number> = new Map();
+  let totalNgrams = 0;
+
+  // First pass: collect frequencies
+  for (const chunk of chunks) {
+    if (isCJKText(chunk)) {
+      // For CJK text, use character-level ngrams
+      for (let len = 2; len <= n; len++) {
+        for (let i = 0; i <= chunk.length - len; i++) {
+          const ngram = chunk.slice(i, i + len);
+          ngramFreq.set(ngram, (ngramFreq.get(ngram) || 0) + 1);
+          totalNgrams++;
+        }
+      }
+    } else {
+      // For non-CJK text, use word-level ngrams
+      const words = chunk.split(/\s+/).filter(word => word.length > 0);
+
+      // Count individual word frequencies
+      words.forEach(word => {
+        wordFreq.set(word, (wordFreq.get(word) || 0) + 1);
+      });
+
+      // Count ngram frequencies
+      for (let len = 2; len <= n; len++) {
+        for (let i = 0; i <= words.length - len; i++) {
+          const ngram = words.slice(i, i + len).join(' ');
+          ngramFreq.set(ngram, (ngramFreq.get(ngram) || 0) + 1);
+          totalNgrams++;
+        }
+      }
+    }
+  }
+
+  // Second pass: calculate PMI and filter
+  const results: NgramResult[] = Array.from(ngramFreq.entries())
+    .filter(([ngram, freq]) => freq >= minFreq)
+    .map(([ngram, freq]) => {
+      const pmi = isCJKText(ngram) ? 0 : calculatePMI(ngram, freq, wordFreq, totalNgrams);
+      return { ngram, freq, pmi };
+    })
+    .filter(result => result.pmi === undefined || result.pmi >= minPMI)
+    .sort((a, b) => {
+      // If both have PMI scores, sort by PMI
+      if (a.pmi !== undefined && b.pmi !== undefined) {
+        return b.pmi - a.pmi;
+      }
+      // If only one has PMI, prioritize the one with PMI
+      if (a.pmi !== undefined) return -1;
+      if (b.pmi !== undefined) return 1;
+      // If neither has PMI (CJK text), sort by frequency
+      return b.freq - a.freq;
+    });
+
+  return results;
+}

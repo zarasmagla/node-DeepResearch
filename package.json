@@ -12,6 +12,7 @@
     "dev": "npx ts-node src/agent.ts",
     "search": "npx ts-node src/test-duck.ts",
     "rewrite": "npx ts-node src/tools/query-rewriter.ts",
+    "ngram": "npx ts-node src/cli/ngram.ts",
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "serve": "ts-node src/server.ts",

@@ -51,8 +51,11 @@
         "agentBeastMode": {
           "temperature": 0.7
         },
-        "mdFixer": {
+        "finalizer": {
           "model": "gemini-2.5-flash-preview-05-20"
+        },
+        "reducer": {
+          "maxTokens": 16000
         },
         "fallback": {
           "maxTokens": 8000,
@@ -85,7 +88,10 @@
         "fallback": {
           "temperature": 0
         },
-        "mdFixer": {}
+        "finalizer": {},
+        "reducer": {
+          "maxTokens": 16000
+        }
       }
     }
   }
