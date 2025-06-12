@@ -2,7 +2,7 @@ import { PromptPair, TrackerContext } from '../types';
 import { getModel } from "../config";
 import { generateText } from "ai";
 import { Schemas } from "../utils/schemas";
-import { logInfo, logError, logDebug } from '../logging';
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 function getPrompt(mdContent: string): PromptPair {
@@ -76,13 +76,13 @@ export async function reduceAnswers(
     logInfo(TOOL_NAME, { text: result.text });
     logDebug(`reduce before/after: ${mdContent.length} -> ${result.text.length}`);
 
-    // if (result.text.length < mdContent.length * 0.85) {
-    //   logWarning(`reduce content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`, {
-    //     originalContent: mdContent,
-    //     repairedContent: result.text
-    //   });
-    //   return mdContent;
-    // }
+    if (result.text.length < mdContent.length * 0.5) {
+      logWarning(`reduce content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`, {
+        originalContent: mdContent,
+        repairedContent: result.text
+      });
+      return mdContent;
+    }
 
     return result.text;
 
