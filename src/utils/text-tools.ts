@@ -25,7 +25,7 @@ export function repairMarkdownFootnotes(
   // Helper function to format references
   const formatReferences = (refs: Array<Reference>) => {
     return refs.map((ref, i) => {
-      const cleanQuote = ref.exactQuote
+      const cleanQuote = (ref?.exactQuote || '')
         .replace(/[^\p{L}\p{N}\s]/gu, ' ')
         .replace(/\s+/g, ' ').trim();
 
