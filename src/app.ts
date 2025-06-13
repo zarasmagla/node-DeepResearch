@@ -384,10 +384,16 @@ const validationRules = [
 ];
 
 app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Response) => {
+  const clientIp = req.headers['cf-connecting-ip'] ||
+  req.headers['x-forwarded-for'] ||
+  req.ip ||
+  req.socket.remoteAddress ||
+  'unknown';
+
   // Validate request body
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    logError('[chat/completions] Validation errors:', { errors: errors.array() });
+    logError('[chat/completions] Validation errors:', { errors: errors.array(), ip: clientIp });
     return res.status(400).json({ error: 'Invalid request body', details: errors.array() });
   }
 
@@ -401,11 +407,6 @@ app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Res
     }
   }
 
-  const clientIp = req.headers['cf-connecting-ip'] ||
-    req.headers['x-forwarded-for'] ||
-    req.ip ||
-    req.socket.remoteAddress ||
-    'unknown';
   // Log request details (excluding sensitive data)
   logInfo('[chat/completions] Request:', {
     model: req.body.model,
