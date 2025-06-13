@@ -17,8 +17,25 @@ import { ObjectGeneratorSafe } from "./utils/safe-generator";
 import { normalizeHostName } from "./utils/url-tools";
 import { get_api_logger } from "./utils/structured-logger";
 import { logger } from "./winston-logger";
+import { Langfuse } from "langfuse";
 
 const app = express();
+
+// Create a shared Langfuse instance for the application
+const langfuse = new Langfuse();
+
+// Graceful shutdown handling
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  await langfuse.shutdownAsync();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  await langfuse.shutdownAsync();
+  process.exit(0);
+});
 
 
 // Get secret from command line args for optional authentication
@@ -658,7 +675,7 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
 
     if (responseSchema) {
       try {
-        const generator = new ObjectGeneratorSafe(context?.tokenTracker);
+        const generator = new ObjectGeneratorSafe(context?.tokenTracker, langfuse);
         console.log('responseSchema', responseSchema);
         const result = await generator.generateObject({
           model: "agent",
