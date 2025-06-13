@@ -823,6 +823,9 @@ But then you realized you have asked them before. You decided to to think out of
             isAggregated: true
           } as AnswerAction;
           candidateAnswers = subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).filter(a => a) as string[];
+          // dedup references by their urls
+          const uniqueURLs = new Set(thisStep.references.map(r => r.url));
+          thisStep.references = Array.from(uniqueURLs).map(url => (thisStep as AnswerAction).references.find(r => r?.url === url)) as Reference[];
 
           // aggregate urls
           visitedURLs.push(...subproblemResponses.map(r => r.readURLs).flat());
