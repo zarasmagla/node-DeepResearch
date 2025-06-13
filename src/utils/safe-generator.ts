@@ -21,7 +21,7 @@ interface GenerateObjectResult<T> {
 
 interface GenerateOptions<T> {
   model: ToolName;
-  schema: z.ZodType<T> | Schema<T>;
+  schema: any;
   prompt?: string;
   system?: string;
   messages?: CoreMessage[];
