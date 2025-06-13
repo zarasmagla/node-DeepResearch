@@ -1093,10 +1093,12 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   } else if (answerStep.isAggregated) {
     answerStep.answer = candidateAnswers.join('\n\n'); // await reduceAnswers(candidateAnswers, context, SchemaGen);
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
-    logDebug('[agent] all image references:', { count: answerStep.imageReferences?.length });
-    const dedupImages = dedupImagesWithEmbeddings(answerStep.imageReferences as ImageObject[], []);
-    logDebug('[agent] deduped images:', { count: dedupImages.length });
-    answerStep.imageReferences = answerStep.imageReferences?.filter(i => i?.url && dedupImages.some(d => d?.url === i.url)) || [];
+    if (withImages && answerStep.imageReferences?.length) {
+      logDebug('[agent] all image references:', { count: answerStep.imageReferences?.length });
+      const dedupImages = dedupImagesWithEmbeddings(answerStep.imageReferences as ImageObject[], []);
+      logDebug('[agent] deduped images:', { count: dedupImages.length });
+      answerStep.imageReferences = answerStep.imageReferences?.filter(i => i?.url && dedupImages.some(d => d?.url === i.url)) || [];
+    }
   }
 
   // max return 300 urls
