@@ -150,7 +150,7 @@ export class Schemas {
 
   getQuestionEvaluateSchema() {
     return z.toJSONSchema(z.object({
-      think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()} Maximum 500 characters.`),
+      think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()} Maximum 500 characters. Make sure output is unique and  is not long and repetitive.`).max(500),
       needsDefinitive: z.boolean().describe('If the answer needs to be definitive'),
       needsFreshness: z.boolean().describe('If the answer needs to be fresh'),
       needsPlurality: z.boolean().describe('If the answer needs to be plural'),
@@ -293,7 +293,8 @@ export class Schemas {
           DO NOT contain any placeholder variables in the final answer. 
           If you have to output tables, always use basic HTML table syntax with proper <table> <thead> <tr> <th> <td> without any CSS styling. STRICTLY AVOID any markdown table syntax. 
           Make sure this is in a correct JSON format. do not return things like 3 tildas and JSON keyword because it breaks formatting.
-          `)
+          Make sure the answer is not too long and repetitive. Answer should be unique.
+          `).max(10000)
       }).optional();
     }
 
