@@ -44,7 +44,7 @@ export class ObjectGeneratorSafe {
   ): z.ZodType<T> | Schema<T> {
     // For zod schemas
     if (schema instanceof z.ZodType) {
-      return schema
+      return schema;
     }
 
     // For AI SDK Schema objects
@@ -116,18 +116,23 @@ export class ObjectGeneratorSafe {
 
     try {
       // Primary attempt with main model
-      console.log('==============================');
+      console.log("==============================");
       const result = await GoogleGenAIHelper.generateObject({
         model: getModel(model),
         schema,
-        prompt: prompt ? prompt : messages?.map((message) => ({
-          role: message.role === "assistant" ? "model" : message.role,
-          parts: [{
-            text: message.content,
-          }],
-        })) as ContentListUnion,
+        prompt: prompt
+          ? prompt
+          : (messages?.map((message) => ({
+              role: message.role === "assistant" ? "model" : message.role,
+              parts: [
+                {
+                  text: message.content,
+                },
+              ],
+            })) as ContentListUnion),
         systemInstruction: system,
         maxOutputTokens: getToolConfig(model).maxTokens,
+        providerOptions,
       });
       this.tokenTracker.trackUsage(model, result.usage);
       return result as unknown as GenerateObjectResult<T>;
@@ -140,7 +145,8 @@ export class ObjectGeneratorSafe {
       } catch (parseError) {
         if (numRetries > 0) {
           logger.error(
-            `${model} failed on object generation -> manual parsing failed -> retry with ${numRetries - 1
+            `${model} failed on object generation -> manual parsing failed -> retry with ${
+              numRetries - 1
             } retries remaining`
           );
           return this.generateObject({
@@ -176,7 +182,8 @@ export class ObjectGeneratorSafe {
               model: getModel("fallback"),
               schema: distilledSchema,
               prompt: `Following the given JSON schema, extract the field from below: \n\n ${failedOutput}`,
-              temperature: getToolConfig('fallback').temperature,
+              temperature: getToolConfig("fallback").temperature,
+              providerOptions,
             });
 
             this.tokenTracker.trackUsage("fallback", fallbackResult.usage); // Track against fallback model
@@ -210,7 +217,9 @@ export class ObjectGeneratorSafe {
       logger.error("error", error.text);
 
       // Clean up line breaks from the error text before parsing
-      const cleanedText = cleanupJsonString(cleanupLineBreaks((error as any).text));
+      const cleanedText = cleanupJsonString(
+        cleanupLineBreaks((error as any).text)
+      );
 
       try {
         // First try standard JSON parsing

@@ -577,7 +577,7 @@ export async function evaluateQuestion(
       providerOptions: {
         google: {
           thinkingConfig: {
-            thinkingBudget: 0, // Added thinkingBudget for Google
+            thinkingBudget: 3072, // Added thinkingBudget for Google
           },
         },
       },
@@ -621,7 +621,7 @@ async function performEvaluation<T>(
     providerOptions: {
       google: {
         thinkingConfig: {
-          thinkingBudget: 0, // Added thinkingBudget for Google
+          thinkingBudget: 1024,
         },
       },
     },

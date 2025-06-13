@@ -20,7 +20,6 @@ import { logger } from "./winston-logger";
 
 const app = express();
 
-
 // Get secret from command line args for optional authentication
 const secret = process.argv
   .find((arg) => arg.startsWith("--secret="))
@@ -504,8 +503,8 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     // Convert JSON schema to Zod schema using a proper converter
     try {
       console.log(body.response_format);
-      responseSchema = body.response_format
-      const jsonString = responseSchema
+      responseSchema = body.response_format;
+      const jsonString = responseSchema;
       logger.info("responseSchema", jsonString);
     } catch (error: any) {
       return res
@@ -659,7 +658,7 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     if (responseSchema) {
       try {
         const generator = new ObjectGeneratorSafe(context?.tokenTracker);
-        console.log('responseSchema', responseSchema);
+        console.log("responseSchema", responseSchema);
         const result = await generator.generateObject({
           model: "agent",
           schema: responseSchema,
@@ -669,7 +668,7 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
           providerOptions: {
             google: {
               thinkingConfig: {
-                thinkingBudget: 0, // Added thinkingBudget for Google
+                thinkingBudget: 2048, // Added thinkingBudget for Google
               },
             },
           },

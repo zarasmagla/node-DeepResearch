@@ -1,4 +1,3 @@
-import { z } from "zod/v4";
 import { CoreMessage } from "ai";
 import { SEARCH_PROVIDER, STEP_SLEEP } from "./config";
 import fs from "fs/promises";
@@ -77,29 +76,35 @@ function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
   knowledge.forEach((k) => {
     messages.push({ role: "user", content: k.question.trim() });
     const aMsg = `
-${k.updated && (k.type === "url" || k.type === "side-info")
-        ? `
+${
+  k.updated && (k.type === "url" || k.type === "side-info")
+    ? `
 <answer-datetime>
 ${k.updated}
 </answer-datetime>
 `
-        : ""
-      }
+    : ""
+}
 
-${k.references && (k.type === "url" || k.type === "side-info")
-        ? `
+${
+  k.references && (k.type === "url" || k.type === "side-info")
+    ? `
 <references>
-${k.references.map(ref => `
+${k.references
+  .map(
+    (ref) => `
 {
   "url": "${ref.url}",
-  "title": "${ref.title || ''}",
-  "exactQuote": "${ref.exactQuote || ''}",
+  "title": "${ref.title || ""}",
+  "exactQuote": "${ref.exactQuote || ""}",
 }
-`).join(',')}
+`
+  )
+  .join(",")}
 </references>
 `
-        : ""
-      }
+    : ""
+}
 
 
 ${k.answer}
@@ -121,24 +126,25 @@ function composeMsgs(
   const userContent = `
 ${question}
 
-${finalAnswerPIP?.length
-      ? `
+${
+  finalAnswerPIP?.length
+    ? `
 <answer-requirements>
 - You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
 - You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
 - Follow reviewer's feedback and improve your answer quality.
 ${finalAnswerPIP
-        .map(
-          (p, idx) => `
+  .map(
+    (p, idx) => `
 <reviewer-${idx + 1}>
 ${p}
 </reviewer-${idx + 1}>
 `
-        )
-        .join("\n")}
+  )
+  .join("\n")}
 </answer-requirements>`
-      : ""
-    }
+    : ""
+}
     `.trim();
 
   msgs.push({ role: "user", content: removeExtraLineBreaks(userContent) });
@@ -186,7 +192,8 @@ ${context.join("\n")}
     const urlListStr = urlList
       .map(
         (item, idx) =>
-          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${item.url
+          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${
+            item.url
           }": "${item.merged.slice(0, 50)}"`
       )
       .join("\n");
@@ -210,15 +217,16 @@ ${urlListStr}
 - Use web search to find relevant information
 - Build a search request based on the deep intention behind the original question and the expected answer format
 - Always prefer a single search request, only add another request if the original question covers multiple aspects or elements and one query is not enough, each request focus on one specific aspect of the original question 
-${allKeywords?.length
-        ? `
+${
+  allKeywords?.length
+    ? `
 - Avoid those unsuccessful search requests and queries:
 <bad-requests>
 ${allKeywords.join("\n")}
 </bad-requests>
 `.trim()
-        : ""
-      }
+    : ""
+}
 </action-search>
 `);
   }
@@ -288,8 +296,10 @@ ${actionSections.join("\n\n")}
   };
 }
 
-
-async function updateReferences(thisStep: AnswerAction, allURLs: Record<string, SearchSnippet>) {
+async function updateReferences(
+  thisStep: AnswerAction,
+  allURLs: Record<string, SearchSnippet>
+) {
   thisStep.references = thisStep.references
     ?.filter((ref) => ref?.url)
     .map((ref) => {
@@ -384,10 +394,7 @@ async function executeSearchQueries(
         throw new Error("No results found");
       }
     } catch (error) {
-      logger.error(`${SEARCH_PROVIDER} search failed for query:`,
-        query,
-        error
-      );
+      logger.error(`${SEARCH_PROVIDER} search failed for query:`, query, error);
       continue;
     } finally {
       await sleep(STEP_SLEEP);
@@ -509,11 +516,11 @@ export async function getResponse(
 }> {
   let step = 0;
   let totalStep = 0;
-  const allContext: StepAction[] = [];  // all steps in the current session, including those leads to wrong results
+  const allContext: StepAction[] = []; // all steps in the current session, including those leads to wrong results
 
   const updateContext = function (step: any) {
     allContext.push(step);
-  }
+  };
 
   question = question?.trim() as string;
   // remove incoming system messages to avoid override
@@ -533,7 +540,7 @@ export async function getResponse(
   }
 
   const SchemaGen = new Schemas();
-  await SchemaGen.setLanguage(languageCode || question)
+  await SchemaGen.setLanguage(languageCode || question);
   const context: TrackerContext = {
     tokenTracker:
       existingContext?.tokenTracker || new TokenTracker(tokenBudget),
@@ -549,7 +556,9 @@ export async function getResponse(
     "STARTED",
     undefined,
     {
-      question: question?.substring(0, 100) + (question && question.length > 100 ? "..." : ""),
+      question:
+        question?.substring(0, 100) +
+        (question && question.length > 100 ? "..." : ""),
       tokenBudget,
       maxBadAttempts,
       hasMessages: !!messages?.length,
@@ -558,13 +567,7 @@ export async function getResponse(
 
   const generator = new ObjectGeneratorSafe(context.tokenTracker);
 
-  let schema: any = SchemaGen.getAgentSchema(
-    true,
-    true,
-    true,
-    true,
-    true
-  );
+  let schema: any = SchemaGen.getAgentSchema(true, true, true, true, true);
   const gaps: string[] = [question]; // All questions to be answered including the orginal question
   const allQuestions = [question];
   const allKeywords: string[] = [];
@@ -715,7 +718,7 @@ export async function getResponse(
       providerOptions: {
         google: {
           thinkingConfig: {
-            thinkingBudget: 0, // Added thinkingBudget for Google
+            thinkingBudget: 8192, // Added thinkingBudget for Google
           },
         },
       },
@@ -1020,8 +1023,8 @@ But then you realized you have asked them before. You decided to to think out of
           diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords: "${keywordsQueries
-              .map((q) => q.q)
-              .join(", ")}".
+            .map((q) => q.q)
+            .join(", ")}".
 You found quite some information and add them to your URL list and **visit** them later when needed. 
 `);
 
@@ -1037,8 +1040,8 @@ You found quite some information and add them to your URL list and **visit** the
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords:  "${keywordsQueries
-            .map((q) => q.q)
-            .join(", ")}".
+          .map((q) => q.q)
+          .join(", ")}".
 But then you realized you have already searched for these keywords before, no new information is returned.
 You decided to think out of the box or cut from a completely different angle.
 `);
@@ -1098,15 +1101,15 @@ You found some useful information on the web and add them to your knowledge for 
           totalStep,
           ...(success
             ? {
-              question: currentQuestion,
-              ...thisStep,
-              result: urlResults,
-            }
+                question: currentQuestion,
+                ...thisStep,
+                result: urlResults,
+              }
             : {
-              ...thisStep,
-              result:
-                "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
-            }),
+                ...thisStep,
+                result:
+                  "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
+              }),
         });
       } else {
         diaryContext.push(`
@@ -1220,7 +1223,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       providerOptions: {
         google: {
           thinkingConfig: {
-            thinkingBudget: 0,
+            thinkingBudget: 24576,
           },
         },
       },
@@ -1280,7 +1283,6 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     answerStep.mdAnswer = buildMdFromAnswer(answerStep);
   }
 
-
   // Log completion of agent processing
   context.logger.agent_step(
     "completed_processing",
@@ -1295,7 +1297,9 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       totalTokens: context.tokenTracker.getTotalUsage().totalTokens,
     },
     {
-      question: question?.substring(0, 100) + (question && question.length > 100 ? "..." : ""),
+      question:
+        question?.substring(0, 100) +
+        (question && question.length > 100 ? "..." : ""),
       totalSteps: totalStep,
       trivialQuestion,
     }
@@ -1347,7 +1351,6 @@ async function storeContext(
   }
 
   try {
-
     await fs.writeFile("context.json", JSON.stringify(allContext, null, 2));
     await fs.writeFile("queries.json", JSON.stringify(allKeywords, null, 2));
     await fs.writeFile("questions.json", JSON.stringify(allQuestions, null, 2));

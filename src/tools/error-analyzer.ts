@@ -108,7 +108,7 @@ export async function analyzeSteps(
       providerOptions: {
         google: {
           thinkingConfig: {
-            thinkingBudget: 0, // Added thinkingBudget for Google
+            thinkingBudget: 4096, // Added thinkingBudget for Google
           },
         },
       },
