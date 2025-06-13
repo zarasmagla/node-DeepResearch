@@ -1084,7 +1084,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     if (imageObjects.length && withImages) {
       try {
         answerStep.imageReferences = await buildImageReferences(answerStep.answer, imageObjects, context, SchemaGen);
-        logDebug('Image references built:', { imageReferences: answerStep.imageReferences.map(i => ({url: i.url, score: i.relevanceScore, answerChunk: i.answerChunk})) });
+        logDebug('Image references built:', { imageReferences: answerStep.imageReferences.map(i => ({ url: i.url, score: i.relevanceScore, answerChunk: i.answerChunk })) });
       } catch (error) {
         logError('Error building image references:', { error });
         answerStep.imageReferences = [];
@@ -1096,11 +1096,11 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     logDebug('[agent] all image references:', { count: answerStep.imageReferences?.length });
     const dedupImages = dedupImagesWithEmbeddings(answerStep.imageReferences as ImageObject[], []);
     logDebug('[agent] deduped images:', { count: dedupImages.length });
-    answerStep.imageReferences = answerStep.imageReferences?.filter(i => dedupImages.some(d => d.url === i.url)) || [];
+    answerStep.imageReferences = answerStep.imageReferences?.filter(i => i?.url && dedupImages.some(d => d?.url === i.url)) || [];
   }
 
   // max return 300 urls
-  const returnedURLs = weightedURLs.slice(0, numReturnedURLs).map(r => r.url);
+  const returnedURLs = weightedURLs.slice(0, numReturnedURLs).filter(r => r?.url).map(r => r.url);
   return {
     result: thisStep,
     context,
