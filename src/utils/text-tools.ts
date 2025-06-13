@@ -164,6 +164,7 @@ ${formatReferences(references)}
  * It extracts existing footnote definitions and uses them as references
  */
 export function repairMarkdownFootnotesOuter(markdownString: string): string {
+  if (!markdownString) return '';
   // First trim the string to handle any extra whitespace
   markdownString = markdownString.trim();
 
@@ -203,6 +204,7 @@ export function repairMarkdownFootnotesOuter(markdownString: string): string {
   let footnoteMatch;
   while ((footnoteMatch = footnoteDefRegex.exec(footnotesPart)) !== null) {
     // The footnote content
+    if (!footnoteMatch[2]) continue;
     let content = footnoteMatch[2].trim();
 
     // Extract URL and title if present
