@@ -314,8 +314,8 @@ if (secret) {
   app.use((req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
-      logError('[chat/completions] Unauthorized request');
-      res.status(401).json({ error: 'Unauthorized' });
+      logError('Unauthorized request');
+      res.status(401).json({ error: 'Unauthorized. Please provide a valid Jina API key.' });
       return;
     }
 
@@ -385,15 +385,15 @@ const validationRules = [
 
 app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Response) => {
   const clientIp = req.headers['cf-connecting-ip'] ||
-  req.headers['x-forwarded-for'] ||
-  req.ip ||
-  req.socket.remoteAddress ||
-  'unknown';
+    req.headers['x-forwarded-for'] ||
+    req.ip ||
+    req.socket.remoteAddress ||
+    'unknown';
 
   // Validate request body
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    logError('[chat/completions] Validation errors:', { errors: errors.array(), ip: clientIp });
+    logError('Validation errors:', { errors: errors.array(), ip: clientIp });
     return res.status(400).json({ error: 'Invalid request body', details: errors.array() });
   }
 
@@ -401,14 +401,14 @@ app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Res
   if (secret) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
-      logError('[chat/completions] Unauthorized request');
-      res.status(401).json({ error: 'Unauthorized' });
+      logError('Unauthorized request');
+      res.status(401).json({ error: 'Unauthorized. Please provide a valid Jina API key.' });
       return;
     }
   }
 
   // Log request details (excluding sensitive data)
-  logInfo('[chat/completions] Request:', {
+  logInfo('[chat/completions] Start:', {
     model: req.body.model,
     stream: req.body.stream,
     messageCount: req.body.messages?.length,
@@ -466,12 +466,12 @@ app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Res
   });
 
   if (!body.messages?.length) {
-    logError('[chat/completions] Messages array is required and must not be empty', { messages: body.messages });
+    logError('Messages array is required and must not be empty', { messages: body.messages });
     return res.status(400).json({ error: 'Messages array is required and must not be empty' });
   }
   const lastMessage = body.messages[body.messages.length - 1];
   if (lastMessage.role !== 'user') {
-    logError('[chat/completions] Last message must be from user', { messages: body.messages });
+    logError('Last message must be from user', { messages: body.messages });
     return res.status(400).json({ error: 'Last message must be from user' });
   }
 
