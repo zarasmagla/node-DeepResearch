@@ -796,39 +796,45 @@ But then you realized you have asked them before. You decided to to think out of
 
       if (teamSize > 1) {
         const subproblems = await researchPlan(question, teamSize, soundBites, context, SchemaGen);
-        // parallel call getResponse for each subproblem with exact same parameters from the current step, but their teamSize is 1
-        const subproblemResponses = await Promise.all(subproblems.map(subproblem => getResponse(subproblem,
-          tokenBudget,
-          maxBadAttempts,
-          context,
-          messages,
-          numReturnedURLs,
-          noDirectAnswer,
-          boostHostnames,
-          badHostnames,
-          onlyHostnames,
-          maxRef,
-          minRelScore, languageCode, searchLanguageCode, searchProvider, withImages, 1)));
-        // convert current step to AnswerAction
-        thisStep = {
-          action: 'answer',
-          think: thisStep.think,
-          answer: subproblemResponses.map(r => (r.result as AnswerAction).answer).join('\n\n'),
-          mdAnswer: subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).join('\n\n'),
-          references: subproblemResponses.map(r => (r.result as AnswerAction).references).flat(),
-          isFinal: true,
-          isAggregated: true
-        } as AnswerAction;
-        candidateAnswers = subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).filter(a => a) as string[];
+        if (subproblems.length > 1) {
 
-        // aggregate urls
-        visitedURLs.push(...subproblemResponses.map(r => r.readURLs).flat());
-        weightedURLs = subproblemResponses.map(r => r.allURLs.map(url => ({ url, title: '' } as BoostedSearchSnippet))).flat();
+          // parallel call getResponse for each subproblem with exact same parameters from the current step, but their teamSize is 1
+          const subproblemResponses = await Promise.all(subproblems.map(subproblem => getResponse(subproblem,
+            tokenBudget,
+            maxBadAttempts,
+            context,
+            messages,
+            numReturnedURLs,
+            noDirectAnswer,
+            boostHostnames,
+            badHostnames,
+            onlyHostnames,
+            maxRef,
+            minRelScore, languageCode, searchLanguageCode, searchProvider, withImages, 1)));
+          // convert current step to AnswerAction
+          thisStep = {
+            action: 'answer',
+            think: thisStep.think,
+            answer: subproblemResponses.map(r => (r.result as AnswerAction).answer).join('\n\n'),
+            mdAnswer: subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).join('\n\n'),
+            references: subproblemResponses.map(r => (r.result as AnswerAction).references).flat(),
+            isFinal: true,
+            isAggregated: true
+          } as AnswerAction;
+          candidateAnswers = subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).filter(a => a) as string[];
 
-        // TODO aggregate images @shazhou2015
+          // aggregate urls
+          visitedURLs.push(...subproblemResponses.map(r => r.readURLs).flat());
+          weightedURLs = subproblemResponses.map(r => r.allURLs.map(url => ({ url, title: '' } as BoostedSearchSnippet))).flat();
 
-        // break the loop, jump directly final boxing
-        break;
+          // TODO aggregate images @shazhou2015
+
+          // break the loop, jump directly final boxing
+          break;
+        } else {
+          // if there is only one subproblem, then we skip the recurrsion
+          gaps.push(subproblems[0]);
+        }
       }
 
       // rewrite queries with initial soundbites
