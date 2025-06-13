@@ -33,6 +33,7 @@ export type ImageReference = {
   relevanceScore?: number;
   answerChunk?: string;
   answerChunkPosition?: number[];
+  embedding?: number[][];
 }
 
 export type AnswerAction = BaseAction & {
@@ -42,6 +43,7 @@ export type AnswerAction = BaseAction & {
   isFinal?: boolean;
   mdAnswer?: string;
   isAggregated?: boolean;
+  imageReferences?: Array<ImageReference>;
 };
 
 

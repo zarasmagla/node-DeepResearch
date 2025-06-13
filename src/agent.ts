@@ -47,6 +47,7 @@ import { logInfo, logError, logDebug, logWarning } from './logging';
 import { researchPlan } from './tools/research-planner';
 import { reduceAnswers } from './tools/reducer';
 import { AxiosError } from 'axios';
+import { dedupImagesWithEmbeddings } from './utils/image-tools';
 
 async function wait(seconds: number) {
   logDebug(`Waiting ${seconds}s...`);
@@ -405,7 +406,7 @@ export async function getResponse(question?: string,
   searchProvider?: string,
   withImages: boolean = false,
   teamSize: number = 2
-): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[], allImages?: string[], relatedImages?: string[] }> {
+): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[], imageReferences?: ImageReference[] }> {
 
   let step = 0;
   let totalStep = 0;
@@ -465,7 +466,6 @@ export async function getResponse(question?: string,
   const visitedURLs: string[] = [];
   const badURLs: string[] = [];
   const imageObjects: ImageObject[] = [];
-  let imageReferences: ImageReference[] = [];
   const evaluationMetrics: Record<string, RepeatEvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
   const regularBudget = tokenBudget * 0.85;
@@ -815,6 +815,7 @@ But then you realized you have asked them before. You decided to to think out of
           answer: subproblemResponses.map(r => (r.result as AnswerAction).answer).join('\n\n'),
           mdAnswer: subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).join('\n\n'),
           references: subproblemResponses.map(r => (r.result as AnswerAction).references).flat(),
+          imageReferences: subproblemResponses.map(r => (r.result as AnswerAction).imageReferences).flat(),
           isFinal: true,
           isAggregated: true
         } as AnswerAction;
@@ -822,8 +823,6 @@ But then you realized you have asked them before. You decided to to think out of
         // aggregate urls
         visitedURLs.push(...subproblemResponses.map(r => r.readURLs).flat());
         weightedURLs = subproblemResponses.map(r => r.allURLs.map(url => ({ url, title: '' } as BoostedSearchSnippet))).flat();
-
-        // TODO aggregate images @shazhou2015
 
         // break the loop, jump directly final boxing
         break;
@@ -1076,16 +1075,20 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
     if (imageObjects.length && withImages) {
       try {
-        imageReferences = await buildImageReferences(answerStep.answer, imageObjects, context, SchemaGen);
-        logDebug('Image references built:', { imageReferences });
+        answerStep.imageReferences = await buildImageReferences(answerStep.answer, imageObjects, context, SchemaGen);
+        logDebug('Image references built:', { imageReferences: answerStep.imageReferences.map(i => ({url: i.url, score: i.relevanceScore, answerChunk: i.answerChunk})) });
       } catch (error) {
         logError('Error building image references:', { error });
-        imageReferences = [];
+        answerStep.imageReferences = [];
       }
     }
   } else if (answerStep.isAggregated) {
     answerStep.answer = await reduceAnswers(answerStep.answer, context, SchemaGen);
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
+    logDebug('[agent] all image references:', { count: answerStep.imageReferences?.length });
+    const dedupImages = dedupImagesWithEmbeddings(answerStep.imageReferences as ImageObject[], []);
+    logDebug('[agent] deduped images:', { count: dedupImages.length });
+    answerStep.imageReferences = answerStep.imageReferences?.filter(i => dedupImages.some(d => d.url === i.url)) || [];
   }
 
   // max return 300 urls
@@ -1096,8 +1099,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     visitedURLs: returnedURLs, // deprecated
     readURLs: visitedURLs.filter(url => !badURLs.includes(url)),
     allURLs: weightedURLs.map(r => r.url),
-    allImages: withImages ? imageObjects.map(i => i.url) : undefined,
-    relatedImages: withImages ? imageReferences.map(i => i.url) : undefined,
+    imageReferences: withImages ? (thisStep as AnswerAction).imageReferences : undefined,
   };
 }
 

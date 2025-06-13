@@ -575,8 +575,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
       visitedURLs,
       readURLs,
       allURLs,
-      allImages,
-      relatedImages,
+      imageReferences,
     } = await getResponse(undefined,
       tokenBudget,
       maxBadAttempts,
@@ -670,7 +669,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         visitedURLs,
         readURLs,
         numURLs: allURLs.length,
-        relatedImages
+        relatedImages: body.with_images ? (imageReferences?.map(ref => ref.url) || []) : undefined,
       };
       res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
       res.end();
@@ -697,7 +696,7 @@ app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
         visitedURLs,
         readURLs,
         numURLs: allURLs.length,
-        relatedImages,
+        relatedImages: body.with_images ? (imageReferences?.map(ref => ref.url) || []) : undefined,
       };
 
       logInfo(`[chat/completions] Completed!`, {

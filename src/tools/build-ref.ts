@@ -540,6 +540,7 @@ export async function buildImageReferences(
       return {
         url: source.url,
         relevanceScore: match.relevanceScore,
+        embedding: [allImageEmbeddings[match.imageIndex]],
         answerChunk: match.answerChunk,
         answerChunkPosition: match.answerChunkPosition
       };
