@@ -448,6 +448,7 @@ export async function getResponse(question?: string,
   const gaps: string[] = [question];  // All questions to be answered including the orginal question
   const allQuestions = [question];
   const allKeywords: string[] = [];
+  let candidateAnswers: string[] = [];
   const allKnowledge: KnowledgeItem[] = [];  // knowledge are intermedidate questions that are answered
 
   let diaryContext = [];
@@ -818,6 +819,7 @@ But then you realized you have asked them before. You decided to to think out of
           isFinal: true,
           isAggregated: true
         } as AnswerAction;
+        candidateAnswers = subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).filter(a => a) as string[];
 
         // aggregate urls
         visitedURLs.push(...subproblemResponses.map(r => r.readURLs).flat());
@@ -1084,7 +1086,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       }
     }
   } else if (answerStep.isAggregated) {
-    answerStep.answer = await reduceAnswers(answerStep.answer, context, SchemaGen);
+    answerStep.answer = await reduceAnswers(candidateAnswers, context, SchemaGen);
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
   }
 

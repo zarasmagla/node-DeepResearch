@@ -5,7 +5,7 @@ import { Schemas } from "../utils/schemas";
 import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
-function getPrompt(mdContent: string): PromptPair {
+function getPrompt(answers: string[]): PromptPair {
 
 
   return {
@@ -14,7 +14,7 @@ You are an article aggregator that creates a coherent, high-quality article by s
 
 <core-instructions>
 1. Content Preservation
-ALWAYS preserve original sentences verbatim - do not paraphrase or rewrite
+ALWAYS preserve original sentences verbatim - do not delete
 Select the highest quality version when multiple articles cover the same point
 Maintain the original author's voice and technical accuracy
 Keep direct quotes, statistics, and factual claims exactly as written
@@ -46,22 +46,29 @@ No attribution to individual sources (present as unified piece)
 
 Do not add your own commentary or analysis
 Do not change technical terms, names, or specific details
-
-Your final output should read as a cohesive, high-quality article that appears to be written by a single author, while actually being a careful curation of the best sentences from all input sources.
     `,
-    user: mdContent
+    user: `
+    Here are the answers to merge:
+${answers.map((a, i) => `
+<answer-${i + 1}>
+${a}
+</answer-${i + 1}>
+
+Your output should read as a coherent, high-quality article that appears to be written by a single author, while actually being a careful curation of the best sentences from all input sources.
+`).join('\n\n')}
+    `
   }
 }
 
 const TOOL_NAME = 'reducer';
 
 export async function reduceAnswers(
-  mdContent: string,
+  answers: string[],
   trackers: TrackerContext,
   schema: Schemas
 ): Promise<string> {
   try {
-    const prompt = getPrompt(mdContent);
+    const prompt = getPrompt(answers);
     trackers?.actionTracker.trackThink('reduce_answer', schema.languageCode)
 
     const result = await generateText({
@@ -71,25 +78,30 @@ export async function reduceAnswers(
     });
 
     trackers.tokenTracker.trackUsage(TOOL_NAME, result.usage)
+    const totalLength = answers.reduce((acc, curr) => acc + curr.length, 0);
+    const reducedLength = result.text.length;
 
 
-    logDebug(`${TOOL_NAME} before/after: ${mdContent.length} -> ${result.text.length}`, {
-      originalContent: mdContent,
+    logDebug(`${TOOL_NAME} before/after: ${totalLength} -> ${reducedLength}`, {
+      answers,
       reducedContent: result.text
     });
 
-    if (result.text.length < mdContent.length * 0.5) {
-      logWarning(`reduce content length ${result.text.length} is significantly shorter than original content ${mdContent.length}, return original content instead.`, {
-        originalContent: mdContent,
+
+    const reductionRatio = reducedLength / totalLength;
+    if (reductionRatio < 0.5) {
+      logWarning(`reduce content length ${reducedLength} is significantly shorter than original content ${totalLength}, return original content instead.`, {
+        originalContent: answers,
         repairedContent: result.text
       });
-      return mdContent;
+      // return simple join of answers
+      return answers.join('\n\n');
     }
 
     return result.text;
 
   } catch (error) {
     logError(TOOL_NAME, { error });
-    return mdContent;
+    return answers.join('\n\n');
   }
 }
