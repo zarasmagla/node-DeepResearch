@@ -134,6 +134,10 @@ export const dedupImagesWithEmbeddings = (
   similarityThreshold: number = 0.86, // Default similarity threshold
 ): ImageObject[] => {
   try {
+    if (newImages.length === 0) {
+      logWarning('No new images provided for deduplication');
+      return [];
+    }
     // Quick return for single new image with no existing images
     if (newImages.length === 1 && existingImages.length === 0) {
       return newImages;
