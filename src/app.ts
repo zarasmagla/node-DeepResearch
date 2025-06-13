@@ -15,6 +15,7 @@ import { ObjectGeneratorSafe } from "./utils/safe-generator";
 import { jsonSchema } from "ai"; // or another converter library
 import { normalizeHostName } from "./utils/url-tools";
 import { logInfo, logError, logDebug, logWarning } from './logging';
+import { body, validationResult } from 'express-validator';
 
 const app = express();
 
@@ -375,7 +376,21 @@ async function processQueue(streamingState: StreamingState, res: Response, reque
   streamingState.processingQueue = false;
 }
 
-app.post('/v1/chat/completions', (async (req: Request, res: Response) => {
+const validationRules = [
+  // Rule: messages is required and must be a string
+  body('messages')
+    .isArray({ min: 1 })
+    .withMessage('The "messages" parameter is required.'),
+];
+
+app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Response) => {
+  // Validate request body
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    logError('[chat/completions] Validation errors:', { errors: errors.array() });
+    return res.status(400).json({ error: 'Invalid request body', details: errors.array() });
+  }
+
   // Check authentication only if secret is set
   if (secret) {
     const authHeader = req.headers.authorization;
