@@ -21,7 +21,7 @@ interface GenerateObjectResult<T> {
 
 interface GenerateOptions<T> {
   model: ToolName;
-  schema: any;
+  schema: z.ZodType<T> | Schema<T>;
   prompt?: string;
   system?: string;
   messages?: CoreMessage[];
@@ -36,7 +36,10 @@ export class ObjectGeneratorSafe {
 
   constructor(tokenTracker?: TokenTracker, langfuse?: Langfuse) {
     this.tokenTracker = tokenTracker || new TokenTracker();
-    this.langfuse = langfuse || new Langfuse();
+    this.langfuse = langfuse || new Langfuse({
+      environment: process.env.NODE_ENV || 'development',
+      release: process.env.K_REVISION || 'unknown',
+    });
     this.ownLangfuse = !langfuse; // Track if we created our own instance
   }
 

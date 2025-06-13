@@ -21,8 +21,11 @@ import { Langfuse } from "langfuse";
 
 const app = express();
 
-// Create a shared Langfuse instance for the application
-const langfuse = new Langfuse();
+// Create a shared Langfuse instance for the application with environment and version info
+const langfuse = new Langfuse({
+  environment: process.env.NODE_ENV || 'development',
+  release: process.env.K_REVISION || 'unknown',
+});
 
 // Graceful shutdown handling
 process.on('SIGTERM', async () => {
