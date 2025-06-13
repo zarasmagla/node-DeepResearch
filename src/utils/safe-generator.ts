@@ -11,6 +11,7 @@ import Hjson from "hjson"; // Import Hjson library
 import { logger } from "../winston-logger";
 import { GoogleGenAIHelper } from "./google-genai-helper";
 import { ContentListUnion } from "@google/genai";
+import { cleanupLineBreaks, cleanupJsonString } from "./text-cleanup";
 
 interface GenerateObjectResult<T> {
   object: T;
@@ -207,9 +208,13 @@ export class ObjectGeneratorSafe {
         "Object not generated according to schema, fallback to manual parsing"
       );
       logger.error("error", error.text);
+
+      // Clean up line breaks from the error text before parsing
+      const cleanedText = cleanupJsonString(cleanupLineBreaks((error as any).text));
+
       try {
         // First try standard JSON parsing
-        const partialResponse = JSON.parse((error as any).text);
+        const partialResponse = JSON.parse(cleanedText);
         console.log("JSON parse success!");
         return {
           object: partialResponse as T,
@@ -218,7 +223,7 @@ export class ObjectGeneratorSafe {
       } catch (parseError) {
         // Use Hjson to parse the error response for more lenient parsing
         try {
-          const hjsonResponse = Hjson.parse((error as any).text);
+          const hjsonResponse = Hjson.parse(cleanedText);
           console.log("Hjson parse success!");
           return {
             object: hjsonResponse as T,

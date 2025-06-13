@@ -26,6 +26,8 @@ You always endorse answers in most readable natural language format.
 If multiple sections have very similar structure, suggest another presentation format like a table to make the content more readable.
 Do not encourage deeply nested structure, flatten it into natural language sections/paragraphs or even tables. Every table should use HTML table syntax <table> <thead> <tr> <th> <td> without any CSS styling.
 
+IMPORTANT: Write your response using clean, readable formatting. Use proper paragraph breaks only where needed for clarity. Avoid excessive line breaks or whitespace.
+
 The following knowledge items are provided for your reference. Note that some of them may not be directly related to the question/answer user provided, but may give some subtle hints and insights:
 ${KnowledgeStr.join('\n\n')}
 `,

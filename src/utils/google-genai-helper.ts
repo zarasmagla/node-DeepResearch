@@ -2,6 +2,7 @@ import { ContentListUnion, GenerateContentConfig, GoogleGenAI, SchemaUnion } fro
 import { GEMINI_API_KEY } from "../config";
 import { logger } from "../winston-logger";
 import { LanguageModelUsage } from "ai";
+import { cleanupLineBreaks } from "./text-cleanup";
 
 /**
  * Helper class for Google Gen AI operations
@@ -50,17 +51,26 @@ export class GoogleGenAIHelper {
                 },
             };
 
-            if (systemInstruction) {
-                config.systemInstruction = systemInstruction;
+            // Enhanced system instruction to prevent excessive line breaks
+            let enhancedSystemInstruction = systemInstruction || "";
+            if (!enhancedSystemInstruction.includes("line break") && !enhancedSystemInstruction.includes("formatting")) {
+                enhancedSystemInstruction += "\n\nIMPORTANT: Provide your response in clean, readable format without excessive line breaks or unnecessary whitespace. Use standard paragraph breaks (double line breaks) only where needed for clarity.";
             }
-            console.log('--------------------------------');
+
+            if (enhancedSystemInstruction) {
+                config.systemInstruction = enhancedSystemInstruction;
+            }
+
             const response = await ai.models.generateContent({
                 model,
                 contents: prompt,
                 config,
             });
 
-            const responseText = response.text || "{}";
+            let responseText = response.text || "{}";
+
+            // Clean up excessive line breaks before parsing
+            responseText = cleanupLineBreaks(responseText);
 
             let parsedObject: T;
 
@@ -77,7 +87,6 @@ export class GoogleGenAIHelper {
                 completionTokens: response.usageMetadata?.candidatesTokenCount || 0,
                 totalTokens: response.usageMetadata?.totalTokenCount || 0
             };
-            console.log('--------------------------------22222');
             return {
                 object: parsedObject,
                 usage
@@ -113,8 +122,14 @@ export class GoogleGenAIHelper {
                 temperature,
             };
 
-            if (systemInstruction) {
-                config.systemInstruction = systemInstruction;
+            // Enhanced system instruction to prevent excessive line breaks
+            let enhancedSystemInstruction = systemInstruction || "";
+            if (!enhancedSystemInstruction.includes("line break") && !enhancedSystemInstruction.includes("formatting")) {
+                enhancedSystemInstruction += "\n\nIMPORTANT: Provide your response in clean, readable format without excessive line breaks or unnecessary whitespace. Use standard paragraph breaks (double line breaks) only where needed for clarity.";
+            }
+
+            if (enhancedSystemInstruction) {
+                config.systemInstruction = enhancedSystemInstruction;
             }
 
             const response = await ai.models.generateContent({
@@ -123,7 +138,10 @@ export class GoogleGenAIHelper {
                 config,
             });
 
-            const responseText = response.text || "";
+            let responseText = response.text || "";
+
+            // Clean up excessive line breaks
+            responseText = cleanupLineBreaks(responseText);
 
             // Create usage estimate
             const usage: LanguageModelUsage = {
