@@ -89,8 +89,8 @@ export async function reduceAnswers(
 
 
     const reductionRatio = reducedLength / totalLength;
-    if (reductionRatio < 0.5) {
-      logWarning(`reduce content length ${reducedLength} is significantly shorter than original content ${totalLength}, return original content instead.`, {
+    if (reductionRatio < 0.6) {
+      logWarning(`reducer content length ${reducedLength} is significantly shorter than original content ${totalLength}, return original content instead.`, {
         originalContent: answers,
         repairedContent: result.text
       });
