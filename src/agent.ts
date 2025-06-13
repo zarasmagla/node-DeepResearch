@@ -1086,7 +1086,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       }
     }
   } else if (answerStep.isAggregated) {
-    answerStep.answer = await reduceAnswers(candidateAnswers, context, SchemaGen);
+    answerStep.answer = candidateAnswers.join('\n\n'); // await reduceAnswers(candidateAnswers, context, SchemaGen);
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
   }
 

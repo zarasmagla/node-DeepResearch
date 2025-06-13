@@ -2,7 +2,7 @@ import { PromptPair, TrackerContext } from '../types';
 import { getModel } from "../config";
 import { generateText } from "ai";
 import { Schemas } from "../utils/schemas";
-import { logInfo, logError, logDebug, logWarning } from '../logging';
+import { logError, logDebug, logWarning } from '../logging';
 
 
 function getPrompt(answers: string[]): PromptPair {
