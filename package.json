@@ -40,6 +40,7 @@
     "express": "^4.21.2",
     "hjson": "^3.2.2",
     "jsdom": "^26.0.0",
+    "langfuse": "^3.37.4",
     "node-cache": "^5.1.2",
     "node-fetch": "^3.3.2",
     "undici": "^7.3.0",

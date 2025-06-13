@@ -17,8 +17,29 @@ import { ObjectGeneratorSafe } from "./utils/safe-generator";
 import { normalizeHostName } from "./utils/url-tools";
 import { get_api_logger } from "./utils/structured-logger";
 import { logger } from "./winston-logger";
+import { Langfuse } from "langfuse";
 
 const app = express();
+
+// Create a shared Langfuse instance for the application with environment and version info
+const langfuse = new Langfuse({
+  environment: process.env.NODE_ENV || 'development',
+  release: process.env.K_REVISION || 'unknown',
+});
+
+// Graceful shutdown handling
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received, shutting down gracefully');
+  await langfuse.shutdownAsync();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received, shutting down gracefully');
+  await langfuse.shutdownAsync();
+  process.exit(0);
+});
+
 
 // Get secret from command line args for optional authentication
 const secret = process.argv

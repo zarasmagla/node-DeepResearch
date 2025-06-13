@@ -140,15 +140,12 @@ export class Schemas {
   getLanguagePrompt() {
     return `Must in the first-person in "lang:${this.languageCode}"; in the style of "${this.languageStyle}".`
   }
-  getLanguageSchema() {
-    return z.object({
-      langCode: z.string().describe('ISO 639-1 language code. Maximum 10 characters.'),
-      langStyle: z.string().describe('[vibe & tone] in [what language], such as formal english, informal chinese, technical german, humor english, slang, genZ, emojis etc. Maximum 100 characters.')
-    });
-  }
 
   getLanguageJsonSchema() {
-    return z.toJSONSchema(this.getLanguageSchema());
+    return z.toJSONSchema(z.object({
+      langCode: z.string().describe('ISO 639-1 language code. Maximum 10 characters.'),
+      langStyle: z.string().describe('[vibe & tone] in [what language], such as formal english, informal chinese, technical german, humor english, slang, genZ, emojis etc. Maximum 100 characters.')
+    }));
   }
 
   getQuestionEvaluateSchema() {

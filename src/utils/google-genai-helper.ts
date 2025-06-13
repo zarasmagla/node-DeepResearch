@@ -101,6 +101,7 @@ export class GoogleGenAIHelper {
     maxOutputTokens = 1000,
     temperature = 0.2,
     providerOptions,
+    langfuseGeneration,
   }: {
     model?: string;
     prompt: ContentListUnion;
@@ -109,6 +110,7 @@ export class GoogleGenAIHelper {
     maxOutputTokens?: number;
     temperature?: number;
     providerOptions?: Record<string, any>;
+    langfuseGeneration?: any; // Optional Langfuse generation for tracing
   }): Promise<{ object: T; usage: LanguageModelUsage }> {
     try {
       const ai = await this.getGoogleGenAI();
@@ -157,6 +159,22 @@ export class GoogleGenAIHelper {
         config.systemInstruction = preprocessInput(systemInstruction);
       }
 
+      // Add metadata to langfuse generation if provided
+      if (langfuseGeneration) {
+        langfuseGeneration.update({
+          metadata: {
+            ...langfuseGeneration.metadata,
+            actualModel: model,
+            configUsed: {
+              maxOutputTokens,
+              temperature,
+              responseMimeType: config.responseMimeType,
+            },
+            systemInstruction: config.systemInstruction,
+          },
+        });
+      }
+
       const response = await ai.models.generateContent({
         model,
         contents: processedPrompt,
@@ -174,6 +192,23 @@ export class GoogleGenAIHelper {
           "Failed to parse Google Gen AI response as JSON:",
           responseText
         );
+
+        // Log parsing error to langfuse if available
+        if (langfuseGeneration) {
+          langfuseGeneration.event({
+            name: "json-parse-error",
+            level: "ERROR",
+            metadata: {
+              error:
+                parseError instanceof Error
+                  ? parseError.message
+                  : String(parseError),
+              rawResponse: responseText.slice(0, 1000), // First 1000 chars
+              responseLength: responseText.length,
+            },
+          });
+        }
+
         throw new Error(`Invalid JSON response: ${responseText}`);
       }
 
@@ -183,12 +218,43 @@ export class GoogleGenAIHelper {
         completionTokens: response.usageMetadata?.candidatesTokenCount || 0,
         totalTokens: response.usageMetadata?.totalTokenCount || 0,
       };
+
+      // Log successful parsing to langfuse if available
+      if (langfuseGeneration) {
+        langfuseGeneration.event({
+          name: "successful-generation",
+          level: "DEFAULT",
+          metadata: {
+            responseLength: responseText.length,
+            parsedObjectType: typeof parsedObject,
+            usage,
+          },
+        });
+      }
+
       return {
         object: parsedObject,
         usage,
       };
     } catch (error) {
       logger.error("Google Gen AI generateObject failed:", error);
+
+      // Log error to langfuse if available
+      if (langfuseGeneration) {
+        langfuseGeneration.event({
+          name: "generation-error",
+          level: "ERROR",
+          metadata: {
+            error: error instanceof Error ? error.message : String(error),
+            errorType:
+              error instanceof Error ? error.constructor.name : "unknown",
+            model,
+            temperature,
+            maxOutputTokens,
+          },
+        });
+      }
+
       throw error;
     }
   }
@@ -202,12 +268,14 @@ export class GoogleGenAIHelper {
     systemInstruction,
     maxOutputTokens = 1000,
     temperature = 0.1,
+    langfuseGeneration,
   }: {
     model?: string;
     prompt: string;
     systemInstruction?: string;
     maxOutputTokens?: number;
     temperature?: number;
+    langfuseGeneration?: any; // Optional Langfuse generation for tracing
   }): Promise<{ text: string; usage: LanguageModelUsage }> {
     try {
       const ai = await this.getGoogleGenAI();
@@ -225,6 +293,21 @@ export class GoogleGenAIHelper {
         config.systemInstruction = preprocessInput(systemInstruction);
       }
 
+      // Add metadata to langfuse generation if provided
+      if (langfuseGeneration) {
+        langfuseGeneration.update({
+          metadata: {
+            ...langfuseGeneration.metadata,
+            actualModel: model,
+            configUsed: {
+              maxOutputTokens,
+              temperature,
+            },
+            systemInstruction: config.systemInstruction,
+          },
+        });
+      }
+
       const response = await ai.models.generateContent({
         model,
         contents: processedPrompt,
@@ -240,12 +323,41 @@ export class GoogleGenAIHelper {
         totalTokens: response.usageMetadata?.totalTokenCount || 0,
       };
 
+      // Log successful generation to langfuse if available
+      if (langfuseGeneration) {
+        langfuseGeneration.event({
+          name: "successful-text-generation",
+          level: "DEFAULT",
+          metadata: {
+            responseLength: responseText.length,
+            usage,
+          },
+        });
+      }
+
       return {
         text: responseText,
         usage,
       };
     } catch (error) {
       logger.error("Google Gen AI generateText failed:", error);
+
+      // Log error to langfuse if available
+      if (langfuseGeneration) {
+        langfuseGeneration.event({
+          name: "text-generation-error",
+          level: "ERROR",
+          metadata: {
+            error: error instanceof Error ? error.message : String(error),
+            errorType:
+              error instanceof Error ? error.constructor.name : "unknown",
+            model,
+            temperature,
+            maxOutputTokens,
+          },
+        });
+      }
+
       throw error;
     }
   }
