@@ -170,13 +170,13 @@ export class ObjectGeneratorSafe {
         prompt: prompt
           ? prompt
           : (messages?.map((message) => ({
-              role: message.role === "assistant" ? "model" : message.role,
-              parts: [
-                {
-                  text: message.content,
-                },
-              ],
-            })) as ContentListUnion),
+            role: message.role === "assistant" ? "model" : message.role,
+            parts: [
+              {
+                text: message.content,
+              },
+            ],
+          })) as ContentListUnion),
         systemInstruction: system,
         maxOutputTokens: getToolConfig(model).maxTokens,
         providerOptions,
@@ -258,8 +258,7 @@ export class ObjectGeneratorSafe {
 
         if (numRetries > 0) {
           logger.error(
-            `${model} failed on object generation -> manual parsing failed -> retry with ${
-              numRetries - 1
+            `${model} failed on object generation -> manual parsing failed -> retry with ${numRetries - 1
             } retries remaining`
           );
 

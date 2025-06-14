@@ -306,11 +306,13 @@ export interface ChatCompletionChunk {
 import { TokenTracker } from './utils/token-tracker';
 import { ActionTracker } from './utils/action-tracker';
 import { StructuredLogger } from './utils/structured-logger';
+import { Langfuse } from 'langfuse';
 
 export interface TrackerContext {
   tokenTracker: TokenTracker;
   actionTracker: ActionTracker;
   logger: StructuredLogger;
+  langfuse: Langfuse;
   verification_id?: string;
 }
 

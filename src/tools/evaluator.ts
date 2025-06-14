@@ -563,11 +563,40 @@ ${question}
 export async function evaluateQuestion(
   question: string,
   trackers: TrackerContext,
-  schemaGen: Schemas
+  schemaGen: Schemas,
+  parentTrace?: any
 ): Promise<EvaluationType[]> {
+  // Use parent trace if provided, otherwise create a new trace using context langfuse
+  const evaluationSpan = parentTrace
+    ? parentTrace.span({
+      name: "question-evaluation",
+      input: {
+        question,
+      },
+    })
+    : trackers.langfuse.trace({
+      name: "question-evaluation",
+      input: {
+        question,
+      },
+      tags: ["evaluation", "question-analysis"],
+    });
+
   try {
-    const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
+    const generator = new ObjectGeneratorSafe(trackers.tokenTracker, trackers.langfuse);
     const prompt = getQuestionEvaluationPrompt(question);
+
+    const evaluationGeneration = evaluationSpan.generation({
+      name: "question-evaluation-generation",
+      model: TOOL_NAME,
+      input: {
+        prompt: prompt.user,
+        system: prompt.system,
+      },
+      metadata: {
+        evaluationType: "question-requirements",
+      },
+    });
 
     const result = await generator.generateObject<{ needsDefinitive: boolean, needsFreshness: boolean, needsPlurality: boolean, needsCompleteness: boolean, think: string }>({
       model: TOOL_NAME,
@@ -595,11 +624,49 @@ export async function evaluateQuestion(
     logger.info('Question Metrics:', question, types);
     trackers?.actionTracker.trackThink(result.object.think);
 
+    evaluationGeneration.end({
+      output: {
+        evaluationTypes: types,
+        reasoning: result.object.think,
+        requirements: {
+          needsDefinitive: result.object.needsDefinitive,
+          needsFreshness: result.object.needsFreshness,
+          needsPlurality: result.object.needsPlurality,
+          needsCompleteness: result.object.needsCompleteness,
+        },
+      },
+      usage: result.usage,
+    });
+
+    evaluationSpan.end({
+      output: {
+        evaluationTypes: types,
+        totalRequirements: types.length,
+      },
+    });
+
     // Always evaluate definitive first, then freshness (if needed), then plurality (if needed)
     return types;
 
   } catch (error) {
     logger.error('Error in question evaluation:', error);
+
+    evaluationSpan.event({
+      name: "question-evaluation-error",
+      level: "ERROR",
+      metadata: {
+        error: error instanceof Error ? error.message : String(error),
+        errorType: error instanceof Error ? error.constructor.name : "unknown",
+      },
+    });
+
+    evaluationSpan.end({
+      output: {
+        error: true,
+        evaluationTypes: [],
+      },
+    });
+
     // Default to no check
     return [];
   }
@@ -610,8 +677,23 @@ async function performEvaluation<T>(
   evaluationType: EvaluationType,
   prompt: PromptPair,
   trackers: TrackerContext,
-  schemaGen: Schemas
+  schemaGen: Schemas,
+  parentSpan?: any
 ): Promise<GenerateObjectResult<T>> {
+  // Create a generation for the specific evaluation
+  const evaluationGeneration = parentSpan?.generation({
+    name: `${evaluationType}-evaluation-generation`,
+    model: TOOL_NAME,
+    input: {
+      evaluationType,
+      prompt: prompt.user,
+      system: prompt.system,
+    },
+    metadata: {
+      evaluationType,
+    },
+  });
+
   const generator = new ObjectGeneratorSafe(trackers.tokenTracker);
   const result = await generator.generateObject<{ type: EvaluationType, think: string, pass: boolean }>({
     model: TOOL_NAME,
@@ -631,6 +713,17 @@ async function performEvaluation<T>(
 
   console.log(`${evaluationType} ${TOOL_NAME}`, result.object);
 
+  if (evaluationGeneration) {
+    evaluationGeneration.end({
+      output: {
+        evaluationType: result.object.type,
+        passed: result.object.pass,
+        reasoning: result.object.think,
+      },
+      usage: result.usage,
+    });
+  }
+
   return {
     ...result,
     object: {
@@ -648,10 +741,41 @@ export async function evaluateAnswer(
   evaluationTypes: EvaluationType[],
   trackers: TrackerContext,
   allKnowledge: KnowledgeItem[],
-  schemaGen: Schemas
+  schemaGen: Schemas,
+  parentTrace?: any
 ): Promise<EvaluationResponse> {
   const logger = get_tools_logger();
   const startTime = Date.now();
+
+  // Use parent trace if provided, otherwise create a new trace using context langfuse
+  const evaluationSpan = parentTrace
+    ? parentTrace.span({
+      name: "answer-evaluation",
+      input: {
+        question,
+        answer: action.answer,
+        evaluationTypes,
+      },
+      metadata: {
+        answerLength: action.answer?.length || 0,
+        hasReferences: (action.references?.length || 0) > 0,
+        referencesCount: action.references?.length || 0,
+      },
+    })
+    : trackers.langfuse.trace({
+      name: "answer-evaluation",
+      input: {
+        question,
+        answer: action.answer,
+        evaluationTypes,
+      },
+      metadata: {
+        answerLength: action.answer?.length || 0,
+        hasReferences: (action.references?.length || 0) > 0,
+        referencesCount: action.references?.length || 0,
+      },
+      tags: ["evaluation", "answer-assessment"],
+    });
 
   logger.info("Starting answer evaluation", {
     verification_id: trackers.verification_id,
@@ -666,8 +790,17 @@ export async function evaluateAnswer(
 
   let result;
 
-
   for (const evaluationType of evaluationTypes) {
+    // Create a span for each evaluation type
+    const evaluationTypeSpan = evaluationSpan.span({
+      name: `${evaluationType}-evaluation`,
+      input: {
+        evaluationType,
+        question,
+        answer: action.answer,
+      },
+    });
+
     let prompt: { system: string; user: string } | undefined
     switch (evaluationType) {
 
@@ -689,18 +822,42 @@ export async function evaluateAnswer(
       default:
         console.error(`Unknown evaluation type: ${evaluationType}`);
     }
+
     if (prompt) {
       result = await performEvaluation(
         evaluationType,
         prompt,
         trackers,
-        schemaGen
+        schemaGen,
+        evaluationTypeSpan
       );
+
+      evaluationTypeSpan.end({
+        output: {
+          passed: (result?.object as EvaluationResponse)?.pass,
+          reasoning: (result?.object as EvaluationResponse)?.think,
+        },
+      });
 
       // fail one, return immediately
       if (!(result?.object as EvaluationResponse)?.pass) {
+        evaluationSpan.end({
+          output: {
+            finalResult: "failed",
+            failedAt: evaluationType,
+            passed: false,
+            reasoning: (result?.object as EvaluationResponse)?.think,
+          },
+        });
+
         return result?.object as EvaluationResponse;
       }
+    } else {
+      evaluationTypeSpan.end({
+        output: {
+          error: "unknown_evaluation_type",
+        },
+      });
     }
   }
 
@@ -713,10 +870,18 @@ export async function evaluateAnswer(
     duration_ms: Date.now() - startTime,
     metadata: {
       evaluationType: finalResult?.type || "unknown",
-      evaluationReason: finalResult?.think?.substring(0, 100) + (finalResult?.think && finalResult.think.length > 100 ? "..." : ""),
+      evaluationReason: finalResult?.think,
     }
   });
 
-  return finalResult;
+  evaluationSpan.end({
+    output: {
+      finalResult: "passed_all",
+      passed: finalResult?.pass || false,
+      totalEvaluations: evaluationTypes.length,
+      finalEvaluationType: finalResult?.type,
+    },
+  });
 
+  return finalResult;
 }

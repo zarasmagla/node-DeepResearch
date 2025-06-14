@@ -525,8 +525,6 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     try {
       console.log(body.response_format);
       responseSchema = body.response_format;
-      const jsonString = responseSchema;
-      logger.info("responseSchema", jsonString);
     } catch (error: any) {
       return res
         .status(400)
@@ -542,6 +540,7 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     tokenTracker: new TokenTracker(),
     actionTracker: new ActionTracker(),
     logger: apiLogger,
+    langfuse,
     verification_id,
   };
 
@@ -678,8 +677,7 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
 
     if (responseSchema) {
       try {
-        const generator = new ObjectGeneratorSafe(context?.tokenTracker);
-        console.log("responseSchema", responseSchema);
+        const generator = new ObjectGeneratorSafe(context?.tokenTracker, langfuse);
         const result = await generator.generateObject({
           model: "agent",
           schema: responseSchema,
@@ -808,16 +806,6 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         numURLs: allURLs.length,
       };
 
-      // Log final response (excluding full content for brevity)
-      console.log("[chat/completions] Response:", {
-        id: response.id,
-        status: 200,
-        contentLength: response.choices[0].message.content.length,
-        usage: response.usage,
-        visitedURLs: response.visitedURLs,
-        readURLs: response.readURLs,
-        numURLs: allURLs.length,
-      });
 
       // Structured logging for successful completion
       apiLogger.api_request(
@@ -839,7 +827,7 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     }
   } catch (error: any) {
     // Log error details
-    console.error("[chat/completions] Error:", {
+    logger.error("[chat/completions] Error:", {
       message: error?.message || "An error occurred",
       stack: error?.stack,
       type: error?.constructor?.name,

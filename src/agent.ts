@@ -63,6 +63,7 @@ import { reviseAnswer } from "./tools/md-fixer";
 import { buildReferences } from "./tools/build-ref";
 import { get_agent_logger } from "./utils/structured-logger";
 import { logger } from "./winston-logger";
+import { Langfuse } from "langfuse";
 
 async function sleep(ms: number) {
   const seconds = Math.ceil(ms / 1000);
@@ -76,35 +77,33 @@ function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
   knowledge.forEach((k) => {
     messages.push({ role: "user", content: k.question.trim() });
     const aMsg = `
-${
-  k.updated && (k.type === "url" || k.type === "side-info")
-    ? `
+${k.updated && (k.type === "url" || k.type === "side-info")
+        ? `
 <answer-datetime>
 ${k.updated}
 </answer-datetime>
 `
-    : ""
-}
+        : ""
+      }
 
-${
-  k.references && (k.type === "url" || k.type === "side-info")
-    ? `
+${k.references && (k.type === "url" || k.type === "side-info")
+        ? `
 <references>
 ${k.references
-  .map(
-    (ref) => `
+          .map(
+            (ref) => `
 {
   "url": "${ref.url}",
   "title": "${ref.title || ""}",
   "exactQuote": "${ref.exactQuote || ""}",
 }
 `
-  )
-  .join(",")}
+          )
+          .join(",")}
 </references>
 `
-    : ""
-}
+        : ""
+      }
 
 
 ${k.answer}
@@ -126,25 +125,24 @@ function composeMsgs(
   const userContent = `
 ${question}
 
-${
-  finalAnswerPIP?.length
-    ? `
+${finalAnswerPIP?.length
+      ? `
 <answer-requirements>
 - You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
 - You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
 - Follow reviewer's feedback and improve your answer quality.
 ${finalAnswerPIP
-  .map(
-    (p, idx) => `
+        .map(
+          (p, idx) => `
 <reviewer-${idx + 1}>
 ${p}
 </reviewer-${idx + 1}>
 `
-  )
-  .join("\n")}
+        )
+        .join("\n")}
 </answer-requirements>`
-    : ""
-}
+      : ""
+    }
     `.trim();
 
   msgs.push({ role: "user", content: removeExtraLineBreaks(userContent) });
@@ -192,8 +190,7 @@ ${context.join("\n")}
     const urlListStr = urlList
       .map(
         (item, idx) =>
-          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${
-            item.url
+          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${item.url
           }": "${item.merged.slice(0, 50)}"`
       )
       .join("\n");
@@ -217,16 +214,15 @@ ${urlListStr}
 - Use web search to find relevant information
 - Build a search request based on the deep intention behind the original question and the expected answer format
 - Always prefer a single search request, only add another request if the original question covers multiple aspects or elements and one query is not enough, each request focus on one specific aspect of the original question 
-${
-  allKeywords?.length
-    ? `
+${allKeywords?.length
+        ? `
 - Avoid those unsuccessful search requests and queries:
 <bad-requests>
 ${allKeywords.join("\n")}
 </bad-requests>
 `.trim()
-    : ""
-}
+        : ""
+      }
 </action-search>
 `);
   }
@@ -332,7 +328,6 @@ async function updateReferences(
       })
   );
 
-  console.log("Updated references:", thisStep.references);
 }
 
 async function executeSearchQueries(
@@ -541,13 +536,42 @@ export async function getResponse(
 
   const SchemaGen = new Schemas();
   await SchemaGen.setLanguage(languageCode || question);
+
   const context: TrackerContext = {
     tokenTracker:
       existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker(),
     logger: existingContext?.logger || get_agent_logger(),
+    langfuse: existingContext?.langfuse || new Langfuse({
+      environment: process.env.NODE_ENV || 'development',
+      release: process.env.K_REVISION || 'unknown',
+    }),
     verification_id: existingContext?.verification_id,
   };
+
+  // Create a root trace for the entire agent workflow using the shared langfuse instance
+  const agentTrace = context.langfuse.trace({
+    name: "agent-workflow",
+    input: {
+      question,
+      tokenBudget,
+      maxBadAttempts,
+      hasMessages: !!messages?.length,
+      boostHostnames,
+      badHostnames,
+      onlyHostnames,
+      maxRef,
+      minRelScore,
+      languageCode,
+    },
+    metadata: {
+      workflowType: "deep-research-agent",
+      version: "v1",
+      numReturnedURLs,
+      noDirectAnswer,
+    },
+    tags: ["agent", "deep-research", "multi-step"],
+  });
 
   // Log the start of agent processing
   context.logger.agent_step(
@@ -557,15 +581,22 @@ export async function getResponse(
     undefined,
     {
       question:
-        question?.substring(0, 100) +
-        (question && question.length > 100 ? "..." : ""),
+        question,
       tokenBudget,
       maxBadAttempts,
       hasMessages: !!messages?.length,
     }
   );
 
-  const generator = new ObjectGeneratorSafe(context.tokenTracker);
+  // Create a span for agent setup and initialization
+  const setupSpan = agentTrace.span({
+    name: "agent-setup",
+    input: {
+      languageDetection: question
+    },
+  });
+
+  const generator = new ObjectGeneratorSafe(context.tokenTracker, context.langfuse);
 
   let schema: any = SchemaGen.getAgentSchema(true, true, true, true, true);
   const gaps: string[] = [question]; // All questions to be answered including the orginal question
@@ -618,10 +649,43 @@ export async function getResponse(
     });
   });
 
+  setupSpan.end({
+    output: {
+      detectedLanguage: SchemaGen.languageCode,
+      languageStyle: SchemaGen.languageStyle,
+      initialURLs: Object.keys(allURLs).length,
+      gaps: gaps.length,
+    },
+  });
+
   while (context.tokenTracker.getTotalUsage().totalTokens < regularBudget) {
     // add 1s delay to avoid rate limiting
     step++;
     totalStep++;
+
+    // Create a span for each agent step
+    const stepSpan = agentTrace.span({
+      name: `agent-step-${totalStep}`,
+      input: {
+        step: totalStep,
+        currentQuestion: gaps[totalStep % gaps.length],
+        budgetUsed: context.tokenTracker.getTotalUsage().totalTokens,
+        budgetPercentage: ((context.tokenTracker.getTotalUsage().totalTokens / tokenBudget) * 100).toFixed(2),
+        allowedActions: {
+          answer: allowAnswer,
+          search: allowSearch,
+          read: allowRead,
+          reflect: allowReflect,
+          coding: allowCoding,
+        },
+      },
+      metadata: {
+        gapsRemaining: gaps.length,
+        urlsAvailable: weightedURLs.length,
+        knowledgeItems: allKnowledge.length,
+      },
+    });
+
     const budgetPercentage = (
       (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget) *
       100
@@ -638,7 +702,7 @@ export async function getResponse(
     if (currentQuestion.trim() === question && totalStep === 1) {
       // only add evaluation for initial question, once at step 1
       evaluationMetrics[currentQuestion] = (
-        await evaluateQuestion(currentQuestion, context, SchemaGen)
+        await evaluateQuestion(currentQuestion, context, SchemaGen, agentTrace)
       ).map((e) => {
         return {
           type: e,
@@ -709,6 +773,24 @@ export async function getResponse(
       currentQuestion,
       currentQuestion === question ? finalAnswerPIP : undefined
     );
+
+    // Create a generation span for the agent decision
+    const decisionGeneration = stepSpan.generation({
+      name: "agent-decision",
+      model: "agent",
+      input: {
+        system: system,
+        currentQuestion,
+        messagesCount: msgWithKnowledge.length,
+      },
+      metadata: {
+        allowedActions: [allowReflect, allowRead, allowAnswer, allowSearch, allowCoding]
+          .map((allowed, idx) => allowed ? ["reflect", "read", "answer", "search", "coding"][idx] : null)
+          .filter(Boolean),
+        schemaType: "agent-action",
+      },
+    });
+
     const result = await generator.generateObject<StepAction>({
       model: "agent",
       schema,
@@ -723,11 +805,21 @@ export async function getResponse(
         },
       },
     });
+
     thisStep = {
       action: result.object.action,
       think: result.object.think,
       ...(result.object as any)[result.object.action],
     } as StepAction;
+
+    decisionGeneration.end({
+      output: {
+        action: thisStep.action,
+        think: thisStep.think,
+      },
+      usage: result.usage,
+    });
+
     // print allowed and chose action
     const actionsStr = [
       allowSearch,
@@ -760,6 +852,13 @@ export async function getResponse(
         // however, if it does give any reference, it must be evaluated, case study: "How to configure a timeout when loading a huggingface dataset with python?"
         thisStep.isFinal = true;
         trivialQuestion = true;
+        stepSpan.end({
+          output: {
+            action: thisStep.action,
+            result: "direct_answer_provided",
+            isFinal: true,
+          },
+        });
         break;
       }
 
@@ -790,6 +889,19 @@ export async function getResponse(
       let evaluation: EvaluationResponse = { pass: true, think: "" };
       if (evaluationMetrics[currentQuestion].length > 0) {
         context.actionTracker.trackThink("eval_first", SchemaGen.languageCode);
+
+        // Create a span for answer evaluation
+        const evaluationSpan = stepSpan.span({
+          name: "answer-evaluation",
+          input: {
+            question: currentQuestion,
+            answer: thisStep.answer,
+            evaluationTypes: evaluationMetrics[currentQuestion]
+              .filter((e) => e.numEvalsRequired > 0)
+              .map((e) => e.type),
+          },
+        });
+
         evaluation =
           (await evaluateAnswer(
             currentQuestion,
@@ -799,8 +911,17 @@ export async function getResponse(
               .map((e) => e.type),
             context,
             allKnowledge,
-            SchemaGen
+            SchemaGen,
+            agentTrace
           )) || evaluation;
+
+        evaluationSpan.end({
+          output: {
+            passed: evaluation.pass,
+            evaluationType: evaluation.type,
+            feedback: evaluation.think,
+          },
+        });
       }
 
       if (currentQuestion.trim() === question) {
@@ -823,6 +944,14 @@ ${evaluation.think}
 Your journey ends here. You have successfully answered the original question. Congratulations! 🎉
 `);
           thisStep.isFinal = true;
+          stepSpan.end({
+            output: {
+              action: thisStep.action,
+              result: "final_answer_accepted",
+              isFinal: true,
+              evaluationPassed: true,
+            },
+          });
           break;
         } else {
           // lower numEvalsRequired for the failed evaluation and if numEvalsRequired is 0, remove it from the evaluation metrics
@@ -844,6 +973,13 @@ Your journey ends here. You have successfully answered the original question. Co
           if (evaluationMetrics[currentQuestion].length === 0) {
             // failed so many times, give up, route to beast mode
             thisStep.isFinal = false;
+            stepSpan.end({
+              output: {
+                action: thisStep.action,
+                result: "evaluation_failed_max_attempts",
+                evaluationsRemaining: 0,
+              },
+            });
             break;
           }
 
@@ -893,6 +1029,14 @@ ${errorAnalysis.improvement}
           allowAnswer = false; // disable answer action in the immediate next step
           diaryContext = [];
           step = 0;
+
+          stepSpan.end({
+            output: {
+              action: thisStep.action,
+              result: "answer_rejected_retrying",
+              evaluationsRemaining: evaluationMetrics[currentQuestion].length,
+            },
+          });
         }
       } else if (evaluation.pass) {
         // solved a gap question
@@ -918,6 +1062,14 @@ Although you solved a sub-question, you still need to find the answer to the ori
         });
         // solved sub-question!
         gaps.splice(gaps.indexOf(currentQuestion), 1);
+
+        stepSpan.end({
+          output: {
+            action: thisStep.action,
+            result: "sub_question_answered",
+            remainingGaps: gaps.length,
+          },
+        });
       }
     } else if (thisStep.action === "reflect" && thisStep.questionsToAnswer) {
       thisStep.questionsToAnswer = chooseK(
@@ -946,6 +1098,15 @@ You will now figure out the answers to these sub-questions and see if they can h
           totalStep,
           ...thisStep,
         });
+
+        stepSpan.end({
+          output: {
+            action: thisStep.action,
+            result: "new_sub_questions_identified",
+            newQuestions: newGapQuestions,
+            totalGaps: gaps.length,
+          },
+        });
       } else {
         diaryContext.push(`
 At step ${step}, you took **reflect** and think about the knowledge gaps. You tried to break down the question "${currentQuestion}" into gap-questions like this: ${newGapQuestions.join(
@@ -959,9 +1120,25 @@ But then you realized you have asked them before. You decided to to think out of
           result:
             "You have tried all possible questions and found no useful information. You must think out of the box or different angle!!!",
         });
+
+        stepSpan.end({
+          output: {
+            action: thisStep.action,
+            result: "no_new_questions_generated",
+          },
+        });
       }
       allowReflect = false;
     } else if (thisStep.action === "search" && thisStep.searchRequests) {
+      // Create a span for search operations
+      const searchSpan = stepSpan.span({
+        name: "search-operation",
+        input: {
+          searchRequests: thisStep.searchRequests,
+          provider: SEARCH_PROVIDER,
+        },
+      });
+
       // dedup search requests
       thisStep.searchRequests = chooseK(
         (await dedupQueries(thisStep.searchRequests, [], context.tokenTracker))
@@ -1023,8 +1200,8 @@ But then you realized you have asked them before. You decided to to think out of
           diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords: "${keywordsQueries
-            .map((q) => q.q)
-            .join(", ")}".
+              .map((q) => q.q)
+              .join(", ")}".
 You found quite some information and add them to your URL list and **visit** them later when needed. 
 `);
 
@@ -1036,12 +1213,22 @@ You found quite some information and add them to your URL list and **visit** the
           });
         }
       }
+
+      searchSpan.end({
+        output: {
+          searchedQueries,
+          newURLsFound: newKnowledge.length,
+          totalURLs: Object.keys(allURLs).length,
+          anyResult,
+        },
+      });
+
       if (!anyResult || !keywordsQueries?.length) {
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords:  "${keywordsQueries
-          .map((q) => q.q)
-          .join(", ")}".
+            .map((q) => q.q)
+            .join(", ")}".
 But then you realized you have already searched for these keywords before, no new information is returned.
 You decided to think out of the box or cut from a completely different angle.
 `);
@@ -1051,6 +1238,21 @@ You decided to think out of the box or cut from a completely different angle.
           ...thisStep,
           result:
             "You have tried all possible queries and found no new information. You must think out of the box or different angle!!!",
+        });
+
+        stepSpan.end({
+          output: {
+            action: thisStep.action,
+            result: "no_new_search_results",
+          },
+        });
+      } else {
+        stepSpan.end({
+          output: {
+            action: thisStep.action,
+            result: "search_successful",
+            newURLsFound: newKnowledge.length,
+          },
         });
       }
       allowSearch = false;
@@ -1062,6 +1264,15 @@ You decided to think out of the box or cut from a completely different angle.
       thisStep.URLTargets?.length &&
       urlList?.length
     ) {
+      // Create a span for URL visiting operations
+      const visitSpan = stepSpan.span({
+        name: "visit-urls",
+        input: {
+          urlTargets: thisStep.URLTargets,
+          availableURLs: urlList?.length || 0,
+        },
+      });
+
       // normalize URLs
       thisStep.URLTargets = (thisStep.URLTargets as number[])
         .map((idx) => normalizeUrl(urlList[idx - 1]))
@@ -1101,15 +1312,23 @@ You found some useful information on the web and add them to your knowledge for 
           totalStep,
           ...(success
             ? {
-                question: currentQuestion,
-                ...thisStep,
-                result: urlResults,
-              }
+              question: currentQuestion,
+              ...thisStep,
+              result: urlResults,
+            }
             : {
-                ...thisStep,
-                result:
-                  "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
-              }),
+              ...thisStep,
+              result:
+                "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
+            }),
+        });
+
+        visitSpan.end({
+          output: {
+            urlsProcessed: uniqueURLs.length,
+            successful: success,
+            newKnowledgeItems: success ? urlResults.length : 0,
+          },
         });
       } else {
         diaryContext.push(`
@@ -1122,9 +1341,30 @@ You decided to think out of the box or cut from a completely different angle.`);
           result:
             "You have visited all possible URLs and found no new information. You must think out of the box or different angle!!!",
         });
+
+        visitSpan.end({
+          output: {
+            result: "no_new_urls_to_visit",
+          },
+        });
       }
       allowRead = false;
+
+      stepSpan.end({
+        output: {
+          action: thisStep.action,
+          result: uniqueURLs.length > 0 ? "urls_processed" : "no_urls_available",
+        },
+      });
     } else if (thisStep.action === "coding" && thisStep.codingIssue) {
+      // Create a span for coding operations
+      const codingSpan = stepSpan.span({
+        name: "coding-solution",
+        input: {
+          codingIssue: thisStep.codingIssue,
+        },
+      });
+
       const sandbox = new CodeSandbox(
         { allContext, URLs: weightedURLs.slice(0, 20), allKnowledge },
         context,
@@ -1148,6 +1388,21 @@ You found the solution and add it to your knowledge for future reference.
           ...thisStep,
           result: result,
         });
+
+        codingSpan.end({
+          output: {
+            success: true,
+            solution: result.solution.output,
+            codeLength: result.solution.code.length,
+          },
+        });
+
+        stepSpan.end({
+          output: {
+            action: thisStep.action,
+            result: "coding_solution_found",
+          },
+        });
       } catch (error) {
         console.log("Error solving coding issue:", error);
         diaryContext.push(`
@@ -1160,9 +1415,31 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
           result:
             "You have tried all possible solutions and found no new information. You must think out of the box or different angle!!!",
         });
+
+        codingSpan.end({
+          output: {
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        });
+
+        stepSpan.end({
+          output: {
+            action: thisStep.action,
+            result: "coding_solution_failed",
+          },
+        });
       } finally {
         allowCoding = false;
       }
+    } else {
+      // Handle unknown action
+      stepSpan.end({
+        output: {
+          action: thisStep.action,
+          result: "unknown_action",
+        },
+      });
     }
 
     await storeContext(
@@ -1183,6 +1460,17 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
   if (!(thisStep as AnswerAction).isFinal) {
     console.log("Enter Beast mode!!!");
+
+    // Create a span for beast mode
+    const beastModeSpan = agentTrace.span({
+      name: "beast-mode-final-answer",
+      input: {
+        reason: "regular_budget_exhausted_or_max_attempts_reached",
+        budgetUsed: context.tokenTracker.getTotalUsage().totalTokens,
+        regularBudget,
+      },
+    });
+
     // any answer is better than no answer, humanity last resort
     step++;
     totalStep++;
@@ -1214,6 +1502,16 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       question,
       finalAnswerPIP
     );
+
+    const beastGeneration = beastModeSpan.generation({
+      name: "beast-mode-generation",
+      model: "agentBeastMode",
+      input: {
+        finalAnswerPIP: finalAnswerPIP.join(" | "),
+        knowledgeItems: allKnowledge.length,
+      },
+    });
+
     const result = await generator.generateObject<StepAction>({
       model: "agentBeastMode",
       schema,
@@ -1236,7 +1534,31 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     // await updateReferences(thisStep, allURLs);
     (thisStep as AnswerAction).isFinal = true;
     context.actionTracker.trackAction({ totalStep, thisStep, gaps });
+
+    beastGeneration.end({
+      output: {
+        action: thisStep.action,
+        answerLength: (thisStep as AnswerAction).answer?.length || 0,
+      },
+      usage: result.usage,
+    });
+
+    beastModeSpan.end({
+      output: {
+        finalAnswer: true,
+        answerLength: (thisStep as AnswerAction).answer?.length || 0,
+      },
+    });
   }
+
+  // Create a span for post-processing
+  const postProcessSpan = agentTrace.span({
+    name: "post-processing",
+    input: {
+      trivialQuestion,
+      hasAnswer: !!(thisStep as AnswerAction).answer,
+    },
+  });
 
   const answerStep = thisStep as AnswerAction;
 
@@ -1283,6 +1605,14 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     answerStep.mdAnswer = buildMdFromAnswer(answerStep);
   }
 
+  postProcessSpan.end({
+    output: {
+      finalAnswerLength: answerStep.answer?.length || 0,
+      referencesCount: answerStep.references?.length || 0,
+      processingApplied: !trivialQuestion,
+    },
+  });
+
   // Log completion of agent processing
   context.logger.agent_step(
     "completed_processing",
@@ -1298,12 +1628,34 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     },
     {
       question:
-        question?.substring(0, 100) +
-        (question && question.length > 100 ? "..." : ""),
+        question,
       totalSteps: totalStep,
       trivialQuestion,
     }
   );
+
+  // Update the agent trace with final results
+  agentTrace.update({
+    output: {
+      finalAnswer: answerStep.answer,
+      answerLength: answerStep.answer?.length || 0,
+      referencesCount: answerStep.references?.length || 0,
+      totalSteps: totalStep,
+      visitedURLsCount: visitedURLs.length,
+      trivialQuestion,
+      isFinal: answerStep.isFinal,
+    },
+    metadata: {
+      tokensUsed: context.tokenTracker.getTotalUsage().totalTokens,
+      tokenBudget,
+      budgetUtilization: ((context.tokenTracker.getTotalUsage().totalTokens / tokenBudget) * 100).toFixed(2) + "%",
+      evaluationMetrics: Object.keys(evaluationMetrics),
+      finalAction: thisStep.action,
+    },
+  });
+
+  // Ensure langfuse data is sent
+  await context.langfuse.shutdownAsync();
 
   // max return 300 urls
   const returnedURLs = weightedURLs.slice(0, numReturnedURLs).map((r) => r.url);
