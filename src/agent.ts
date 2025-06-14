@@ -573,20 +573,6 @@ export async function getResponse(
     tags: ["agent", "deep-research", "multi-step"],
   });
 
-  // Log the start of agent processing
-  context.logger.agent_step(
-    "start_processing",
-    context.verification_id || "unknown",
-    "STARTED",
-    undefined,
-    {
-      question:
-        question,
-      tokenBudget,
-      maxBadAttempts,
-      hasMessages: !!messages?.length,
-    }
-  );
 
   // Create a span for agent setup and initialization
   const setupSpan = agentTrace.span({
@@ -1613,26 +1599,9 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     },
   });
 
-  // Log completion of agent processing
-  context.logger.agent_step(
-    "completed_processing",
-    context.verification_id || "unknown",
-    "SUCCESS",
-    {
-      finalAction: thisStep.action,
-      isFinal: (thisStep as AnswerAction).isFinal,
-      answerLength: (thisStep as AnswerAction).answer?.length || 0,
-      referencesCount: (thisStep as AnswerAction).references?.length || 0,
-      visitedURLsCount: visitedURLs.length,
-      totalTokens: context.tokenTracker.getTotalUsage().totalTokens,
-    },
-    {
-      question:
-        question,
-      totalSteps: totalStep,
-      trivialQuestion,
-    }
-  );
+  console.log("mdAnswer", answerStep.mdAnswer);
+  console.log("answer", question, thisStep);
+
 
   // Update the agent trace with final results
   agentTrace.update({

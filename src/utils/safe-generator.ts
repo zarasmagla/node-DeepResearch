@@ -126,7 +126,7 @@ export class ObjectGeneratorSafe {
     const trace = this.langfuse.trace({
       name: "object-generation",
       metadata: {
-        model,
+        model: getModel(model),
         numRetries,
         hasSchema: !!schema,
         hasPrompt: !!prompt,
@@ -160,7 +160,7 @@ export class ObjectGeneratorSafe {
         },
         metadata: {
           attempt: "primary",
-          model,
+          model: getModel(model),
         },
       });
 

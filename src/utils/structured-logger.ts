@@ -190,32 +190,6 @@ export class StructuredLogger {
         });
     }
 
-    agent_step(
-        step: string,
-        verification_id: string,
-        status: string = "STARTED",
-        result_data?: any,
-        input_data?: any,
-        duration_ms?: number,
-        error?: Error
-    ): void {
-        this.info(`Agent step: ${step}`, {
-            verification_id,
-            operation: `agent_${step}`,
-            status,
-            duration_ms,
-            metadata: {
-                agent_step: step,
-                input_data: this._truncate_data(input_data, 300),
-                result_data: this._truncate_data(result_data, 500),
-            },
-            error: error ? {
-                type: error.constructor?.name || "Error",
-                message: error.message || String(error),
-                stack: error.stack,
-            } : undefined,
-        });
-    }
 
     search_operation(
         query: string,
