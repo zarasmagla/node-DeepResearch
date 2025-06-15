@@ -5,6 +5,7 @@ import { Schemas } from "../utils/schemas";
 import { getKnowledgeStr } from "../utils/text-tools";
 import { get_tools_logger } from "../utils/structured-logger";
 import { logger } from "../winston-logger";
+import { getModel } from "../config";
 
 const TOOL_NAME = 'evaluator';
 
@@ -588,7 +589,7 @@ export async function evaluateQuestion(
 
     const evaluationGeneration = evaluationSpan.generation({
       name: "question-evaluation-generation",
-      model: TOOL_NAME,
+      model: getModel(TOOL_NAME),
       input: {
         prompt: prompt.user,
         system: prompt.system,
@@ -683,7 +684,7 @@ async function performEvaluation<T>(
   // Create a generation for the specific evaluation
   const evaluationGeneration = parentSpan?.generation({
     name: `${evaluationType}-evaluation-generation`,
-    model: TOOL_NAME,
+    model: getModel(TOOL_NAME),
     input: {
       evaluationType,
       prompt: prompt.user,
@@ -710,8 +711,6 @@ async function performEvaluation<T>(
   }) as GenerateObjectResult<any>;
 
   trackers.actionTracker.trackThink(result.object.think)
-
-  console.log(`${evaluationType} ${TOOL_NAME}`, result.object);
 
   if (evaluationGeneration) {
     evaluationGeneration.end({

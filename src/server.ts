@@ -1,3 +1,8 @@
+// Enable source map support for better error stack traces in production
+if (process.env.NODE_ENV === 'production') {
+  require('source-map-support').install();
+}
+
 import app from "./app";
 
 const port = process.env.PORT || 3000;

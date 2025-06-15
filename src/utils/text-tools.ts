@@ -1,6 +1,6 @@
-import {AnswerAction, KnowledgeItem, Reference} from "../types";
+import { AnswerAction, KnowledgeItem, Reference } from "../types";
 import i18nJSON from './i18n.json';
-import {JSDOM} from 'jsdom';
+import { JSDOM } from 'jsdom';
 import fs from "fs/promises";
 
 
@@ -96,7 +96,7 @@ export function repairMarkdownFootnotes(
   // No footnotes in answer but we have references - append them at the end
   if (validFootnotes.length === 0) {
     const appendedCitations = Array.from(
-      {length: references.length},
+      { length: references.length },
       (_, i) => `[^${i + 1}]`
     ).join('');
 
@@ -124,7 +124,7 @@ ${formattedReferences}
 
     // Create citations for unused references
     const unusedReferences = Array.from(
-      {length: references.length},
+      { length: references.length },
       (_, i) => !usedIndices.has(i + 1) ? `[^${i + 1}]` : ''
     ).join('');
 
@@ -363,7 +363,7 @@ export function fixCodeBlockIndentation(markdownText: string): string {
           }
         }
 
-        codeBlockStack.push({indent, language: restOfLine, listIndent});
+        codeBlockStack.push({ indent, language: restOfLine, listIndent });
         result.push(line);
       } else {
         // This is a closing code fence
@@ -661,7 +661,7 @@ function sanitizeCell(content: string): string {
 if (typeof window === 'undefined') {
   global.DOMParser = class DOMParser {
     parseFromString(htmlString: string, mimeType: string) {
-      const dom = new JSDOM(htmlString, {contentType: mimeType});
+      const dom = new JSDOM(htmlString, { contentType: mimeType });
       return dom.window.document;
     }
   };
@@ -821,5 +821,5 @@ export async function detectBrokenUnicodeViaFileIO(str: string) {
   await fs.unlink(tempFilePath);
 
   // Now check for the visible replacement character
-  return {broken: readStr.includes('�'), readStr};
+  return { broken: readStr.includes('�'), readStr };
 }

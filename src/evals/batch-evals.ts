@@ -187,11 +187,6 @@ async function batchEvaluate(inputFile: string): Promise<void> {
   const stats = calculateStats(results, modelName);
   printStats(stats);
 
-  // Save results
-  await fs.writeFile(outputFile, JSON.stringify({
-    results,
-    statistics: stats
-  }, null, 2));
 
   console.log(`\nEvaluation results saved to ${outputFile}`);
 }

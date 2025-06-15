@@ -1,3 +1,8 @@
+// Enable source map support for better error stack traces in production
+if (process.env.NODE_ENV === 'production') {
+  require('source-map-support').install();
+}
+
 import { CoreMessage } from "ai";
 import { SEARCH_PROVIDER, STEP_SLEEP } from "./config";
 import fs from "fs/promises";
@@ -1671,19 +1676,6 @@ async function storeContext(
     return;
   }
 
-  try {
-    await fs.writeFile("context.json", JSON.stringify(allContext, null, 2));
-    await fs.writeFile("queries.json", JSON.stringify(allKeywords, null, 2));
-    await fs.writeFile("questions.json", JSON.stringify(allQuestions, null, 2));
-    await fs.writeFile("knowledge.json", JSON.stringify(allKnowledge, null, 2));
-    await fs.writeFile("urls.json", JSON.stringify(weightedURLs, null, 2));
-    await fs.writeFile(
-      "messages.json",
-      JSON.stringify(msgWithKnowledge, null, 2)
-    );
-  } catch (error) {
-    logger.error("Context storage failed:", error);
-  }
 }
 
 export async function main() {

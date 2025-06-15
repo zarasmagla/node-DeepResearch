@@ -61,7 +61,6 @@ SetA: ${JSON.stringify(newQueries)}
 SetB: ${JSON.stringify(existingQueries)}`;
 }
 
-
 const TOOL_NAME = 'dedup';
 
 export async function dedupQueries(
