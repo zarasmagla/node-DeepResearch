@@ -251,6 +251,9 @@ export class GoogleGenAIHelper {
             model,
             temperature,
             maxOutputTokens,
+            input: prompt,
+            systemInstruction,
+            schema,
           },
         });
       }

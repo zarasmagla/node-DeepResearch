@@ -4,8 +4,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 import { CoreMessage } from "ai";
-import { SEARCH_PROVIDER, STEP_SLEEP } from "./config";
-import fs from "fs/promises";
+import { getModel, SEARCH_PROVIDER, STEP_SLEEP } from "./config";
 import { SafeSearchType, search as duckSearch } from "duck-duck-scrape";
 import { braveSearch } from "./tools/brave-search";
 import { rewriteQuery } from "./tools/query-rewriter";
@@ -768,7 +767,7 @@ export async function getResponse(
     // Create a generation span for the agent decision
     const decisionGeneration = stepSpan.generation({
       name: "agent-decision",
-      model: "agent",
+      model: getModel("agent"),
       input: {
         system: system,
         currentQuestion,
@@ -1496,7 +1495,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
     const beastGeneration = beastModeSpan.generation({
       name: "beast-mode-generation",
-      model: "agentBeastMode",
+      model: getModel("agentBeastMode"),
       input: {
         finalAnswerPIP: finalAnswerPIP.join(" | "),
         knowledgeItems: allKnowledge.length,

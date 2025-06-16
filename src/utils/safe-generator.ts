@@ -138,8 +138,6 @@ export class ObjectGeneratorSafe {
     });
 
     try {
-      // Primary attempt with main model
-      console.log('==============================');
 
       // Create a generation for the primary attempt
       const primaryGeneration = trace.generation({
