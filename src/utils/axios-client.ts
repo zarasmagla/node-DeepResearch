@@ -11,10 +11,10 @@ const MAX_CONTENT_LENGTH = 10 * 1024 * 1024;
 const MAX_REDIRECTS = 5;
 
 // Maximum number of sockets to keep open
-const MAX_SOCKETS = 50;
+const MAX_SOCKETS = 200;
 
 // Maximum number of free sockets to keep open
-const MAX_FREE_SOCKETS = 10;
+const MAX_FREE_SOCKETS = 50;
 
 // Keep-alive timeout in milliseconds
 const KEEP_ALIVE_TIMEOUT = 30000;
