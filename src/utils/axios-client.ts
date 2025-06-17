@@ -68,7 +68,7 @@ axiosClient.interceptors.response.use(
         }
         throw new Error(errorData?.readableMessage || `HTTP Error ${status}`);
       } else if (error.request) {
-        throw new Error(`No response received from server`);
+        throw new Error(`No response received from server: ${error.message}`);
       } else {
         throw new Error(`Request failed: ${error.message}`);
       }
