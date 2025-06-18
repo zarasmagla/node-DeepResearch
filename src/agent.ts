@@ -377,13 +377,13 @@ async function executeSearchQueries(
       });
     } catch (error) {
       logWarning('serpCluster failed:', { error });
+    } finally {
       newKnowledge.push({
         question: `What do Internet say about "${oldQuery}"?`,
         answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
         type: 'side-info',
         updated: query.tbs ? formatDateRange(query) : undefined
       });
-    } finally {
       context.actionTracker.trackAction({
         thisStep: {
           action: 'search',
