@@ -31,6 +31,7 @@ ${attempt.error ? `Error: ${attempt.error}
 2. You can access any of these available variables directly:
 ${availableVars}
 3. You don't have access to any third party libraries that need to be installed, so you must write complete, self-contained code.
+4. Must have a return statement.
 </rules>
 
 ${previousAttempts.length > 0 ? `Previous attempts and their errors:
