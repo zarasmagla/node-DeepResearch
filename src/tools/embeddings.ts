@@ -3,7 +3,7 @@ import { JinaEmbeddingRequest, JinaEmbeddingResponse } from "../types";
 import axiosClient from "../utils/axios-client";
 import { logError, logDebug, logWarning } from '../logging';
 
-const BATCH_SIZE = 128;
+const BATCH_SIZE = 32;
 const API_URL = "https://api.jina.ai/v1/embeddings";
 const MAX_RETRIES = 3; // Maximum number of retries for missing embeddings
 
