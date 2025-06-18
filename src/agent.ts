@@ -305,7 +305,8 @@ async function executeSearchQueries(
       switch (searchProvider || SEARCH_PROVIDER) {
         case 'jina':
         case 'arxiv':
-          results = (await search(query, searchProvider, 30, meta, context.tokenTracker)).response.results || [];
+          const num = meta ? undefined : 30;
+          results = (await search(query, searchProvider, num, meta, context.tokenTracker)).response.results || [];
           break;
         case 'duck':
           results = (await duckSearch(query.q, { safeSearch: SafeSearchType.STRICT })).results;

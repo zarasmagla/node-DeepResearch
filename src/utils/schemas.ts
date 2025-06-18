@@ -176,6 +176,7 @@ export class Schemas {
 
   getSerpClusterSchema(): z.ZodObject<any> {
     return z.object({
+      think: z.string().describe(`Short explain of why you group the search results like this. ${this.getLanguagePrompt()}`).max(500),
       clusters: z.array(
         z.object({
           insight: z.string().describe('Summary and list key numbers, data, soundbites, and insights that worth to be highlighted. End with an actionable advice such as "Visit these URLs if you want to understand [what...]". Do not use "This cluster..."').max(200),
