@@ -814,7 +814,6 @@ But then you realized you have asked them before. You decided to to think out of
         allWebContents,
         undefined,
         searchProvider,
-        'more'
       );
 
       allKeywords.push(...searchedQueries);
