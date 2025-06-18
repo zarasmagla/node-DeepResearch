@@ -8,6 +8,7 @@ export async function search(
   query: SERPQuery,
   domain?: string,
   num?: number,
+  meta?: string,
   tracker?: TokenTracker
 ): Promise<{ response: JinaSearchResponse }> {
   try {
@@ -20,7 +21,8 @@ export async function search(
       {
         ...query,
         domain,
-        num
+        num,
+        meta
       },
       {
         headers: {

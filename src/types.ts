@@ -327,6 +327,7 @@ export interface ChatCompletionChunk {
       content?: string;
       type?: 'text' | 'think' | 'json' | 'error';
       url?: string;
+      query?: string;
       annotations?: Array<URLAnnotation>;
     };
     logprobs: null;

@@ -18,7 +18,8 @@ import {
   BoostedSearchSnippet,
   SearchSnippet, EvaluationResponse, Reference, SERPQuery, RepeatEvaluationType, UnNormalizedSearchSnippet, WebContent,
   ImageObject,
-  ImageReference
+  ImageReference,
+  SearchAction
 } from "./types";
 import { TrackerContext } from "./types";
 import { search } from "./tools/jina-search";
@@ -281,7 +282,8 @@ async function executeSearchQueries(
   SchemaGen: Schemas,
   webContents: Record<string, WebContent>,
   onlyHostnames?: string[],
-  searchProvider?: string
+  searchProvider?: string,
+  meta?: string
 ): Promise<{
   newKnowledge: KnowledgeItem[],
   searchedQueries: string[]
@@ -303,7 +305,7 @@ async function executeSearchQueries(
       switch (searchProvider || SEARCH_PROVIDER) {
         case 'jina':
         case 'arxiv':
-          results = (await search(query, searchProvider, 30, context.tokenTracker)).response.results || [];
+          results = (await search(query, searchProvider, 30, meta, context.tokenTracker)).response.results || [];
           break;
         case 'duck':
           results = (await duckSearch(query.q, { safeSearch: SafeSearchType.STRICT })).results;
@@ -380,6 +382,14 @@ async function executeSearchQueries(
         type: 'side-info',
         updated: query.tbs ? formatDateRange(query) : undefined
       });
+    } finally {
+      context.actionTracker.trackAction({
+        thisStep: {
+          action: 'search',
+          think: '',
+          searchRequests: [oldQuery]
+        } as SearchAction
+      })
     }
 
 
@@ -802,7 +812,8 @@ But then you realized you have asked them before. You decided to to think out of
         SchemaGen,
         allWebContents,
         undefined,
-        searchProvider
+        searchProvider,
+        'more'
       );
 
       allKeywords.push(...searchedQueries);

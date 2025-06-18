@@ -8,6 +8,7 @@ import {
   ChatCompletionChunk,
   AnswerAction,
   Model, StepAction, VisitAction,
+  SearchAction,
 } from './types';
 import { TokenTracker } from "./utils/token-tracker";
 import { ActionTracker } from "./utils/action-tracker";
@@ -561,6 +562,27 @@ app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Res
           res.write(`data: ${JSON.stringify(chunk)}\n\n`);
         });
       }
+
+      if (step.action === 'search') {
+        // emit every search request in the search action in url field
+        ((step as SearchAction).searchRequests as string[])?.forEach((query) => {
+          const chunk: ChatCompletionChunk = {
+            id: requestId,
+            object: 'chat.completion.chunk',
+            created,
+            model: body.model,
+            system_fingerprint: 'fp_' + requestId,
+            choices: [{
+              index: 0,
+              delta: { type: 'think', query },
+              logprobs: null,
+              finish_reason: null,
+            }]
+          };
+          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        });
+      }
+
       if (step.think) {
         // if not ends with a space, add one
         const content = step.think + ' ';
