@@ -179,8 +179,8 @@ export class Schemas {
       think: z.string().describe(`Explain why you cluster the search results like this. ${this.getLanguagePrompt()}`).max(500),
       clusters: z.array(
         z.object({
-          question: z.string().describe('What question this cluster answers.').max(100),
-          insight: z.string().describe('Summary and list key numbers, data and insights that worth to be highlighted. End with an actionable advice such as "Visit these URLs if you want to understand [what...]". Do not use "This cluster..."').max(200),
+          insight: z.string().describe('Summary and list key numbers, data, soundbites, and insights that worth to be highlighted. End with an actionable advice such as "Visit these URLs if you want to understand [what...]". Do not use "This cluster..."').max(200),
+          question: z.string().describe('What concrete and specific question this cluster answers. Should not be general question like "where can I find [what...]"').max(100),
           urls: z.array(z.string().describe('URLs in this cluster.').max(100))
         }))
         .max(MAX_CLUSTERS)
