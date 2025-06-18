@@ -45,6 +45,7 @@
           "temperature": 0.1
         },
         "researchPlanner": {},
+        "serpCluster": {},
         "agent": {
           "temperature": 0.7
         },
@@ -79,6 +80,7 @@
         "queryRewriter": {
           "temperature": 0.1
         },
+        "serpCluster": {},
         "agent": {
           "temperature": 0.7
         },

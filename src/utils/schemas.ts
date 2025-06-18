@@ -6,6 +6,7 @@ import { logDebug } from '../logging';
 export const MAX_URLS_PER_STEP = 5
 export const MAX_QUERIES_PER_STEP = 5
 export const MAX_REFLECT_PER_STEP = 2
+export const MAX_CLUSTERS = 5
 
 function getLanguagePrompt(question: string): PromptPair {
   return {
@@ -170,6 +171,20 @@ export class Schemas {
       )
         .length(teamSize)
         .describe(`Array of exactly ${teamSize} orthogonal research plans, each focusing on a different fundamental dimension of the main topic`)
+    });
+  }
+
+  getSerpClusterSchema(): z.ZodObject<any> {
+    return z.object({
+      think: z.string().describe(`Explain why you cluster the search results like this. ${this.getLanguagePrompt()}`).max(500),
+      clusters: z.array(
+        z.object({
+          question: z.string().describe('What question this cluster answers.').max(100),
+          insight: z.string().describe('Summary and list key numbers, data and insights that worth to be highlighted. End with an actionable advice such as "Visit these URLs if you want to understand [what...]". Do not use "This cluster..."').max(200),
+          urls: z.array(z.string().describe('URLs in this cluster.').max(100))
+        }))
+        .max(MAX_CLUSTERS)
+        .describe(`'The optimal clustering of search engine results, orthogonal to each other. Maximum ${MAX_CLUSTERS} clusters allowed.'`)
     });
   }
 

@@ -48,6 +48,7 @@ import { researchPlan } from './tools/research-planner';
 import { reduceAnswers } from './tools/reducer';
 import { AxiosError } from 'axios';
 import { dedupImagesWithEmbeddings } from './utils/image-tools';
+import { serpCluster } from './tools/serp-cluster';
 
 async function wait(seconds: number) {
   logDebug(`Waiting ${seconds}s...`);
@@ -361,12 +362,27 @@ async function executeSearchQueries(
 
     searchedQueries.push(query.q)
 
-    newKnowledge.push({
-      question: `What do Internet say about "${oldQuery}"?`,
-      answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
-      type: 'side-info',
-      updated: query.tbs ? formatDateRange(query) : undefined
-    });
+    try {
+      const clusters = await serpCluster(minResults, context, SchemaGen);
+      clusters.forEach(c => {
+        newKnowledge.push({
+          question: c.question,
+          answer: c.insight,
+          references: c.urls,
+          type: 'url',
+        });
+      });
+    } catch (error) {
+      logWarning('serpCluster failed:', { error });
+      newKnowledge.push({
+        question: `What do Internet say about "${oldQuery}"?`,
+        answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
+        type: 'side-info',
+        updated: query.tbs ? formatDateRange(query) : undefined
+      });
+    }
+
+
   }
   if (searchedQueries.length === 0) {
     if (onlyHostnames && onlyHostnames.length > 0) {
@@ -405,7 +421,7 @@ export async function getResponse(question?: string,
   searchLanguageCode?: string,
   searchProvider?: string,
   withImages: boolean = false,
-  teamSize: number = 2
+  teamSize: number = 1
 ): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[], imageReferences?: ImageReference[] }> {
 
   let step = 0;
