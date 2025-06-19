@@ -522,7 +522,7 @@ export async function buildImageReferences(
     const filteredMatches = [];
 
     for (const match of allMatches) {
-      if (match.relevanceScore < minRelScore) continue;
+      // if (match.relevanceScore < minRelScore) continue;
 
       if (!usedImages.has(match.imageIndex) && !usedAnswerChunks.has(match.answerChunkIndex)) {
         filteredMatches.push(match);

@@ -48,7 +48,7 @@ import { logInfo, logError, logDebug, logWarning } from './logging';
 import { researchPlan } from './tools/research-planner';
 import { reduceAnswers } from './tools/reducer';
 import { AxiosError } from 'axios';
-import { dedupImagesWithEmbeddings } from './utils/image-tools';
+import { dedupImagesWithEmbeddings, filterImages } from './utils/image-tools';
 import { serpCluster } from './tools/serp-cluster';
 
 async function wait(seconds: number) {
@@ -845,7 +845,7 @@ But then you realized you have asked them before. You decided to to think out of
             answer: subproblemResponses.map(r => (r.result as AnswerAction).answer).join('\n\n'),
             mdAnswer: subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).join('\n\n'),
             references: subproblemResponses.map(r => (r.result as AnswerAction).references).flat(),
-            imageReferences: subproblemResponses.map(r => (r.result as AnswerAction).imageReferences).flat(),
+            imageReferences: subproblemResponses.map(r => (r.result as AnswerAction).imageReferences).filter(Boolean).flat(),
             isFinal: true,
             isAggregated: true
           } as AnswerAction;
@@ -1124,10 +1124,12 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     answerStep.answer = candidateAnswers.join('\n\n'); // await reduceAnswers(candidateAnswers, context, SchemaGen);
     answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
     if (withImages && answerStep.imageReferences?.length) {
-      logDebug('[agent] all image references:', { count: answerStep.imageReferences?.length });
-      const dedupImages = dedupImagesWithEmbeddings(answerStep.imageReferences as ImageObject[], []);
-      logDebug('[agent] deduped images:', { count: dedupImages.length });
-      answerStep.imageReferences = answerStep.imageReferences?.filter(i => i?.url && dedupImages.some(d => d?.url === i.url)) || [];
+      const sortedImages = answerStep.imageReferences.sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
+      logDebug('[agent] all sorted image references:', { count: sortedImages?.length });
+      const dedupImages = dedupImagesWithEmbeddings(sortedImages as ImageObject[], []);
+      const filteredImages = filterImages(sortedImages, dedupImages);
+      logDebug('[agent] filtered images:', { count: filteredImages.length });
+      answerStep.imageReferences = filteredImages.slice(0, 10); // limit to 10 images
     }
   }
 

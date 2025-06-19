@@ -1,6 +1,6 @@
 import { getEmbeddings } from '../tools/embeddings';
 import { TokenTracker } from './token-tracker';
-import { ImageObject } from '../types';
+import { ImageObject, ImageReference } from '../types';
 import { cosineSimilarity } from '../tools/cosine';
 import { logInfo, logError, logDebug, logWarning } from '../logging';
 import sharp from 'sharp';
@@ -190,4 +190,28 @@ export const dedupImagesWithEmbeddings = (
     // Return all new images if there is an error
     return newImages;
   }
+}
+
+export const filterImages = (imageReferences: ImageReference[], dedupedImages: ImageObject[]): ImageReference[] => {
+  if (!imageReferences || imageReferences.length === 0) {
+    logInfo('No image references provided for filtering');
+    return [];
+  }
+
+  if (!dedupedImages || dedupedImages.length === 0) {
+    logInfo('No deduplicated images provided for filtering');
+    return imageReferences;
+  }
+
+  const urlMap = new Map();
+  for (const img of imageReferences) {
+    if (img?.url && !urlMap.has(img.url)) {
+      urlMap.set(img.url, img);
+    }
+  }
+
+  const filteredReferences = dedupedImages.map(img => urlMap.get(img.url))
+  .filter(Boolean);
+
+  return filteredReferences;
 }
