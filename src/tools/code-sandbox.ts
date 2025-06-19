@@ -138,12 +138,11 @@ export class CodeSandbox {
       const generation = await this.generateCode(problem, attempts);
       const { code } = generation;
 
-      logDebug(`Coding attempt ${i + 1}:`, { code });
       // Evaluate the code
       const result = this.evaluateCode(code);
-      logDebug(`Coding attempt ${i + 1} success:`, { result });
 
       if (result.success) {
+        logInfo('Coding success:', { problem, result });
         return {
           solution: {
             code,
@@ -153,7 +152,7 @@ export class CodeSandbox {
         };
       }
 
-      logError('Coding error:', { error: result.error });
+      logWarning('Coding error:', { error: result.error });
 
       // Store the failed attempt
       attempts.push({
