@@ -108,7 +108,7 @@ Minor wording differences are acceptable as long as the core information of the 
 
     logger.info("==========================", JSON.stringify(schemaToBeProcessed));
     const result = await GoogleGenAIHelper.generateObject<{ pass: boolean; reason: string }>({
-      model: "gemini-2.5-flash-preview-05-20",
+      model: "gemini-2.5-flash",
       prompt,
       schema: schemaToBeProcessed,
       maxOutputTokens: 1000,

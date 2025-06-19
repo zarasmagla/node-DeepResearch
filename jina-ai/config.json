@@ -34,7 +34,7 @@
   "models": {
     "gemini": {
       "default": {
-        "model": "gemini-2.5-flash-preview-05-20",
+        "model": "gemini-2.5-flash",
         "temperature": 0.6,
         "maxTokens": 8000
       },
