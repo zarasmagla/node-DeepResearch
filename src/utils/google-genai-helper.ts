@@ -94,7 +94,7 @@ export class GoogleGenAIHelper {
    * Generate structured JSON object using Google Gen AI
    */
   static async generateObject<T>({
-    model = "gemini-2.5-flash-preview-05-20",
+    model = "gemini-2.5-flash",
     prompt,
     systemInstruction,
     schema,
