@@ -149,6 +149,12 @@ ${p}
     }
     `.trim();
 
+  // Remove existing user message which contains the question basically because below we are pushing a modified version
+  if (msgs[msgs.length - 1].role === "user") {
+    // remove it from the end of the array
+    msgs.pop();
+  }
+
   msgs.push({ role: "user", content: removeExtraLineBreaks(userContent) });
   return msgs;
 }
@@ -520,7 +526,7 @@ export async function getResponse(
   const updateContext = function (step: any) {
     allContext.push(step);
   };
-
+  console.log("question", question);
   question = question?.trim() as string;
   // remove incoming system messages to avoid override
   messages = messages?.filter((m) => m.role !== "system");
@@ -790,7 +796,7 @@ export async function getResponse(
       providerOptions: {
         google: {
           thinkingConfig: {
-            thinkingBudget: 8192, // Added thinkingBudget for Google
+            thinkingBudget: 20192, // Added thinkingBudget for Google
           },
         },
       },
