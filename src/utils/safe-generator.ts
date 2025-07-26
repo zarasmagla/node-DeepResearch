@@ -22,7 +22,7 @@ interface GenerateObjectResult<T> {
 interface GenerateOptions<T> {
   model: ToolName;
   schema: any;
-  prompt?: string;
+  prompt?: ContentListUnion;
   system?: string;
   messages?: CoreMessage[];
   numRetries?: number;

@@ -681,9 +681,13 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         const result = await generator.generateObject({
           model: "agent",
           schema: responseSchema,
-          prompt: finalAnswer,
+          prompt: [{ role: "user", parts: [{ text: finalAnswer }] }, {
+            role: "user", parts: [{
+              text: "Generate a Markdown language for the reason field and make sure to translate every  field including references to Georgian"
+            }]
+          }],
           system:
-            "Extract the structured data from the text according to the JSON schema. IMPORTANT: Keep all JSON property names, field names, and object keys exactly as defined in the schema - do not translate them. Only translate the actual string values/content inside the fields to Georgian language, but preserve all quotes and exact quotes as they are. The JSON structure and property names must remain in English.",
+            "You are a expert in converting text to JSON and generating a correct Markdown format in Georgian language.Extract the structured data from the text according to the JSON schema. IMPORTANT: Translate all text in Georgian language and return main reason field in Markdown",
           providerOptions: {
             google: {
               thinkingConfig: {
