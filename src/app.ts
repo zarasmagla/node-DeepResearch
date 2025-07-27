@@ -691,7 +691,7 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
           providerOptions: {
             google: {
               thinkingConfig: {
-                thinkingBudget: 20048, // Added thinkingBudget for Google
+                thinkingBudget: 2048, // Added thinkingBudget for Google
               },
             },
           },
