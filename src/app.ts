@@ -23,23 +23,22 @@ const app = express();
 
 // Create a shared Langfuse instance for the application with environment and version info
 const langfuse = new Langfuse({
-  environment: process.env.NODE_ENV || 'development',
-  release: process.env.K_REVISION || 'unknown',
+  environment: process.env.NODE_ENV || "development",
+  release: process.env.K_REVISION || "unknown",
 });
 
 // Graceful shutdown handling
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down gracefully');
+process.on("SIGTERM", async () => {
+  logger.info("SIGTERM received, shutting down gracefully");
   await langfuse.shutdownAsync();
   process.exit(0);
 });
 
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down gracefully');
+process.on("SIGINT", async () => {
+  logger.info("SIGINT received, shutting down gracefully");
   await langfuse.shutdownAsync();
   process.exit(0);
 });
-
 
 // Get secret from command line args for optional authentication
 const secret = process.argv
@@ -677,21 +676,20 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
 
     if (responseSchema) {
       try {
-        const generator = new ObjectGeneratorSafe(context?.tokenTracker, langfuse);
+        const generator = new ObjectGeneratorSafe(
+          context?.tokenTracker,
+          langfuse
+        );
         const result = await generator.generateObject({
           model: "agent",
           schema: responseSchema,
-          prompt: [{ role: "user", parts: [{ text: finalAnswer }] }, {
-            role: "user", parts: [{
-              text: "Generate a Markdown language for the reason field and make sure to translate every  field including references to Georgian"
-            }]
-          }],
+          prompt: [{ role: "user", parts: [{ text: finalAnswer }] }],
           system:
-            "You are a expert in converting text to JSON and generating a correct Markdown format in Georgian language.Extract the structured data from the text according to the JSON schema. IMPORTANT: Translate all text in Georgian language and return main reason field in Markdown",
+            "Extract the structured data from the provided text according to the JSON schema specifications. Follow the schema attribute descriptions precisely.",
           providerOptions: {
             google: {
               thinkingConfig: {
-                thinkingBudget: 2048, // Added thinkingBudget for Google
+                thinkingBudget: 8192,
               },
             },
           },
@@ -809,7 +807,6 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         readURLs,
         numURLs: allURLs.length,
       };
-
 
       // Structured logging for successful completion
       apiLogger.api_request(
