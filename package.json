@@ -16,7 +16,8 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "serve": "npx ts-node-dev --respawn src/server.ts",
-    "start": "NODE_ENV=production node dist/server.js",
+    "start": "node --enable-source-maps dist/server.js",
+    "start:debug": "NODE_ENV=development node --enable-source-maps --inspect dist/server.js",
     "start:ts": "NODE_ENV=production ts-node src/server.ts",
     "prod:build": "npm run build:clean",
     "prod:start": "npm run prod:build && npm run start",
@@ -25,7 +26,7 @@
     "test:watch": "jest --watch",
     "test:docker": "jest src/__tests__/docker.test.ts --testTimeout=300000"
   },
-  "keywords": [],
+  "keywords": [ ],
   "author": "Jina AI",
   "license": "Apache-2.0",
   "description": "",

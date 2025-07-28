@@ -19,7 +19,7 @@ interface GenerateObjectResult<T> {
   usage: LanguageModelUsage;
 }
 
-interface GenerateOptions<T> {
+interface GenerateOptions {
   model: ToolName;
   schema: any;
   prompt?: ContentListUnion;
@@ -36,10 +36,12 @@ export class ObjectGeneratorSafe {
 
   constructor(tokenTracker?: TokenTracker, langfuse?: Langfuse) {
     this.tokenTracker = tokenTracker || new TokenTracker();
-    this.langfuse = langfuse || new Langfuse({
-      environment: process.env.NODE_ENV || 'development',
-      release: process.env.K_REVISION || 'unknown',
-    });
+    this.langfuse =
+      langfuse ||
+      new Langfuse({
+        environment: process.env.NODE_ENV || "development",
+        release: process.env.K_REVISION || "unknown",
+      });
     this.ownLangfuse = !langfuse; // Track if we created our own instance
   }
 
@@ -106,7 +108,7 @@ export class ObjectGeneratorSafe {
   }
 
   async generateObject<T>(
-    options: GenerateOptions<T>
+    options: GenerateOptions
   ): Promise<GenerateObjectResult<T>> {
     const {
       model,
@@ -138,20 +140,26 @@ export class ObjectGeneratorSafe {
     });
 
     try {
-
       // Create a generation for the primary attempt
       const primaryGeneration = trace.generation({
         name: "primary-generation",
         model: getModel(model),
         input: {
-          prompt: prompt || messages?.map((message) => ({
-            role: message.role === "assistant" ? "model" : message.role,
-            parts: [{
-              text: message.content,
-            }],
-          })),
+          prompt:
+            prompt ||
+            messages?.map((message: CoreMessage) => ({
+              role: message.role === "assistant" ? "model" : message.role,
+              parts: [
+                {
+                  text: message.content,
+                },
+              ],
+            })),
           system,
-          schema: typeof schema === 'object' ? JSON.stringify(schema, null, 2) : String(schema),
+          schema:
+            typeof schema === "object"
+              ? JSON.stringify(schema, null, 2)
+              : String(schema),
         },
         modelParameters: {
           maxOutputTokens: getToolConfig(model).maxTokens,
@@ -167,14 +175,14 @@ export class ObjectGeneratorSafe {
         schema,
         prompt: prompt
           ? prompt
-          : (messages?.map((message) => ({
-            role: message.role === "assistant" ? "model" : message.role,
-            parts: [
-              {
-                text: message.content,
-              },
-            ],
-          })) as ContentListUnion),
+          : (messages?.map((message: CoreMessage) => ({
+              role: message.role === "assistant" ? "model" : message.role,
+              parts: [
+                {
+                  text: message.content,
+                },
+              ],
+            })) as ContentListUnion),
         systemInstruction: system,
         maxOutputTokens: getToolConfig(model).maxTokens,
         providerOptions,
@@ -210,7 +218,8 @@ export class ObjectGeneratorSafe {
         level: "WARNING",
         metadata: {
           error: error instanceof Error ? error.message : String(error),
-          errorType: error instanceof Error ? error.constructor.name : "unknown",
+          errorType:
+            error instanceof Error ? error.constructor.name : "unknown",
         },
       });
 
@@ -249,14 +258,21 @@ export class ObjectGeneratorSafe {
           name: "manual-parsing-failed",
           level: "WARNING",
           metadata: {
-            error: parseError instanceof Error ? parseError.message : String(parseError),
-            errorType: parseError instanceof Error ? parseError.constructor.name : "unknown",
+            error:
+              parseError instanceof Error
+                ? parseError.message
+                : String(parseError),
+            errorType:
+              parseError instanceof Error
+                ? parseError.constructor.name
+                : "unknown",
           },
         });
 
         if (numRetries > 0) {
           logger.error(
-            `${model} failed on object generation -> manual parsing failed -> retry with ${numRetries - 1
+            `${model} failed on object generation -> manual parsing failed -> retry with ${
+              numRetries - 1
             } retries remaining`
           );
 
@@ -310,10 +326,13 @@ export class ObjectGeneratorSafe {
               model: getModel("fallback"),
               input: {
                 prompt: `Following the given JSON schema, extract the field from below: \n\n ${failedOutput}`,
-                schema: typeof distilledSchema === 'object' ? JSON.stringify(distilledSchema, null, 2) : String(distilledSchema),
+                schema:
+                  typeof distilledSchema === "object"
+                    ? JSON.stringify(distilledSchema, null, 2)
+                    : String(distilledSchema),
               },
               modelParameters: {
-                temperature: getToolConfig('fallback').temperature,
+                temperature: getToolConfig("fallback").temperature,
               },
               metadata: {
                 attempt: "fallback",
@@ -364,8 +383,14 @@ export class ObjectGeneratorSafe {
               name: "fallback-generation-failed",
               level: "ERROR",
               metadata: {
-                error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
-                errorType: fallbackError instanceof Error ? fallbackError.constructor.name : "unknown",
+                error:
+                  fallbackError instanceof Error
+                    ? fallbackError.message
+                    : String(fallbackError),
+                errorType:
+                  fallbackError instanceof Error
+                    ? fallbackError.constructor.name
+                    : "unknown",
               },
             });
 
@@ -406,8 +431,14 @@ export class ObjectGeneratorSafe {
                 name: "all-recovery-failed",
                 level: "ERROR",
                 metadata: {
-                  error: finalError instanceof Error ? finalError.message : String(finalError),
-                  errorType: finalError instanceof Error ? finalError.constructor.name : "unknown",
+                  error:
+                    finalError instanceof Error
+                      ? finalError.message
+                      : String(finalError),
+                  errorType:
+                    finalError instanceof Error
+                      ? finalError.constructor.name
+                      : "unknown",
                 },
               });
 

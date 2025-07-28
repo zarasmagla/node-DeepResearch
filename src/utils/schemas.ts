@@ -150,7 +150,7 @@ export class Schemas {
 
   getQuestionEvaluateSchema() {
     return z.toJSONSchema(z.object({
-      think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()} Maximum 500 characters. Make sure output is unique and  is not long and repetitive.`).max(500),
+      think: z.string().describe(`A very concise explain of why those checks are needed. ${this.getLanguagePrompt()} Maximum 500 characters. Make sure output is unique and  is not long and repetitive.`),
       needsDefinitive: z.boolean().describe('If the answer needs to be definitive'),
       needsFreshness: z.boolean().describe('If the answer needs to be fresh'),
       needsPlurality: z.boolean().describe('If the answer needs to be plural'),
@@ -294,7 +294,7 @@ export class Schemas {
           Make sure the answer is not too long and repetitive. Answer should be unique.
 
           Make sure to output in Markdown format, DO NOT USE JSON syntax!
-          `).max(40000)
+          `)
       }).optional();
     }
 

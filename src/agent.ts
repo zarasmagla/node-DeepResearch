@@ -1,8 +1,3 @@
-// Enable source map support for better error stack traces in production
-if (process.env.NODE_ENV === 'production') {
-  require('source-map-support').install();
-}
-
 import { CoreMessage } from "ai";
 import { getModel, SEARCH_PROVIDER, STEP_SLEEP } from "./config";
 import { SafeSearchType, search as duckSearch } from "duck-duck-scrape";
@@ -81,33 +76,35 @@ function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
   knowledge.forEach((k) => {
     messages.push({ role: "user", content: k.question.trim() });
     const aMsg = `
-${k.updated && (k.type === "url" || k.type === "side-info")
-        ? `
+${
+  k.updated && (k.type === "url" || k.type === "side-info")
+    ? `
 <answer-datetime>
 ${k.updated}
 </answer-datetime>
 `
-        : ""
-      }
+    : ""
+}
 
-${k.references && (k.type === "url" || k.type === "side-info")
-        ? `
+${
+  k.references && (k.type === "url" || k.type === "side-info")
+    ? `
 <references>
 ${k.references
-          .map(
-            (ref) => `
+  .map(
+    (ref) => `
 {
   "url": "${ref.url}",
   "title": "${ref.title || ""}",
   "exactQuote": "${ref.exactQuote || ""}",
 }
 `
-          )
-          .join(",")}
+  )
+  .join(",")}
 </references>
 `
-        : ""
-      }
+    : ""
+}
 
 
 ${k.answer}
@@ -129,24 +126,25 @@ function composeMsgs(
   const userContent = `
 ${question}
 
-${finalAnswerPIP?.length
-      ? `
+${
+  finalAnswerPIP?.length
+    ? `
 <answer-requirements>
 - You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
 - You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
 - Follow reviewer's feedback and improve your answer quality.
 ${finalAnswerPIP
-        .map(
-          (p, idx) => `
+  .map(
+    (p, idx) => `
 <reviewer-${idx + 1}>
 ${p}
 </reviewer-${idx + 1}>
 `
-        )
-        .join("\n")}
+  )
+  .join("\n")}
 </answer-requirements>`
-      : ""
-    }
+    : ""
+}
     `.trim();
 
   msgs.push({ role: "user", content: removeExtraLineBreaks(userContent) });
@@ -194,7 +192,8 @@ ${context.join("\n")}
     const urlListStr = urlList
       .map(
         (item, idx) =>
-          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${item.url
+          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${
+            item.url
           }": "${item.merged.slice(0, 50)}"`
       )
       .join("\n");
@@ -218,15 +217,16 @@ ${urlListStr}
 - Use web search to find relevant information
 - Build a search request based on the deep intention behind the original question and the expected answer format
 - Always prefer a single search request, only add another request if the original question covers multiple aspects or elements and one query is not enough, each request focus on one specific aspect of the original question 
-${allKeywords?.length
-        ? `
+${
+  allKeywords?.length
+    ? `
 - Avoid those unsuccessful search requests and queries:
 <bad-requests>
 ${allKeywords.join("\n")}
 </bad-requests>
 `.trim()
-        : ""
-      }
+    : ""
+}
 </action-search>
 `);
   }
@@ -331,7 +331,6 @@ async function updateReferences(
         ref.dateTime = (await getLastModified(ref.url)) || "";
       })
   );
-
 }
 
 async function executeSearchQueries(
@@ -546,10 +545,12 @@ export async function getResponse(
       existingContext?.tokenTracker || new TokenTracker(tokenBudget),
     actionTracker: existingContext?.actionTracker || new ActionTracker(),
     logger: existingContext?.logger || get_agent_logger(),
-    langfuse: existingContext?.langfuse || new Langfuse({
-      environment: process.env.NODE_ENV || 'development',
-      release: process.env.K_REVISION || 'unknown',
-    }),
+    langfuse:
+      existingContext?.langfuse ||
+      new Langfuse({
+        environment: process.env.NODE_ENV || "development",
+        release: process.env.K_REVISION || "unknown",
+      }),
     verification_id: existingContext?.verification_id,
   };
 
@@ -577,16 +578,18 @@ export async function getResponse(
     tags: ["agent", "deep-research", "multi-step"],
   });
 
-
   // Create a span for agent setup and initialization
   const setupSpan = agentTrace.span({
     name: "agent-setup",
     input: {
-      languageDetection: question
+      languageDetection: question,
     },
   });
 
-  const generator = new ObjectGeneratorSafe(context.tokenTracker, context.langfuse);
+  const generator = new ObjectGeneratorSafe(
+    context.tokenTracker,
+    context.langfuse
+  );
 
   let schema: any = SchemaGen.getAgentSchema(true, true, true, true, true);
   const gaps: string[] = [question]; // All questions to be answered including the orginal question
@@ -660,7 +663,10 @@ export async function getResponse(
         step: totalStep,
         currentQuestion: gaps[totalStep % gaps.length],
         budgetUsed: context.tokenTracker.getTotalUsage().totalTokens,
-        budgetPercentage: ((context.tokenTracker.getTotalUsage().totalTokens / tokenBudget) * 100).toFixed(2),
+        budgetPercentage: (
+          (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget) *
+          100
+        ).toFixed(2),
         allowedActions: {
           answer: allowAnswer,
           search: allowSearch,
@@ -774,8 +780,18 @@ export async function getResponse(
         messagesCount: msgWithKnowledge.length,
       },
       metadata: {
-        allowedActions: [allowReflect, allowRead, allowAnswer, allowSearch, allowCoding]
-          .map((allowed, idx) => allowed ? ["reflect", "read", "answer", "search", "coding"][idx] : null)
+        allowedActions: [
+          allowReflect,
+          allowRead,
+          allowAnswer,
+          allowSearch,
+          allowCoding,
+        ]
+          .map((allowed, idx) =>
+            allowed
+              ? ["reflect", "read", "answer", "search", "coding"][idx]
+              : null
+          )
           .filter(Boolean),
         schemaType: "agent-action",
       },
@@ -1190,8 +1206,8 @@ But then you realized you have asked them before. You decided to to think out of
           diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords: "${keywordsQueries
-              .map((q) => q.q)
-              .join(", ")}".
+            .map((q) => q.q)
+            .join(", ")}".
 You found quite some information and add them to your URL list and **visit** them later when needed. 
 `);
 
@@ -1217,8 +1233,8 @@ You found quite some information and add them to your URL list and **visit** the
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords:  "${keywordsQueries
-            .map((q) => q.q)
-            .join(", ")}".
+          .map((q) => q.q)
+          .join(", ")}".
 But then you realized you have already searched for these keywords before, no new information is returned.
 You decided to think out of the box or cut from a completely different angle.
 `);
@@ -1302,15 +1318,15 @@ You found some useful information on the web and add them to your knowledge for 
           totalStep,
           ...(success
             ? {
-              question: currentQuestion,
-              ...thisStep,
-              result: urlResults,
-            }
+                question: currentQuestion,
+                ...thisStep,
+                result: urlResults,
+              }
             : {
-              ...thisStep,
-              result:
-                "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
-            }),
+                ...thisStep,
+                result:
+                  "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
+              }),
         });
 
         visitSpan.end({
@@ -1343,7 +1359,8 @@ You decided to think out of the box or cut from a completely different angle.`);
       stepSpan.end({
         output: {
           action: thisStep.action,
-          result: uniqueURLs.length > 0 ? "urls_processed" : "no_urls_available",
+          result:
+            uniqueURLs.length > 0 ? "urls_processed" : "no_urls_available",
         },
       });
     } else if (thisStep.action === "coding" && thisStep.codingIssue) {
@@ -1606,7 +1623,6 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
   console.log("mdAnswer", answerStep.mdAnswer);
   console.log("answer", question, thisStep);
 
-
   // Update the agent trace with final results
   agentTrace.update({
     output: {
@@ -1621,7 +1637,11 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     metadata: {
       tokensUsed: context.tokenTracker.getTotalUsage().totalTokens,
       tokenBudget,
-      budgetUtilization: ((context.tokenTracker.getTotalUsage().totalTokens / tokenBudget) * 100).toFixed(2) + "%",
+      budgetUtilization:
+        (
+          (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget) *
+          100
+        ).toFixed(2) + "%",
       evaluationMetrics: Object.keys(evaluationMetrics),
       finalAction: thisStep.action,
     },
@@ -1654,14 +1674,7 @@ async function storeContext(
   },
   step: number
 ) {
-  const {
-    allContext,
-    allKeywords,
-    allQuestions,
-    allKnowledge,
-    weightedURLs,
-    msgWithKnowledge,
-  } = memory;
+  const { allContext, allKeywords, allQuestions, allKnowledge } = memory;
   if ((process as any).asyncLocalContext?.available?.()) {
     (process as any).asyncLocalContext.ctx.promptContext = {
       prompt,
@@ -1674,7 +1687,6 @@ async function storeContext(
     };
     return;
   }
-
 }
 
 export async function main() {
