@@ -3,6 +3,7 @@ import { ProxyAgent, setGlobalDispatcher } from 'undici';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI, OpenAIProviderSettings } from '@ai-sdk/openai';
 import configJson from '../config.json';
+import { logInfo, logError } from './logging';
 // Load environment variables
 dotenv.config();
 
@@ -33,7 +34,7 @@ if (env.https_proxy) {
     const dispatcher = new ProxyAgent({ uri: proxyUrl });
     setGlobalDispatcher(dispatcher);
   } catch (error) {
-    console.error('Failed to set proxy:', error);
+    logError('Failed to set proxy:', { error });
   }
 }
 
@@ -68,6 +69,7 @@ interface ToolConfig {
 }
 
 interface ToolOverrides {
+  model?: string;
   temperature?: number;
   maxTokens?: number;
 }
@@ -79,7 +81,7 @@ export function getToolConfig(toolName: ToolName): ToolConfig {
   const toolOverrides = providerConfig.tools[toolName] as ToolOverrides;
 
   return {
-    model: process.env.DEFAULT_MODEL_NAME || defaultConfig.model,
+    model: toolOverrides.model ?? defaultConfig.model,
     temperature: toolOverrides.temperature ?? defaultConfig.temperature,
     maxTokens: toolOverrides.maxTokens ?? defaultConfig.maxTokens
   };
@@ -113,9 +115,6 @@ export function getModel(toolName: ToolName) {
 
   if (LLM_PROVIDER === 'vertex') {
     const createVertex = require('@ai-sdk/google-vertex').createVertex;
-    if (toolName === 'searchGrounding') {
-      return createVertex({ project: process.env.GCLOUD_PROJECT, ...providerConfig?.clientConfig })(config.model, { useSearchGrounding: true });
-    }
     return createVertex({ project: process.env.GCLOUD_PROJECT, ...providerConfig?.clientConfig })(config.model);
   }
 
@@ -123,10 +122,7 @@ export function getModel(toolName: ToolName) {
     throw new Error('GEMINI_API_KEY not found');
   }
 
-  if (toolName === 'searchGrounding') {
-    return createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })(config.model, { useSearchGrounding: true });
-  }
-  return config.model
+  return createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })(config.model);
 }
 
 // Validate required environment variables
@@ -157,4 +153,4 @@ const configSummary = {
   }
 };
 
-console.log('Configuration Summary:', JSON.stringify(configSummary, null, 2));
+logInfo('Configuration Summary:', { summary: configSummary });

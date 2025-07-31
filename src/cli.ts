@@ -2,6 +2,7 @@
 import { Command } from 'commander';
 import { getResponse } from './agent';
 import { version } from '../package.json';
+import { logInfo, logError, logDebug, logWarning } from './logging';
 
 const program = new Command();
 
@@ -30,17 +31,17 @@ program
       );
 
       if (result.action === 'answer') {
-        console.log('\nAnswer:', result.answer);
+        logInfo('\nAnswer:', { answer: result.answer });
         if (result.references?.length) {
-          console.log('\nReferences:');
-          result.references.forEach(ref => {
-            console.log(`- ${ref.url}`);
-            console.log(`  "${ref.exactQuote}"`);
-          });
+          logInfo('\nReferences:');
+          for (const ref of result.references) {
+            logInfo(`- ${ref.url}`);
+            logInfo(`  "${ref.exactQuote}"`);
+          }
         }
       }
     } catch (error) {
-      console.error('Error:', error instanceof Error ? error.message : String(error));
+      logError('Error:', { error: error instanceof Error ? error.message : String(error) });
       process.exit(1);
     }
   });

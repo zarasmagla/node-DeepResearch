@@ -1,4 +1,4 @@
-import { BoostedSearchSnippet, KnowledgeItem, SearchSnippet, TrackerContext, VisitAction, WebContent } from "../types";
+import { BoostedSearchSnippet, ImageObject, KnowledgeItem, SearchSnippet, TrackerContext, VisitAction, WebContent } from "../types";
 import { getI18nText, smartMergeStrings } from "./text-tools";
 import { rerankDocuments } from "../tools/jina-rerank";
 import { readUrl } from "../tools/read";
@@ -6,9 +6,10 @@ import { Schemas } from "./schemas";
 import { cherryPick } from "../tools/jina-latechunk";
 import { formatDateBasedOnType } from "./date-tools";
 import { classifyText } from "../tools/jina-classify-spam";
-import { segmentText } from "../tools/segment";
+import { processImage } from "./image-tools";
+import { chunkText } from "../tools/segment";
 import axiosClient from "./axios-client";
-import { logger } from "../winston-logger";
+import { logError, logDebug, logWarning } from '../logging';
 
 export function normalizeUrl(urlString: string, debug = false, options = {
   removeAnchors: true,
@@ -68,7 +69,9 @@ export function normalizeUrl(urlString: string, debug = false, options = {
         try {
           return decodeURIComponent(segment);
         } catch (e) {
-          if (debug) console.error(`Failed to decode path segment: ${segment}`, e);
+          if (debug) {
+            logDebug(`Failed to decode path segment: ${segment}`, { error: e });
+          }
           return segment;
         }
       })
@@ -87,7 +90,9 @@ export function normalizeUrl(urlString: string, debug = false, options = {
             return [key, decodedValue];
           }
         } catch (e) {
-          if (debug) console.error(`Failed to decode query param ${key}=${value}`, e);
+          if (debug) {
+            logDebug(`Failed to decode query param ${key}=${value}`, { error: e });
+          }
         }
         return [key, value];
       })
@@ -132,7 +137,9 @@ export function normalizeUrl(urlString: string, debug = false, options = {
           url.hash = '#' + decodedHash;
         }
       } catch (e) {
-        if (debug) console.error(`Failed to decode fragment: ${url.hash}`, e);
+        if (debug) {
+          logDebug(`Failed to decode fragment: ${url.hash}`, { error: e });
+        }
       }
     }
 
@@ -152,13 +159,15 @@ export function normalizeUrl(urlString: string, debug = false, options = {
         normalizedUrl = decodedUrl;
       }
     } catch (e) {
-      if (debug) console.error('Failed to decode final URL', e);
+      if (debug) {
+        logDebug('Failed to decode final URL', { error: e });
+      }
     }
 
     return normalizedUrl;
   } catch (error) {
     // Main URL parsing error - this one we should throw
-    logger.error(`Invalid URL "${urlString}": ${error}`);
+    logWarning(`Invalid URL "${urlString}": ${error}`);
     return;
   }
 }
@@ -179,7 +188,7 @@ const extractUrlParts = (urlStr: string) => {
       path: url.pathname
     };
   } catch (e) {
-    logger.error(`Error parsing URL: ${urlStr}`, e);
+    logError(`Error parsing URL: ${urlStr}`, { error: e });
     return { hostname: "", path: "" };
   }
 };
@@ -261,7 +270,7 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
     // Step 2: Rerank only the unique contents
     const uniqueContents = Object.keys(uniqueContentMap);
     const uniqueIndicesMap = Object.values(uniqueContentMap);
-    logger.info(`rerank URLs: ${urlItems.length}->${uniqueContents.length}`)
+    logDebug(`unique URLs: ${urlItems.length}->${uniqueContents.length}`);
     rerankDocuments(question, uniqueContents, trackers.tokenTracker)
       .then(({ results }) => {
         // Step 3: Map the scores back to all original items
@@ -280,7 +289,7 @@ export const rankURLs = (urlItems: SearchSnippet[], options: any = {}, trackers:
 
   return (urlItems as BoostedSearchSnippet[]).map(item => {
     if (!item || !item.url) {
-      logger.error('Skipping invalid item:', item);
+      logError('Skipping invalid item:', { item });
       return item; // Return unchanged
     }
 
@@ -421,13 +430,21 @@ export async function getLastModified(url: string): Promise<string | undefined> 
 
     return undefined;
   } catch (error) {
-    logger.error('Failed to fetch last modified date:');
+    logError('Failed to fetch last modified date', { error });
     return undefined;
   }
 }
 
 
 export const keepKPerHostname = (results: BoostedSearchSnippet[], k: number) => {
+  // First count unique hostnames
+  const uniqueHostnames = new Set(results.map(result => extractUrlParts(result.url).hostname));
+
+  // If only one or zero unique hostnames, return original results
+  if (uniqueHostnames.size <= 1) {
+    return results;
+  }
+
   const hostnameMap: Record<string, number> = {};
   const filteredResults: BoostedSearchSnippet[] = [];
 
@@ -453,9 +470,11 @@ export async function processURLs(
   allURLs: Record<string, SearchSnippet>,
   visitedURLs: string[],
   badURLs: string[],
+  imageObjects: ImageObject[],
   schemaGen: Schemas,
   question: string,
-  webContents: Record<string, WebContent>
+  webContents: Record<string, WebContent>,
+  withImages: boolean = false,
 ): Promise<{ urlResults: any[], success: boolean }> {
   // Skip if no URLs to process
   if (urls.length === 0) {
@@ -484,11 +503,11 @@ export async function processURLs(
         // Store normalized URL for consistent reference
         url = normalizedUrl;
 
-        const { response } = await readUrl(url, true, context.tokenTracker);
+        const { response } = await readUrl(url, true, context.tokenTracker, withImages);
         const { data } = response;
         const guessedTime = await getLastModified(url);
         if (guessedTime) {
-          logger.info('Guessed time for', url, guessedTime);
+          logDebug(`Guessed time for ${url}: ${guessedTime}`);
         }
 
         // Early return if no valid data
@@ -501,27 +520,20 @@ export async function processURLs(
         const spamDetectLength = 300;
         const isGoodContent = data.content.length > spamDetectLength || !await classifyText(data.content);
         if (!isGoodContent) {
-          logger.error(`Blocked content ${data.content.length}:`, url, data.content.slice(0, spamDetectLength));
+          logWarning(`Blocked content ${data.content.length}:`, {
+            url,
+            content: data.content.slice(0, spamDetectLength)
+          });
           throw new Error(`Blocked content ${url}`);
         }
 
         // add to web contents
-        const { chunks, chunk_positions } = await segmentText(data.content, context);
-        // filter out the chunks that are too short, minChunkLength is 80
-        const minChunkLength = 80;
-        for (let i = 0; i < chunks.length; i++) {
-          if (chunks[i].length < minChunkLength) {
-            chunks.splice(i, 1);
-            chunk_positions.splice(i, 1);
-            i--;
-          }
-        }
+        const { chunks, chunk_positions } = chunkText(data.content);
         webContents[data.url] = {
-          // full: data.content,
           chunks,
           chunk_positions,
           title: data.title
-        }
+        };
 
         const knowledgeItemQuestion = `Regarding "${question}", what key information does the linked source provide?`;
 
@@ -554,9 +566,20 @@ export async function processURLs(
           }
         });
 
+        // Process images
+        if (withImages && data.images) {
+          const imageEntries = Object.entries(data.images || {});
+          imageEntries.forEach(async ([alt, url]) => {
+            const imageObject = await processImage(url, context.tokenTracker);
+            if (imageObject && !imageObjects.find(i => i.url === imageObject.url)) {
+              imageObjects.push(imageObject);
+            }
+          });
+        }
+
         return { url, result: response };
       } catch (error: any) {
-        logger.error('Error reading URL:', url, error);
+        logError('Error reading URL:', { url, error });
         badURLs.push(url);
         // Extract hostname from the URL
         if (
@@ -571,10 +594,10 @@ export async function processURLs(
           try {
             hostname = extractUrlParts(url).hostname;
           } catch (e) {
-            logger.error('Error parsing URL for hostname:', url, e);
+            logError('Error parsing URL for hostname:', { url, error: e });
           }
           badHostnames.push(hostname);
-          logger.info(`Added ${hostname} to bad hostnames list`);
+          logDebug(`Added ${hostname} to bad hostnames list`);
         }
         return null;
       } finally {
@@ -603,7 +626,7 @@ export async function processURLs(
     Object.keys(allURLs).forEach(url => {
       if (badHostnames.includes(extractUrlParts(url).hostname)) {
         delete allURLs[url];
-        console.log(`Removed ${url} from allURLs`);
+        logWarning(`Removed ${url} from allURLs because of bad hostname`);
       }
     }
     )

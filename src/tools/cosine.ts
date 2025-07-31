@@ -1,3 +1,5 @@
+import { logInfo, logError, logDebug, logWarning } from '../logging';
+
 export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (vecA.length !== vecB.length) {
     throw new Error("Vectors must have the same length");
@@ -21,7 +23,7 @@ export function cosineSimilarity(vecA: number[], vecB: number[]): number {
 
 // Fallback similarity ranking using Jaccard
 export async function jaccardRank(query: string, documents: string[]): Promise<{ results: { index: number, relevance_score: number }[] }> {
-  console.log(`[fallback] Using Jaccard similarity for ${documents.length} documents`);
+  logWarning(`[fallback] Using Jaccard similarity for ${documents.length} documents`);
   // Convert texts to lowercase and tokenize by splitting on non-alphanumeric characters
   const queryTokens = new Set(query.toLowerCase().split(/\W+/).filter(t => t.length > 0));
 
@@ -37,11 +39,11 @@ export async function jaccardRank(query: string, documents: string[]): Promise<{
     // Calculate Jaccard similarity
     const score = union.size === 0 ? 0 : intersection.size / union.size;
 
-    return {index, relevance_score: score};
+    return { index, relevance_score: score };
   });
 
   // Sort by score in descending order
   results.sort((a, b) => b.relevance_score - a.relevance_score);
 
-  return {results};
+  return { results };
 }

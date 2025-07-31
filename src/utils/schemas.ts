@@ -5,6 +5,7 @@ import { EvaluationType, PromptPair } from "../types";
 export const MAX_URLS_PER_STEP = 5
 export const MAX_QUERIES_PER_STEP = 5
 export const MAX_REFLECT_PER_STEP = 2
+export const MAX_CLUSTERS = 5
 
 function getLanguagePrompt(question: string): PromptPair {
   return {
@@ -108,6 +109,7 @@ const languageISO6391Map: Record<string, string> = {
 export class Schemas {
   public languageStyle: string = 'formal English';
   public languageCode: string = 'en';
+  public searchLanguageCode: string | undefined = undefined;
 
 
   async setLanguage(query: string) {
@@ -133,8 +135,9 @@ export class Schemas {
       },
     });
 
-    this.languageCode = (result.object as any).langCode;
-    this.languageStyle = (result.object as any).langStyle;
+    this.languageCode = result.object.langCode;
+    this.languageStyle = result.object.langStyle;
+    logDebug(`language: ${this.languageCode} -> ${this.languageStyle}`);
   }
 
   getLanguagePrompt() {
@@ -170,28 +173,58 @@ export class Schemas {
   }
 
   getErrorAnalysisSchema() {
-    return z.object({
+    const schema = z.object({
       recap: z.string().describe(`Recap of the actions taken and the steps conducted in first person narrative. Maximum 500 characters.`),
       blame: z.string().describe(`Which action or the step was the root cause of the answer rejection. ${this.getLanguagePrompt()} Maximum 500 characters.`),
       improvement: z.string().describe(`Suggested key improvement for the next iteration, do not use bullet points, be concise and hot-take vibe. ${this.getLanguagePrompt()} Maximum 500 characters.`)
     });
+    return z.toJSONSchema(schema);
   }
 
-  getErrorAnalysisJsonSchema() {
-    return z.toJSONSchema(this.getErrorAnalysisSchema());
+  getResearchPlanSchema(teamSize: number = 3) {
+    const schema = z.object({
+      think: z.string()
+        .describe('Explain your decomposition strategy and how you ensured orthogonality between subproblems')
+        .max(300),
+
+      subproblems: z.array(
+        z.string()
+          .describe('Complete research plan containing: title, scope, key questions, methodology')
+          .max(500)
+      )
+        .length(teamSize)
+        .describe(`Array of exactly ${teamSize} orthogonal research plans, each focusing on a different fundamental dimension of the main topic`)
+    });
+    return z.toJSONSchema(schema);
+  }
+
+  getSerpClusterSchema() {
+    const schema = z.object({
+      think: z.string().describe(`Short explain of why you group the search results like this. ${this.getLanguagePrompt()}`).max(500),
+      clusters: z.array(
+        z.object({
+          insight: z.string().describe('Summary and list key numbers, data, soundbites, and insights that worth to be highlighted. End with an actionable advice such as "Visit these URLs if you want to understand [what...]". Do not use "This cluster..."').max(200),
+          question: z.string().describe('What concrete and specific question this cluster answers. Should not be general question like "where can I find [what...]"').max(100),
+          urls: z.array(z.string().describe('URLs in this cluster.').max(100))
+        }))
+        .max(MAX_CLUSTERS)
+        .describe(`'The optimal clustering of search engine results, orthogonal to each other. Maximum ${MAX_CLUSTERS} clusters allowed.'`)
+    });
+    return z.toJSONSchema(schema);
   }
 
   getQueryRewriterSchema() {
     const schema = z.object({
-      think: z.string().describe(`Explain why you choose those search queries. ${this.getLanguagePrompt()} Maximum 500 characters.`),
+      think: z.string().describe(`Explain why you choose those search queries. ${this.getLanguagePrompt()}`).max(500),
       queries: z.array(
         z.object({
           tbs: z.enum(['qdr:h', 'qdr:d', 'qdr:w', 'qdr:m', 'qdr:y']).describe('time-based search filter, must use this field if the search request asks for latest info. qdr:h for past hour, qdr:d for past 24 hours, qdr:w for past week, qdr:m for past month, qdr:y for past year. Choose exactly one.'),
-          location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the city level in order to simulate a real user search.').optional(),
-          q: z.string().describe('keyword-based search query, 2-3 words preferred. Maximum 80 characters.'),
+          location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the city level in order to simulate a real user\'s search.').optional(),
+          q: z.string().describe(`keyword-based search query, 2-3 words preferred, total length < 30 characters. ${this.searchLanguageCode ? `Must in ${this.searchLanguageCode}` : ''}`).max(50),
         }))
         .describe(`'Array of search keywords queries, orthogonal to each other. Maximum ${MAX_QUERIES_PER_STEP} queries allowed.'`)
     });
+
     return z.toJSONSchema(schema);
   }
 

@@ -2,10 +2,11 @@ import { AnswerAction, KnowledgeItem, Reference } from "../types";
 import i18nJSON from './i18n.json';
 import { JSDOM } from 'jsdom';
 import fs from "fs/promises";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 export function buildMdFromAnswer(answer: AnswerAction): string {
-  return repairMarkdownFootnotes(answer.answer, answer.references);
+  return repairMarkdownFootnotes(answer.answer || answer.mdAnswer || '', answer.references);
 }
 
 export function repairMarkdownFootnotes(
@@ -23,8 +24,8 @@ export function repairMarkdownFootnotes(
 
   // Helper function to format references
   const formatReferences = (refs: Array<Reference>) => {
-    return refs.map((ref, i) => {
-      const cleanQuote = ref.exactQuote
+    return refs.filter(ref => ref?.url && ref?.title && ref?.exactQuote).map((ref, i) => {
+      const cleanQuote = (ref?.exactQuote || '')
         .replace(/[^\p{L}\p{N}\s]/gu, ' ')
         .replace(/\s+/g, ' ').trim();
 
@@ -163,6 +164,7 @@ ${formatReferences(references)}
  * It extracts existing footnote definitions and uses them as references
  */
 export function repairMarkdownFootnotesOuter(markdownString: string): string {
+  if (!markdownString) return '';
   // First trim the string to handle any extra whitespace
   markdownString = markdownString.trim();
 
@@ -202,6 +204,7 @@ export function repairMarkdownFootnotesOuter(markdownString: string): string {
   let footnoteMatch;
   while ((footnoteMatch = footnoteDefRegex.exec(footnotesPart)) !== null) {
     // The footnote content
+    if (!footnoteMatch[2]) continue;
     let content = footnoteMatch[2].trim();
 
     // Extract URL and title if present
@@ -222,11 +225,13 @@ export function repairMarkdownFootnotesOuter(markdownString: string): string {
     }
 
     // Add to references array
-    references.push({
-      exactQuote: content,
-      url,
-      title
-    });
+    if (content && title && url) {
+      references.push({
+        exactQuote: content,
+        url,
+        title,
+      });
+    }
   }
 
   // Only process if we found valid references
@@ -260,7 +265,7 @@ export function getI18nText(key: string, lang = 'en', params: Record<string, str
   const i18nData = i18nJSON as Record<string, any>;
   // 确保语言代码存在，如果不存在则使用英语作为后备
   if (!i18nData[lang]) {
-    console.error(`Language '${lang}' not found, falling back to English.`);
+    logError(`Language '${lang}' not found, falling back to English.`);
     lang = 'en';
   }
 
@@ -269,12 +274,12 @@ export function getI18nText(key: string, lang = 'en', params: Record<string, str
 
   // 如果文本不存在，则使用英语作为后备
   if (!text) {
-    console.error(`Key '${key}' not found for language '${lang}', falling back to English.`);
+    logError(`Key '${key}' not found for language '${lang}', falling back to English.`);
     text = i18nData['en'][key];
 
     // 如果英语版本也不存在，则返回键名
     if (!text) {
-      console.error(`Key '${key}' not found for English either.`);
+      logError(`Key '${key}' not found for English either.`);
       return key;
     }
   }
@@ -484,7 +489,7 @@ export function convertHtmlTablesToMd(mdString: string): string {
 
     return result;
   } catch (error) {
-    console.error('Error converting HTML tables to Markdown:', error);
+    logError('Error converting HTML tables to Markdown:', { error });
     return mdString; // Return original string if conversion fails
   }
 }
@@ -625,7 +630,7 @@ function convertSingleHtmlTableToMd(htmlTable: string): string | null {
 
     return mdTable;
   } catch (error) {
-    console.error('Error converting single HTML table:', error);
+    logError('Error converting single HTML table:', { error });
     return null;
   }
 }
@@ -822,4 +827,112 @@ export async function detectBrokenUnicodeViaFileIO(str: string) {
 
   // Now check for the visible replacement character
   return { broken: readStr.includes('�'), readStr };
+}
+
+interface NgramResult {
+  ngram: string;
+  freq: number;
+  pmi?: number;  // Added PMI score
+}
+
+function calculatePMI(
+  ngram: string,
+  ngramFreq: number,
+  wordFreqs: Map<string, number>,
+  totalNgrams: number
+): number {
+  const words = ngram.split(' ');
+  if (words.length < 2) return 0;
+
+  // Calculate joint probability
+  const jointProb = ngramFreq / totalNgrams;
+
+  // Calculate individual probabilities
+  const wordProbs = words.map(word => (wordFreqs.get(word) || 0) / totalNgrams);
+
+  // Calculate PMI
+  const pmi = Math.log2(jointProb / wordProbs.reduce((a, b) => a * b, 1));
+  return pmi;
+}
+
+function isCJK(char: string): boolean {
+  const code = char.charCodeAt(0);
+  return (
+    (code >= 0x4E00 && code <= 0x9FFF) || // CJK Unified Ideographs
+    (code >= 0x3040 && code <= 0x309F) || // Hiragana
+    (code >= 0x30A0 && code <= 0x30FF) || // Katakana
+    (code >= 0xAC00 && code <= 0xD7AF)    // Hangul
+  );
+}
+
+function isCJKText(text: string): boolean {
+  return Array.from(text).some(char => isCJK(char));
+}
+
+export function extractNgrams(
+  text: string,
+  n: number,
+  minFreq: number = 2,
+  minPMI: number = 1.0  // Added minimum PMI threshold
+): NgramResult[] {
+  // Split text into chunks by newlines
+  const chunks = text.split('\n').filter(chunk => chunk.trim().length > 0);
+
+  // Maps to store frequencies
+  const ngramFreq: Map<string, number> = new Map();
+  const wordFreq: Map<string, number> = new Map();
+  let totalNgrams = 0;
+
+  // First pass: collect frequencies
+  for (const chunk of chunks) {
+    if (isCJKText(chunk)) {
+      // For CJK text, use character-level ngrams
+      for (let len = 2; len <= n; len++) {
+        for (let i = 0; i <= chunk.length - len; i++) {
+          const ngram = chunk.slice(i, i + len);
+          ngramFreq.set(ngram, (ngramFreq.get(ngram) || 0) + 1);
+          totalNgrams++;
+        }
+      }
+    } else {
+      // For non-CJK text, use word-level ngrams
+      const words = chunk.split(/\s+/).filter(word => word.length > 0);
+
+      // Count individual word frequencies
+      words.forEach(word => {
+        wordFreq.set(word, (wordFreq.get(word) || 0) + 1);
+      });
+
+      // Count ngram frequencies
+      for (let len = 2; len <= n; len++) {
+        for (let i = 0; i <= words.length - len; i++) {
+          const ngram = words.slice(i, i + len).join(' ');
+          ngramFreq.set(ngram, (ngramFreq.get(ngram) || 0) + 1);
+          totalNgrams++;
+        }
+      }
+    }
+  }
+
+  // Second pass: calculate PMI and filter
+  const results: NgramResult[] = Array.from(ngramFreq.entries())
+    .filter(([ngram, freq]) => freq >= minFreq)
+    .map(([ngram, freq]) => {
+      const pmi = isCJKText(ngram) ? 0 : calculatePMI(ngram, freq, wordFreq, totalNgrams);
+      return { ngram, freq, pmi };
+    })
+    .filter(result => result.pmi === undefined || result.pmi >= minPMI)
+    .sort((a, b) => {
+      // If both have PMI scores, sort by PMI
+      if (a.pmi !== undefined && b.pmi !== undefined) {
+        return b.pmi - a.pmi;
+      }
+      // If only one has PMI, prioritize the one with PMI
+      if (a.pmi !== undefined) return -1;
+      if (b.pmi !== undefined) return 1;
+      // If neither has PMI (CJK text), sort by frequency
+      return b.freq - a.freq;
+    });
+
+  return results;
 }

@@ -1,6 +1,7 @@
 import { TokenTracker } from "../utils/token-tracker";
 import { JINA_API_KEY } from "../config";
 import axiosClient from "../utils/axios-client";
+import { logError } from '../logging';
 
 const JINA_API_URL = 'https://api.jina.ai/v1/classify';
 
@@ -80,9 +81,9 @@ export async function classifyText(
     return false; // Default to false if no prediction is available
   } catch (error) {
     if (error instanceof Error && error.message.includes('timed out')) {
-      console.error('Classification request timed out:', error.message);
+      logError('Classification request timed out:', { error: error.message });
     } else {
-      console.error('Error in classifying text:', error);
+      logError('Error in classifying text:', { error });
     }
     return false; // Default to false in case of error or timeout
   }

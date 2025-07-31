@@ -13,7 +13,7 @@
   "defaults": {
     "search_provider": "jina",
     "llm_provider": "gemini",
-    "step_sleep": 100
+    "step_sleep": 1
   },
   "providers": {
     "gemini": {
@@ -34,17 +34,34 @@
         "maxTokens": 30000
       },
       "tools": {
-        "coder": { "temperature": 0.7 },
-        "searchGrounding": { "temperature": 0 },
-        "dedup": { "temperature": 0.1 },
-        "evaluator": { "temperature": 0.6, "maxTokens": 15000 },
-        "errorAnalyzer": { "maxTokens": 20000 },
-        "queryRewriter": { "temperature": 0.1 },
-        "agent": { "temperature": 0.7, "maxTokens": 40000 },
-        "agentBeastMode": { "temperature": 0.7, "maxTokens": 60000 },
+        "coder": {
+          "temperature": 0.7
+        },
+        "evaluator": {
+          "temperature": 0.6,
+          "maxTokens": 200
+        },
+        "errorAnalyzer": {},
+        "queryRewriter": {
+          "temperature": 0.1
+        },
+        "researchPlanner": {},
+        "serpCluster": {},
+        "agent": {
+          "temperature": 0.7
+        },
+        "agentBeastMode": {
+          "temperature": 0.7
+        },
+        "finalizer": {
+          "model": "gemini-2.5-flash-preview-05-20"
+        },
+        "reducer": {
+          "maxTokens": 16000
+        },
         "fallback": {
-          "maxTokens": 30000,
-          "model": "gemini-2.5-flash"
+          "maxTokens": 8000,
+          "model": "gemini-2.0-flash-lite"
         }
       }
     },
@@ -55,15 +72,29 @@
         "maxTokens": 8000
       },
       "tools": {
-        "coder": { "temperature": 0.7 },
-        "searchGrounding": { "temperature": 0 },
-        "dedup": { "temperature": 0.1 },
+        "coder": {
+          "temperature": 0.7
+        },
+        "researchPlanner": {},
         "evaluator": {},
         "errorAnalyzer": {},
-        "queryRewriter": { "temperature": 0.1 },
-        "agent": { "temperature": 0.7 },
-        "agentBeastMode": { "temperature": 0.7 },
-        "fallback": { "temperature": 0 }
+        "queryRewriter": {
+          "temperature": 0.1
+        },
+        "serpCluster": {},
+        "agent": {
+          "temperature": 0.7
+        },
+        "agentBeastMode": {
+          "temperature": 0.7
+        },
+        "fallback": {
+          "temperature": 0
+        },
+        "finalizer": {},
+        "reducer": {
+          "maxTokens": 16000
+        }
       }
     }
   }

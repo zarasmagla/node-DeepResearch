@@ -24,7 +24,8 @@ import {
 } from "./types";
 import { TrackerContext } from "./types";
 import { search } from "./tools/jina-search";
-// import {grounding} from "./tools/grounding";
+
+import { zodToJsonSchema } from "zod-to-json-schema";
 import { ObjectGeneratorSafe } from "./utils/safe-generator";
 import { CodeSandbox } from "./tools/code-sandbox";
 import { serperSearch } from "./tools/serper-search";
@@ -57,17 +58,18 @@ import {
   Schemas,
 } from "./utils/schemas";
 import { formatDateBasedOnType, formatDateRange } from "./utils/date-tools";
-import { repairUnknownChars } from "./tools/broken-ch-fixer";
-import { reviseAnswer } from "./tools/md-fixer";
-import { buildReferences } from "./tools/build-ref";
-import { get_agent_logger } from "./utils/structured-logger";
-import { logger } from "./winston-logger";
-import { Langfuse } from "langfuse";
+import { finalizeAnswer } from "./tools/finalizer";
+import { buildImageReferences, buildReferences } from "./tools/build-ref";
+import { logInfo, logError, logDebug, logWarning } from './logging';
+import { researchPlan } from './tools/research-planner';
+import { reduceAnswers } from './tools/reducer';
+import { AxiosError } from 'axios';
+import { dedupImagesWithEmbeddings, filterImages } from './utils/image-tools';
+import { serpCluster } from './tools/serp-cluster';
 
-async function sleep(ms: number) {
-  const seconds = Math.ceil(ms / 1000);
-  console.log(`Waiting ${seconds}s...`);
-  return new Promise((resolve) => setTimeout(resolve, ms));
+async function wait(seconds: number) {
+  logDebug(`Waiting ${seconds}s...`);
+  await new Promise(resolve => setTimeout(resolve, seconds * 1000));
 }
 
 function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
@@ -76,35 +78,33 @@ function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
   knowledge.forEach((k) => {
     messages.push({ role: "user", content: k.question.trim() });
     const aMsg = `
-${
-  k.updated && (k.type === "url" || k.type === "side-info")
-    ? `
+${k.updated && (k.type === "url" || k.type === "side-info")
+        ? `
 <answer-datetime>
 ${k.updated}
 </answer-datetime>
 `
-    : ""
-}
+        : ""
+      }
 
-${
-  k.references && (k.type === "url" || k.type === "side-info")
-    ? `
+${k.references && (k.type === "url" || k.type === "side-info")
+        ? `
 <references>
 ${k.references
-  .map(
-    (ref) => `
+          .map(
+            (ref) => `
 {
   "url": "${ref.url}",
   "title": "${ref.title || ""}",
   "exactQuote": "${ref.exactQuote || ""}",
 }
 `
-  )
-  .join(",")}
+          )
+          .join(",")}
 </references>
 `
-    : ""
-}
+        : ""
+      }
 
 
 ${k.answer}
@@ -126,25 +126,24 @@ function composeMsgs(
   const userContent = `
 ${question}
 
-${
-  finalAnswerPIP?.length
-    ? `
+${finalAnswerPIP?.length
+      ? `
 <answer-requirements>
 - You provide deep, unexpected insights, identifying hidden patterns and connections, and creating "aha moments.".
 - You break conventional thinking, establish unique cross-disciplinary connections, and bring new perspectives to the user.
 - Follow reviewer's feedback and improve your answer quality.
 ${finalAnswerPIP
-  .map(
-    (p, idx) => `
+        .map(
+          (p, idx) => `
 <reviewer-${idx + 1}>
 ${p}
 </reviewer-${idx + 1}>
 `
-  )
-  .join("\n")}
+        )
+        .join("\n")}
 </answer-requirements>`
-    : ""
-}
+      : ""
+    }
     `.trim();
 
   msgs.push({ role: "user", content: removeExtraLineBreaks(userContent) });
@@ -192,8 +191,7 @@ ${context.join("\n")}
     const urlListStr = urlList
       .map(
         (item, idx) =>
-          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${
-            item.url
+          `  - [idx=${idx + 1}] [weight=${item.score.toFixed(2)}] "${item.url
           }": "${item.merged.slice(0, 50)}"`
       )
       .join("\n");
@@ -217,16 +215,15 @@ ${urlListStr}
 - Use web search to find relevant information
 - Build a search request based on the deep intention behind the original question and the expected answer format
 - Always prefer a single search request, only add another request if the original question covers multiple aspects or elements and one query is not enough, each request focus on one specific aspect of the original question 
-${
-  allKeywords?.length
-    ? `
+${allKeywords?.length
+        ? `
 - Avoid those unsuccessful search requests and queries:
 <bad-requests>
 ${allKeywords.join("\n")}
 </bad-requests>
 `.trim()
-    : ""
-}
+        : ""
+      }
 </action-search>
 `);
   }
@@ -324,13 +321,12 @@ async function updateReferences(
     .filter(Boolean) as Reference[]; // Add type assertion here
 
   // parallel process guess all url datetime
-  await Promise.all(
-    (thisStep.references || [])
-      .filter((ref) => !ref.dateTime)
-      .map(async (ref) => {
-        ref.dateTime = (await getLastModified(ref.url)) || "";
-      })
-  );
+  await Promise.all((thisStep.references || []).filter(ref => !ref.dateTime)
+    .map(async ref => {
+      ref.dateTime = await getLastModified(ref.url) || '';
+    }));
+
+  logDebug('Updated references:', { references: thisStep.references });
 }
 
 async function executeSearchQueries(
@@ -339,7 +335,9 @@ async function executeSearchQueries(
   allURLs: Record<string, SearchSnippet>,
   SchemaGen: Schemas,
   webContents: Record<string, WebContent>,
-  onlyHostnames?: string[]
+  onlyHostnames?: string[],
+  searchProvider?: string,
+  meta?: string
 ): Promise<{
   newKnowledge: KnowledgeItem[];
   searchedQueries: string[];
@@ -367,11 +365,12 @@ async function executeSearchQueries(
     }
 
     try {
-      console.log("Search query:", query);
-      switch (SEARCH_PROVIDER) {
-        case "jina":
-          results =
-            (await search(query, context.tokenTracker)).response?.data || [];
+      logDebug('Search query:', { query });
+      switch (searchProvider || SEARCH_PROVIDER) {
+        case 'jina':
+        case 'arxiv':
+          const num = meta ? undefined : 30;
+          results = (await search(query, searchProvider, num, meta, context.tokenTracker)).response.results || [];
           break;
         case "duck":
           results = (
@@ -392,10 +391,17 @@ async function executeSearchQueries(
         throw new Error("No results found");
       }
     } catch (error) {
-      logger.error(`${SEARCH_PROVIDER} search failed for query:`, query, error);
+      logError(`${SEARCH_PROVIDER} search failed for query:`, {
+        query,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      // check if the error is 401
+      if (error instanceof AxiosError && error.response?.status === 401 && (searchProvider === 'jina' || searchProvider === 'arxiv')) {
+        throw new Error('Unauthorized Jina API key');
+      }
       continue;
     } finally {
-      await sleep(STEP_SLEEP);
+      await wait(STEP_SLEEP);
     }
 
     const minResults: SearchSnippet[] = results
@@ -425,48 +431,45 @@ async function executeSearchQueries(
 
     searchedQueries.push(query.q);
 
-    const snippets = minResults
-      .map((r) => ({
-        url: r.url,
-        title: r.title,
-        description: removeHTMLtags(r.description),
-        date: r.date,
-      }))
-      .filter((s) => s.url && s.description);
-
-    if (snippets.length > 0) {
+    try {
+      const clusters = await serpCluster(minResults, context, SchemaGen);
+      clusters.forEach(c => {
+        newKnowledge.push({
+          question: c.question,
+          answer: c.insight,
+          references: c.urls,
+          type: 'url',
+        });
+      });
+    } catch (error) {
+      logWarning('serpCluster failed:', { error });
+    } finally {
       newKnowledge.push({
         question: `What do Internet say about "${oldQuery}"?`,
-        answer: snippets.map((s) => s.description).join("; "),
-        type: "side-info",
-        references: snippets.map((s) => ({
-          url: s.url,
-          title: s.title,
-          exactQuote: s.description,
-        })),
-        updated: query.tbs ? formatDateRange(query) : undefined,
+        answer: removeHTMLtags(minResults.map(r => r.description).join('; ')),
+        type: 'side-info',
+        updated: query.tbs ? formatDateRange(query) : undefined
       });
+      context.actionTracker.trackAction({
+        thisStep: {
+          action: 'search',
+          think: '',
+          searchRequests: [oldQuery]
+        } as SearchAction
+      })
     }
+
+
   }
   if (searchedQueries.length === 0) {
     if (onlyHostnames && onlyHostnames.length > 0) {
-      console.log(
-        `No results found for queries: ${uniqQOnly.join(
-          ", "
-        )} on hostnames: ${onlyHostnames.join(", ")}`
-      );
-      context.actionTracker.trackThink(
-        "hostnames_no_results",
-        SchemaGen.languageCode,
-        { hostnames: onlyHostnames.join(", ") }
-      );
+      logWarning(`No results found for queries: ${uniqQOnly.join(', ')} on hostnames: ${onlyHostnames.join(', ')}`);
+      context.actionTracker.trackThink('hostnames_no_results', SchemaGen.languageCode, { hostnames: onlyHostnames.join(', ') });
     }
   } else {
-    console.log(`Utility/Queries: ${utilityScore}/${searchedQueries.length}`);
+    logDebug(`Utility/Queries: ${utilityScore}/${searchedQueries.length}`);
     if (searchedQueries.length > MAX_QUERIES_PER_STEP) {
-      console.log(
-        `So many queries??? ${searchedQueries.map((q) => `"${q}"`).join(", ")}`
-      );
+      logDebug(`So many queries??? ${searchedQueries.map(q => `"${q}"`).join(', ')}`)
     }
 
     // Log successful search completion
@@ -503,15 +506,14 @@ export async function getResponse(
   badHostnames: string[] = [],
   onlyHostnames: string[] = [],
   maxRef: number = 10,
-  minRelScore: number = 0.75,
-  languageCode: string | undefined = undefined
-): Promise<{
-  result: StepAction;
-  context: TrackerContext;
-  visitedURLs: string[];
-  readURLs: string[];
-  allURLs: string[];
-}> {
+  minRelScore: number = 0.80,
+  languageCode: string | undefined = undefined,
+  searchLanguageCode?: string,
+  searchProvider?: string,
+  withImages: boolean = false,
+  teamSize: number = 1
+): Promise<{ result: StepAction; context: TrackerContext; visitedURLs: string[], readURLs: string[], allURLs: string[], imageReferences?: ImageReference[] }> {
+
   let step = 0;
   let totalStep = 0;
   const allContext: StepAction[] = []; // all steps in the current session, including those leads to wrong results
@@ -538,8 +540,10 @@ export async function getResponse(
   }
 
   const SchemaGen = new Schemas();
-  await SchemaGen.setLanguage(languageCode || question);
-
+  await SchemaGen.setLanguage(languageCode || question)
+  if (searchLanguageCode) {
+    SchemaGen.searchLanguageCode = searchLanguageCode;
+  }
   const context: TrackerContext = {
     tokenTracker:
       existingContext?.tokenTracker || new TokenTracker(tokenBudget),
@@ -595,7 +599,8 @@ export async function getResponse(
   const gaps: string[] = [question]; // All questions to be answered including the orginal question
   const allQuestions = [question];
   const allKeywords: string[] = [];
-  const allKnowledge: KnowledgeItem[] = []; // knowledge are intermedidate questions that are answered
+  let candidateAnswers: string[] = [];
+  const allKnowledge: KnowledgeItem[] = [];  // knowledge are intermedidate questions that are answered
 
   let diaryContext = [];
   let weightedURLs: BoostedSearchSnippet[] = [];
@@ -617,6 +622,7 @@ export async function getResponse(
   const allWebContents: Record<string, WebContent> = {};
   const visitedURLs: string[] = [];
   const badURLs: string[] = [];
+  const imageObjects: ImageObject[] = [];
   const evaluationMetrics: Record<string, RepeatEvaluationType[]> = {};
   // reserve the 10% final budget for the beast mode
   const regularBudget = tokenBudget * 0.85;
@@ -682,13 +688,11 @@ export async function getResponse(
       },
     });
 
-    const budgetPercentage = (
-      (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget) *
-      100
-    ).toFixed(2);
-    console.log(`Step ${totalStep} / Budget used ${budgetPercentage}%`);
-    console.log("Gaps:", gaps);
+
     allowReflect = allowReflect && gaps.length <= MAX_REFLECT_PER_STEP;
+    const budgetPercentage = (context.tokenTracker.getTotalUsage().totalTokens / tokenBudget * 100).toFixed(2);
+    logDebug(`Step ${totalStep} / Budget used ${budgetPercentage}%`, { gaps });
+    allowReflect = allowReflect && (gaps.length <= MAX_REFLECT_PER_STEP);
     // rotating question from gaps
     const currentQuestion: string = gaps[totalStep % gaps.length];
     // if (!evaluationMetrics[currentQuestion]) {
@@ -729,13 +733,12 @@ export async function getResponse(
         filterURLs(allURLs, visitedURLs, badHostnames, onlyHostnames),
         {
           question: currentQuestion,
-          boostHostnames,
-        },
-        context
-      );
+          boostHostnames
+        }, context);
+
       // improve diversity by keep top 2 urls of each hostname
       weightedURLs = keepKPerHostname(weightedURLs, 2);
-      console.log("Weighted URLs:", weightedURLs.length);
+      logDebug('Weighted URLs:', { count: weightedURLs.length });
     }
     allowRead = allowRead && weightedURLs.length > 0;
 
@@ -827,17 +830,8 @@ export async function getResponse(
     });
 
     // print allowed and chose action
-    const actionsStr = [
-      allowSearch,
-      allowRead,
-      allowAnswer,
-      allowReflect,
-      allowCoding,
-    ]
-      .map((a, i) => (a ? ["search", "read", "answer", "reflect"][i] : null))
-      .filter((a) => a)
-      .join(", ");
-    console.log(`${currentQuestion}: ${thisStep.action} <- [${actionsStr}]`);
+    const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect, allowCoding].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
+    logDebug(`Step decision: ${thisStep.action} <- [${actionsStr}]`, { thisStep, currentQuestion });
 
     context.actionTracker.trackAction({ totalStep, thisStep, gaps });
 
@@ -892,7 +886,11 @@ export async function getResponse(
         ...thisStep,
       });
 
-      let evaluation: EvaluationResponse = { pass: true, think: "" };
+      logDebug('Current question evaluation:', {
+        question: currentQuestion,
+        metrics: evaluationMetrics[currentQuestion]
+      });
+      let evaluation: EvaluationResponse = { pass: true, think: '' };
       if (evaluationMetrics[currentQuestion].length > 0) {
         context.actionTracker.trackThink("eval_first", SchemaGen.languageCode);
 
@@ -1158,13 +1156,60 @@ But then you realized you have asked them before. You decided to to think out of
         context,
         allURLs,
         SchemaGen,
-        allWebContents
+        allWebContents,
+        undefined,
+        searchProvider,
       );
 
       allKeywords.push(...searchedQueries);
       allKnowledge.push(...newKnowledge);
 
       const soundBites = newKnowledge.map((k) => k.answer).join(" ");
+
+      if (teamSize > 1) {
+        const subproblems = await researchPlan(question, teamSize, soundBites, context, SchemaGen);
+        if (subproblems.length > 1) {
+
+          // parallel call getResponse for each subproblem with exact same parameters from the current step, but their teamSize is 1
+          const subproblemResponses = await Promise.all(subproblems.map(subproblem => getResponse(subproblem,
+            tokenBudget,
+            maxBadAttempts,
+            context,
+            messages,
+            numReturnedURLs,
+            noDirectAnswer,
+            boostHostnames,
+            badHostnames,
+            onlyHostnames,
+            maxRef,
+            minRelScore, languageCode, searchLanguageCode, searchProvider, withImages, 1)));
+          // convert current step to AnswerAction
+          thisStep = {
+            action: 'answer',
+            think: thisStep.think,
+            answer: subproblemResponses.map(r => (r.result as AnswerAction).answer).join('\n\n'),
+            mdAnswer: subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).join('\n\n'),
+            references: subproblemResponses.map(r => (r.result as AnswerAction).references).flat(),
+            imageReferences: subproblemResponses.map(r => (r.result as AnswerAction).imageReferences).filter(Boolean).flat(),
+            isFinal: true,
+            isAggregated: true
+          } as AnswerAction;
+          candidateAnswers = subproblemResponses.map(r => (r.result as AnswerAction).mdAnswer).filter(a => a) as string[];
+          // dedup references by their urls
+          const uniqueURLs = new Set(thisStep.references.filter(r => r?.url).map(r => r.url));
+          thisStep.references = Array.from(uniqueURLs).map(url => (thisStep as AnswerAction).references.find(r => r?.url === url)) as Reference[];
+
+          // aggregate urls
+          visitedURLs.push(...subproblemResponses.map(r => r.readURLs).flat());
+          weightedURLs = subproblemResponses.map(r => r.allURLs.map(url => ({ url, title: '' } as BoostedSearchSnippet))).flat();
+
+          // break the loop, jump directly final boxing
+          break;
+        } else {
+          // if there is only one subproblem, then we skip the recurrsion
+          gaps.push(subproblems[0]);
+        }
+      }
 
       // rewrite queries with initial soundbites
       let keywordsQueries = await rewriteQuery(
@@ -1189,14 +1234,16 @@ But then you realized you have asked them before. You decided to to think out of
       let anyResult = false;
 
       if (keywordsQueries.length > 0) {
-        const { searchedQueries, newKnowledge } = await executeSearchQueries(
-          keywordsQueries,
-          context,
-          allURLs,
-          SchemaGen,
-          allWebContents,
-          onlyHostnames
-        );
+        const { searchedQueries, newKnowledge } =
+          await executeSearchQueries(
+            keywordsQueries,
+            context,
+            allURLs,
+            SchemaGen,
+            allWebContents,
+            onlyHostnames,
+            searchProvider
+          );
 
         if (searchedQueries.length > 0) {
           anyResult = true;
@@ -1206,8 +1253,8 @@ But then you realized you have asked them before. You decided to to think out of
           diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords: "${keywordsQueries
-            .map((q) => q.q)
-            .join(", ")}".
+              .map((q) => q.q)
+              .join(", ")}".
 You found quite some information and add them to your URL list and **visit** them later when needed. 
 `);
 
@@ -1233,8 +1280,8 @@ You found quite some information and add them to your URL list and **visit** the
         diaryContext.push(`
 At step ${step}, you took the **search** action and look for external information for the question: "${currentQuestion}".
 In particular, you tried to search for the following keywords:  "${keywordsQueries
-          .map((q) => q.q)
-          .join(", ")}".
+            .map((q) => q.q)
+            .join(", ")}".
 But then you realized you have already searched for these keywords before, no new information is returned.
 You decided to think out of the box or cut from a completely different angle.
 `);
@@ -1292,6 +1339,7 @@ You decided to think out of the box or cut from a completely different angle.
       ].slice(0, MAX_URLS_PER_STEP);
 
       const uniqueURLs = thisStep.URLTargets;
+      logDebug('Unique URLs:', { urls: uniqueURLs });
 
       if (uniqueURLs.length > 0) {
         const { urlResults, success } = await processURLs(
@@ -1301,9 +1349,11 @@ You decided to think out of the box or cut from a completely different angle.
           allURLs,
           visitedURLs,
           badURLs,
+          imageObjects,
           SchemaGen,
           currentQuestion,
-          allWebContents
+          allWebContents,
+          withImages
         );
 
         diaryContext.push(
@@ -1318,15 +1368,15 @@ You found some useful information on the web and add them to your knowledge for 
           totalStep,
           ...(success
             ? {
-                question: currentQuestion,
-                ...thisStep,
-                result: urlResults,
-              }
+              question: currentQuestion,
+              ...thisStep,
+              result: urlResults,
+            }
             : {
-                ...thisStep,
-                result:
-                  "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
-              }),
+              ...thisStep,
+              result:
+                "You have tried all possible URLs and found no new information. You must think out of the box or different angle!!!",
+            }),
         });
 
         visitSpan.end({
@@ -1411,7 +1461,9 @@ You found the solution and add it to your knowledge for future reference.
           },
         });
       } catch (error) {
-        console.log("Error solving coding issue:", error);
+        logError('Error solving coding issue:', {
+          error: error instanceof Error ? error.message : String(error)
+        });
         diaryContext.push(`
 At step ${step}, you took the **coding** action and try to solve the coding issue: ${thisStep.codingIssue}.
 But unfortunately, you failed to solve the issue. You need to think out of the box or cut from a completely different angle.
@@ -1449,35 +1501,23 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       });
     }
 
-    await storeContext(
-      system,
-      schema,
-      {
-        allContext,
-        allKeywords,
-        allQuestions,
-        allKnowledge,
-        weightedURLs,
-        msgWithKnowledge,
-      },
-      totalStep
-    );
-    await sleep(STEP_SLEEP);
+    await storeContext(system, schema, {
+      allContext,
+      allKeywords,
+      allQuestions,
+      allKnowledge,
+      weightedURLs,
+      msgWithKnowledge
+    }, totalStep);
+    await wait(STEP_SLEEP);
   }
 
   if (!(thisStep as AnswerAction).isFinal) {
-    console.log("Enter Beast mode!!!");
-
-    // Create a span for beast mode
-    const beastModeSpan = agentTrace.span({
-      name: "beast-mode-final-answer",
-      input: {
-        reason: "regular_budget_exhausted_or_max_attempts_reached",
-        budgetUsed: context.tokenTracker.getTotalUsage().totalTokens,
-        regularBudget,
-      },
+    logInfo(`Beast mode!!! budget ${(context.tokenTracker.getTotalUsage().totalTokens / tokenBudget * 100).toFixed(2)}%`, {
+      usage: context.tokenTracker.getTotalUsageSnakeCase(),
+      evaluationMetrics,
+      maxBadAttempts,
     });
-
     // any answer is better than no answer, humanity last resort
     step++;
     totalStep++;
@@ -1569,20 +1609,19 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
   const answerStep = thisStep as AnswerAction;
 
-  if (!trivialQuestion) {
+  if (trivialQuestion) {
+    answerStep.mdAnswer = buildMdFromAnswer(answerStep);
+  } else if (!answerStep.isAggregated) {
     answerStep.answer = repairMarkdownFinal(
       convertHtmlTablesToMd(
         fixBadURLMdLinks(
           fixCodeBlockIndentation(
             repairMarkdownFootnotesOuter(
-              await repairUnknownChars(
-                await reviseAnswer(
-                  answerStep.answer,
-                  allKnowledge,
-                  context,
-                  SchemaGen
-                ),
-                context
+              await finalizeAnswer(
+                answerStep.answer,
+                allKnowledge,
+                context,
+                SchemaGen
               )
             )
           ),
@@ -1604,14 +1643,30 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
     answerStep.answer = answer;
     answerStep.references = references;
-    await updateReferences(answerStep, allURLs);
-    answerStep.mdAnswer = repairMarkdownFootnotesOuter(
-      buildMdFromAnswer(answerStep)
-    );
-  } else {
-    answerStep.mdAnswer = buildMdFromAnswer(answerStep);
-  }
+    await updateReferences(answerStep, allURLs)
+    answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
 
+    if (imageObjects.length && withImages) {
+      try {
+        answerStep.imageReferences = await buildImageReferences(answerStep.answer, imageObjects, context, SchemaGen);
+        logDebug('Image references built:', { imageReferences: answerStep.imageReferences.map(i => ({ url: i.url, score: i.relevanceScore, answerChunk: i.answerChunk })) });
+      } catch (error) {
+        logError('Error building image references:', { error });
+        answerStep.imageReferences = [];
+      }
+    }
+  } else if (answerStep.isAggregated) {
+    answerStep.answer = candidateAnswers.join('\n\n'); // await reduceAnswers(candidateAnswers, context, SchemaGen);
+    answerStep.mdAnswer = repairMarkdownFootnotesOuter(buildMdFromAnswer(answerStep));
+    if (withImages && answerStep.imageReferences?.length) {
+      const sortedImages = answerStep.imageReferences.sort((a, b) => (b.relevanceScore ?? 0) - (a.relevanceScore ?? 0));
+      logDebug('[agent] all sorted image references:', { count: sortedImages?.length });
+      const dedupImages = dedupImagesWithEmbeddings(sortedImages as ImageObject[], []);
+      const filteredImages = filterImages(sortedImages, dedupImages);
+      logDebug('[agent] filtered images:', { count: filteredImages.length });
+      answerStep.imageReferences = filteredImages.slice(0, 10); // limit to 10 images
+    }
+  }
   postProcessSpan.end({
     output: {
       finalAnswerLength: answerStep.answer?.length || 0,
@@ -1649,15 +1704,15 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
 
   // Ensure langfuse data is sent
   await context.langfuse.shutdownAsync();
-
   // max return 300 urls
-  const returnedURLs = weightedURLs.slice(0, numReturnedURLs).map((r) => r.url);
+  const returnedURLs = weightedURLs.slice(0, numReturnedURLs).filter(r => r?.url).map(r => r.url);
   return {
     result: thisStep,
     context,
-    visitedURLs: returnedURLs,
-    readURLs: visitedURLs.filter((url) => !badURLs.includes(url)),
-    allURLs: weightedURLs.map((r) => r.url),
+    visitedURLs: returnedURLs, // deprecated
+    readURLs: visitedURLs.filter(url => !badURLs.includes(url)),
+    allURLs: weightedURLs.map(r => r.url),
+    imageReferences: withImages ? (thisStep as AnswerAction).imageReferences : undefined,
   };
 }
 
@@ -1694,18 +1749,18 @@ export async function main() {
   const {
     result: finalStep,
     context: tracker,
-    visitedURLs: visitedURLs,
-  } = (await getResponse(question)) as {
-    result: AnswerAction;
-    context: TrackerContext;
-    visitedURLs: string[];
-  };
-  console.log("Final Answer:", finalStep.answer);
-  console.log("Visited URLs:", visitedURLs);
+    visitedURLs: visitedURLs
+  } = await getResponse(question) as { result: AnswerAction; context: TrackerContext; visitedURLs: string[] };
+  logInfo('Final Answer:', { answer: finalStep.answer });
+  logInfo('Visited URLs:', { urls: visitedURLs });
 
   tracker.tokenTracker.printSummary();
 }
 
 if (require.main === module) {
-  main().catch(logger.error);
+  main().catch(error => {
+    logError('Main execution error:', {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  });
 }

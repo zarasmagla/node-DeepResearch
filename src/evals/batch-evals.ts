@@ -2,10 +2,12 @@ import fs from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { getResponse } from '../agent';
+import { z } from 'zod';
 import { AnswerAction, TrackerContext } from "../types";
-import { logger } from "../winston-logger";
-import { GoogleGenAIHelper } from "../utils/google-genai-helper";
-import { z } from 'zod/v4';
+import { logInfo, logError } from '../logging';
+import { GoogleGenAIHelper } from '../utils/google-genai-helper';
+import { logger } from '../winston-logger';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 const execAsync = promisify(exec);
 
@@ -67,18 +69,18 @@ function calculateStats(results: EvaluationResult[], modelName: string): Evaluat
 }
 
 function printStats(stats: EvaluationStats): void {
-  console.log('\n=== Evaluation Statistics ===');
-  console.log(`Model: ${stats.model_name}`);
-  console.log(`Pass Rate: ${stats.pass_rate.toFixed(0)}%`);
-  console.log(`Average Steps: ${stats.avg_steps.toFixed(0)}`);
-  console.log(`Maximum Steps: ${stats.max_steps}`);
-  console.log(`Minimum Steps: ${stats.min_steps}`);
-  console.log(`Median Steps: ${stats.median_steps.toFixed(0)}`);
-  console.log(`Average Tokens: ${stats.avg_tokens.toFixed(0)}`);
-  console.log(`Median Tokens: ${stats.median_tokens.toFixed(0)}`);
-  console.log(`Maximum Tokens: ${stats.max_tokens}`);
-  console.log(`Minimum Tokens: ${stats.min_tokens}`);
-  console.log('===========================\n');
+  logInfo('\n=== Evaluation Statistics ===');
+  logInfo(`Model: ${stats.model_name}`);
+  logInfo(`Pass Rate: ${stats.pass_rate.toFixed(0)}%`);
+  logInfo(`Average Steps: ${stats.avg_steps.toFixed(0)}`);
+  logInfo(`Maximum Steps: ${stats.max_steps}`);
+  logInfo(`Minimum Steps: ${stats.min_steps}`);
+  logInfo(`Median Steps: ${stats.median_steps.toFixed(0)}`);
+  logInfo(`Average Tokens: ${stats.avg_tokens.toFixed(0)}`);
+  logInfo(`Median Tokens: ${stats.median_tokens.toFixed(0)}`);
+  logInfo(`Maximum Tokens: ${stats.max_tokens}`);
+  logInfo(`Minimum Tokens: ${stats.min_tokens}`);
+  logInfo('===========================\n');
 }
 
 async function getCurrentGitCommit(): Promise<string> {
@@ -86,7 +88,7 @@ async function getCurrentGitCommit(): Promise<string> {
     const { stdout } = await execAsync('git rev-parse --short HEAD');
     return stdout.trim();
   } catch (error) {
-    logger.error('Error getting git commit:', error);
+    logError('Error getting git commit:', { error });
     return 'unknown';
   }
 }
@@ -104,7 +106,7 @@ Minor wording differences are acceptable as long as the core information of the 
       pass: z.boolean().describe('Whether the actual answer matches the expected answer'),
       reason: z.string().describe('Detailed explanation of why the evaluation passed or failed')
     });
-    const schemaToBeProcessed = z.toJSONSchema(schema)
+    const schemaToBeProcessed = zodToJsonSchema(schema)
 
     logger.info("==========================", JSON.stringify(schemaToBeProcessed));
     const result = await GoogleGenAIHelper.generateObject<{ pass: boolean; reason: string }>({
@@ -117,7 +119,7 @@ Minor wording differences are acceptable as long as the core information of the 
 
     return result.object;
   } catch (error) {
-    logger.error('Evaluation failed:', error);
+    logError('Evaluation failed:', { error });
     return {
       pass: false,
       reason: `Evaluation error: ${error}`
@@ -136,7 +138,7 @@ async function batchEvaluate(inputFile: string): Promise<void> {
   // Process each question
   for (let i = 0; i < questions.length; i++) {
     const { question, answer: expectedAnswer } = questions[i];
-    console.log(`\nProcessing question ${i + 1}/${questions.length}: ${question}`);
+    logInfo(`\nProcessing question ${i + 1}/${questions.length}: ${question}`);
 
     try {
       // Get response using the agent
@@ -167,10 +169,10 @@ async function batchEvaluate(inputFile: string): Promise<void> {
         actual_answer: actualAnswer
       });
 
-      console.log(`Evaluation: ${evaluation.pass ? 'PASS' : 'FAIL'}`);
-      console.log(`Reason: ${evaluation.reason}`);
+      logInfo(`Evaluation: ${evaluation.pass ? 'PASS' : 'FAIL'}`);
+      logInfo(`Reason: ${evaluation.reason}`);
     } catch (error) {
-      logger.error(`Error processing question: ${question}`, error);
+      logError(`Error processing question: ${question}`, { error });
       results.push({
         pass: false,
         reason: `Error: ${error}`,
@@ -188,7 +190,7 @@ async function batchEvaluate(inputFile: string): Promise<void> {
   printStats(stats);
 
 
-  console.log(`\nEvaluation results saved to ${outputFile}`);
+  logInfo(`\nEvaluation results saved to ${outputFile}`);
 }
 
 // Run batch evaluation if this is the main module

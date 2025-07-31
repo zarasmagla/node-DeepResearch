@@ -1,6 +1,7 @@
 import { ObjectGeneratorSafe } from "../utils/safe-generator";
 import { CodeGenResponse, PromptPair, TrackerContext } from "../types";
 import { Schemas } from "../utils/schemas";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 
 interface SandboxResult {
@@ -30,6 +31,7 @@ ${attempt.error ? `Error: ${attempt.error}
 2. You can access any of these available variables directly:
 ${availableVars}
 3. You don't have access to any third party libraries that need to be installed, so you must write complete, self-contained code.
+4. Must have a return statement.
 </rules>
 
 ${previousAttempts.length > 0 ? `Previous attempts and their errors:
@@ -49,7 +51,7 @@ Response:
 }
 </example>`;
 
-  console.log('Coding prompt', prompt)
+  logDebug('Coding prompt', { prompt });
 
   return { system: prompt, user: problem };
 }
@@ -101,7 +103,7 @@ export class CodeSandbox {
         }
       `);
 
-      console.log('Context:', this.context);
+      logDebug('Context:', { context: this.context });
 
       // Execute the code with the context and get the return value
       const output = evalInContext(this.context);
@@ -136,12 +138,11 @@ export class CodeSandbox {
       const generation = await this.generateCode(problem, attempts);
       const { code } = generation;
 
-      console.log(`Coding attempt ${i + 1}:`, code);
       // Evaluate the code
       const result = this.evaluateCode(code);
-      console.log(`Coding attempt ${i + 1} success:`, result);
 
       if (result.success) {
+        logInfo('Coding success:', { problem, result });
         return {
           solution: {
             code,
@@ -151,7 +152,7 @@ export class CodeSandbox {
         };
       }
 
-      console.error('Coding error:', result.error);
+      logWarning('Coding error:', { error: result.error });
 
       // Store the failed attempt
       attempts.push({

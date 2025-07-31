@@ -1,7 +1,8 @@
 import { PromptPair, SearchAction, SERPQuery, TrackerContext } from '../types';
 import { ObjectGeneratorSafe } from "../utils/safe-generator";
 import { Schemas } from "../utils/schemas";
-import { logger } from "../winston-logger";
+import { logInfo, logError } from '../logging';
+
 
 function getPrompt(query: string, think: string, context: string): PromptPair {
   const currentTime = new Date();
@@ -272,11 +273,10 @@ export async function rewriteQuery(action: SearchAction, context: string, tracke
 
     const queryResults = await Promise.all(queryPromises);
     const allQueries: SERPQuery[] = queryResults.flat();
-    console.log(TOOL_NAME, allQueries);
-    // For some reason allQueries contains undefined, we just filter thouse values
-    return allQueries.filter(Boolean);
+    logInfo(TOOL_NAME, { queries: allQueries });
+    return allQueries;
   } catch (error) {
-    logger.error(`Error in ${TOOL_NAME}`, error);
+    logError('Query rewrite error:', { error });
     throw error;
   }
 }

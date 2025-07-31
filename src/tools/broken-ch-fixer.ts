@@ -1,8 +1,8 @@
-import { TrackerContext } from "../types";
-import { detectBrokenUnicodeViaFileIO } from "../utils/text-tools";
-import { logger } from "../winston-logger";
 import { GoogleGenAIHelper } from "../utils/google-genai-helper";
 import { getModel } from "../config";
+import { TrackerContext } from "../types";
+import { detectBrokenUnicodeViaFileIO } from "../utils/text-tools";
+import { logError, logDebug, logWarning } from '../logging';
 
 
 /**
@@ -11,7 +11,7 @@ import { getModel } from "../config";
 export async function repairUnknownChars(mdContent: string, trackers?: TrackerContext): Promise<string> {
   const { broken, readStr } = await detectBrokenUnicodeViaFileIO(mdContent);
   if (!broken) return readStr;
-  console.log("Detected broken unicode in output, attempting to repair...");
+  logWarning("Detected broken unicode in output, attempting to repair...");
 
   let repairedContent = readStr;
   let remainingUnknowns = true;
@@ -87,8 +87,8 @@ Rules:
         (await detectBrokenUnicodeViaFileIO(replacement)).broken ||
         replacement.length > unknownCount * 4
       ) {
-        console.log(`Skipping invalid replacement ${replacement} at position ${position}`);
-        // Skip to the next � character without modifying content
+        logWarning(`Skipping invalid replacement ${replacement} at position ${position}`);
+        // Skip to the next character without modifying content
       } else {
         // Replace the unknown sequence with the generated text
         repairedContent = repairedContent.substring(0, position) +
@@ -96,11 +96,11 @@ Rules:
           repairedContent.substring(position + unknownCount);
       }
 
-      console.log(`Repair iteration ${iterations}: replaced ${unknownCount} � chars with "${replacement}"`);
+      logDebug(`Repair iteration ${iterations}: replaced ${unknownCount} chars with "${replacement}"`);
 
     } catch (error) {
-      logger.error("Error repairing unknown characters:", error);
-      // Skip to the next � character without modifying this one
+      logError("Error repairing unknown characters:", { error });
+      // Skip to the next character without modifying this one
     }
   }
 

@@ -1,182 +1,65 @@
-import {TokenTracker} from "../utils/token-tracker";
-import {JINA_API_KEY} from "../config";
-import {TrackerContext} from "../types";
-import axiosClient from "../utils/axios-client";
+interface ChunkOptions {
+    type?: 'newline' | 'punctuation' | 'characters' | 'regex';
+    value?: string | number;
+    minChunkLength?: number;
+}
 
-export async function segmentText(
-  content: string,
-  tracker: TrackerContext,
-  maxChunkLength = 500,
-  returnChunks = true,
-): Promise<{
-  chunks: string[];
-  chunk_positions: [number, number][];
-}> {
-  if (!content.trim()) {
-    throw new Error('Content cannot be empty');
-  }
+export function chunkText(text: string, options: ChunkOptions = {}): {
+    chunks: string[];
+    chunk_positions: [number, number][];
+} {
+    let chunks: string[] = [];
+    const minChunkLength = options.minChunkLength || 80;
+    const type = options.type || 'newline';
 
-  // Initialize token tracker
-  const tokenTracker = tracker?.tokenTracker || new TokenTracker();
+    switch (type) {
+        case 'newline':
+            chunks = text.split('\n').filter(chunk => chunk.trim().length > 0);
+            break;
 
-  // Maximum size to send in a single API request (slightly under 64K to be safe)
-  const MAX_BATCH_SIZE = 60000;
+        case 'punctuation':
+            // Split by common Chinese and English punctuation while preserving them
+            chunks = text.split(/(?<=[.!?。！？])/).filter(chunk => chunk.trim().length > 0);
+            break;
 
-  // Split content into batches
-  const batches = splitTextIntoBatches(content, MAX_BATCH_SIZE);
-  console.log(`Split content into ${batches.length} batches`);
+        case 'characters':
+            const chunkSize = Number(options.value) || 1000;
+            for (let i = 0; i < text.length; i += chunkSize) {
+                chunks.push(text.slice(i, i + chunkSize));
+            }
+            break;
 
-  // Calculate offsets for each batch upfront
-  const batchOffsets: number[] = [];
-  let currentOffset = 0;
-  for (const batch of batches) {
-    batchOffsets.push(currentOffset);
-    currentOffset += batch.length;
-  }
+        case 'regex':
+            if (!options.value || typeof options.value !== 'string') {
+                throw new Error('Regex pattern is required for regex chunking');
+            }
+            chunks = text.split(new RegExp(options.value)).filter(chunk => chunk.trim().length > 0);
+            break;
 
-  // Process all batches in parallel
-  const batchPromises = batches.map(async (batch, i) => {
-    console.log(`[Segment] Processing batch ${i + 1}/${batches.length} (size: ${batch.length})`);
+        default:
+            throw new Error('Invalid chunking type');
+    }
 
-    try {
-      const {data} = await axiosClient.post(
-        'https://api.jina.ai/v1/segment',
-        {
-          content: batch,
-          return_chunks: returnChunks,
-          max_chunk_length: maxChunkLength
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${JINA_API_KEY}`,
-          },
-          timeout: 10000,
-          responseType: 'json'
+    // Filter out chunks that are too short
+    const filteredChunks: string[] = [];
+    const filteredPositions: [number, number][] = [];
+    let currentPos = 0;
+
+    for (const chunk of chunks) {
+        const startPos = text.indexOf(chunk, currentPos);
+        if (startPos === -1) continue; // Skip if chunk not found
+        const endPos = startPos + chunk.length;
+
+        // Only include chunks that meet the minimum length requirement
+        if (chunk.length >= minChunkLength) {
+            filteredChunks.push(chunk);
+            filteredPositions.push([startPos, endPos]);
         }
-      );
-
-      if (!data) {
-        throw new Error('Invalid response data');
-      }
-
-      console.log(`Batch ${i + 1} result:`, {
-        numChunks: data.num_chunks,
-        numTokens: data.num_tokens,
-        tokenizer: data.tokenizer
-      });
-
-      // Get the batch offset
-      const offset = batchOffsets[i];
-
-      // Adjust chunk positions to account for the offset of this batch
-      const adjustedPositions = data.chunk_positions
-        ? data.chunk_positions.map((position: [number, number]) => {
-            return [
-              position[0] + offset,
-              position[1] + offset
-            ] as [number, number];
-          })
-        : [];
-
-      return {
-        chunks: data.chunks || [],
-        positions: adjustedPositions,
-        tokens: data.usage?.tokens || 0
-      };
-    } catch (error: any) {
-      console.error(`Error processing batch ${i + 1}: ${error.message}`);
-      throw error;
-    }
-  });
-
-  // Wait for all batches to complete
-  const batchResults = await Promise.all(batchPromises);
-
-  // Aggregate results
-  const allChunks = [];
-  const allChunkPositions = [];
-  let totalTokens = 0;
-
-  for (const result of batchResults) {
-    if (returnChunks) {
-      allChunks.push(...result.chunks);
-    }
-    allChunkPositions.push(...result.positions);
-    totalTokens += result.tokens;
-  }
-
-  // Track total token usage for all batches
-  tokenTracker.trackUsage('segment', {
-    totalTokens: totalTokens,
-    promptTokens: content.length,
-    completionTokens: totalTokens
-  });
-
-  return {
-    chunks: allChunks,
-    chunk_positions: allChunkPositions
-  };
-}
-
-/**
- * Splits text into batches that fit within the specified size limit
- * Tries to split at paragraph boundaries when possible
- */
-function splitTextIntoBatches(text: string, maxBatchSize: number): string[] {
-  const batches = [];
-  let currentIndex = 0;
-
-  while (currentIndex < text.length) {
-    if (currentIndex + maxBatchSize >= text.length) {
-      // If the remaining text fits in one batch, add it and we're done
-      batches.push(text.slice(currentIndex));
-      break;
+        currentPos = endPos;
     }
 
-    // Find a good split point - preferably at a paragraph break
-    // Look for the last paragraph break within the max batch size
-    let endIndex = currentIndex + maxBatchSize;
-
-    // Try to find paragraph breaks (double newline)
-    const paragraphBreakIndex = text.lastIndexOf('\n\n', endIndex);
-    if (paragraphBreakIndex > currentIndex && paragraphBreakIndex <= endIndex - 10) {
-      // Found a paragraph break that's at least 10 chars before the max size
-      // This avoids tiny splits at the end of a batch
-      endIndex = paragraphBreakIndex + 2; // Include the double newline
-    } else {
-      // If no paragraph break, try a single newline
-      const newlineIndex = text.lastIndexOf('\n', endIndex);
-      if (newlineIndex > currentIndex && newlineIndex <= endIndex - 5) {
-        endIndex = newlineIndex + 1; // Include the newline
-      } else {
-        // If no newline, try a sentence break
-        const sentenceBreakIndex = findLastSentenceBreak(text, currentIndex, endIndex);
-        if (sentenceBreakIndex > currentIndex) {
-          endIndex = sentenceBreakIndex;
-        }
-        // If no sentence break found, we'll just use the max batch size
-      }
-    }
-
-    batches.push(text.slice(currentIndex, endIndex));
-    currentIndex = endIndex;
-  }
-
-  return batches;
-}
-
-/**
- * Finds the last sentence break (period, question mark, or exclamation point followed by space)
- * within the given range
- */
-function findLastSentenceBreak(text: string, startIndex: number, endIndex: number): number {
-  // Look for ". ", "? ", or "! " patterns
-  for (let i = endIndex; i > startIndex; i--) {
-    if ((text[i - 2] === '.' || text[i - 2] === '?' || text[i - 2] === '!') &&
-      text[i - 1] === ' ') {
-      return i;
-    }
-  }
-  return -1; // No sentence break found
-}
+    return {
+        chunks: filteredChunks,
+        chunk_positions: filteredPositions
+    };
+} 

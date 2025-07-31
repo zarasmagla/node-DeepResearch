@@ -1,7 +1,7 @@
 import { TokenTracker } from "../utils/token-tracker";
 import { JINA_API_KEY } from "../config";
 import axiosClient from '../utils/axios-client';
-import { logger } from "../winston-logger";
+import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 const JINA_API_URL = 'https://api.jina.ai/v1/rerank';
 
@@ -44,7 +44,7 @@ export async function rerankDocuments(
       batches.push(documents.slice(i, i + batchSize));
     }
 
-    console.log(`Rerank ${documents.length} documents in ${batches.length} batches of up to ${batchSize} each`);
+    logDebug(`Reranking ${documents.length} documents in ${batches.length} batches`);
 
     // Process all batches in parallel
     const batchResults = await Promise.all(
@@ -96,7 +96,7 @@ export async function rerankDocuments(
 
     return { results: finalResults };
   } catch (error) {
-    logger.error('Error in reranking documents:', error);
+    logError('Reranking error:', { error });
 
     // Return empty results if there is an error
     return {

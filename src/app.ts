@@ -1,6 +1,6 @@
-import express, { Request, Response, RequestHandler } from "express";
-import cors from "cors";
-import { getResponse } from "./agent";
+import express, { Request, Response, RequestHandler } from 'express';
+import cors from 'cors';
+import { getResponse } from './agent';
 import {
   TrackerContext,
   ChatCompletionRequest,
@@ -11,10 +11,7 @@ import {
   StepAction,
   VisitAction,
 } from "./types";
-import { TokenTracker } from "./utils/token-tracker";
-import { ActionTracker } from "./utils/action-tracker";
-import { ObjectGeneratorSafe } from "./utils/safe-generator";
-import { normalizeHostName } from "./utils/url-tools";
+
 import { get_api_logger } from "./utils/structured-logger";
 import { logger } from "./winston-logger";
 import { Langfuse } from "langfuse";
@@ -25,7 +22,17 @@ const app = express();
 const langfuse = new Langfuse({
   environment: process.env.NODE_ENV || "development",
   release: process.env.K_REVISION || "unknown",
-});
+
+})
+
+import { TokenTracker } from "./utils/token-tracker";
+import { ActionTracker } from "./utils/action-tracker";
+import { ObjectGeneratorSafe } from "./utils/safe-generator";
+import { jsonSchema } from "ai"; // or another converter library
+import { normalizeHostName } from "./utils/url-tools";
+import { logInfo, logError, logDebug, logWarning } from './logging';
+import { body, validationResult } from 'express-validator';
+
 
 // Graceful shutdown handling
 process.on("SIGTERM", async () => {
@@ -221,15 +228,13 @@ async function emitRemainingContent(
     object: "chat.completion.chunk",
     created,
     model: model,
-    system_fingerprint: "fp_" + requestId,
-    choices: [
-      {
-        index: 0,
-        delta: { content, type: "think" },
-        logprobs: null,
-        finish_reason: null,
-      },
-    ],
+    system_fingerprint: 'fp_' + requestId,
+    choices: [{
+      index: 0,
+      delta: { content, type: "think" },
+      logprobs: null,
+      finish_reason: null
+    }],
   };
   res.write(`data: ${JSON.stringify(chunk)}\n\n`);
 }
@@ -255,13 +260,13 @@ function getTokenBudgetAndMaxAttempts(
   }
 
   switch (reasoningEffort) {
-    case "low":
+    case 'low':
       return { tokenBudget: 100000, maxBadAttempts: 1 };
-    case "high":
-      return { tokenBudget: 1000000, maxBadAttempts: 2 };
-    case "medium":
+    case 'high':
+      return { tokenBudget: 1000000, maxBadAttempts: 4 };
+    case 'medium':
     default:
-      return { tokenBudget: 500000, maxBadAttempts: 1 };
+      return { tokenBudget: 500000, maxBadAttempts: 2 };
   }
 }
 
@@ -290,14 +295,19 @@ async function completeCurrentStreaming(
 
 // OpenAI-compatible chat completions endpoint
 // Models API endpoints
-app.get("/v1/models", (async (_req: Request, res: Response) => {
-  const models: Model[] = [
-    {
-      id: "jina-deepsearch-v1",
-      object: "model",
-      created: 1686935002,
-      owned_by: "jina-ai",
-    },
+app.get('/v1/models', (async (_req: Request, res: Response) => {
+  const models: Model[] = [{
+    id: 'jina-deepsearch-v1',
+    object: 'model',
+    created: 1686935002,
+    owned_by: 'jina-ai'
+  },
+  {
+    id: 'jina-deepsearch-v2',
+    object: 'model',
+    created: 1717987200,
+    owned_by: 'jina-ai'
+  }
   ];
 
   res.json({
@@ -316,6 +326,13 @@ app.get("/v1/models/:model", (async (req: Request, res: Response) => {
       created: 1686935002,
       owned_by: "jina-ai",
     });
+  } else if (modelId === 'jina-deepsearch-v2') {
+    res.json({
+      id: 'jina-deepsearch-v2',
+      object: 'model',
+      created: 1717987200,
+      owned_by: 'jina-ai'
+    });
   } else {
     res.status(404).json({
       error: {
@@ -332,13 +349,9 @@ if (secret) {
   // Check authentication only if secret is set
   app.use((req, res, next) => {
     const authHeader = req.headers.authorization;
-    if (
-      !authHeader ||
-      !authHeader.startsWith("Bearer ") ||
-      authHeader.split(" ")[1] !== secret
-    ) {
-      logger.error("[chat/completions] Unauthorized request");
-      res.status(401).json({ error: "Unauthorized" });
+    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
+      logError('Unauthorized request');
+      res.status(401).json({ error: 'Unauthorized. Please provide a valid Jina API key.' });
       return;
     }
 
@@ -383,15 +396,13 @@ async function processQueue(
           object: "chat.completion.chunk",
           created,
           model,
-          system_fingerprint: "fp_" + requestId,
-          choices: [
-            {
-              index: 0,
-              delta: { content: word, type: "think" },
-              logprobs: null,
-              finish_reason: null,
-            },
-          ],
+          system_fingerprint: 'fp_' + requestId,
+          choices: [{
+            index: 0,
+            delta: { content: word, type: 'think' },
+            logprobs: null,
+            finish_reason: null
+          }]
         };
         res.write(`data: ${JSON.stringify(chunk)}\n\n`);
       }
@@ -410,29 +421,39 @@ async function processQueue(
   streamingState.processingQueue = false;
 }
 
-app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
+const validationRules = [
+  // Rule: messages is required and must be a string
+  body('messages')
+    .isArray({ min: 1 })
+    .withMessage('The "messages" parameter is required.'),
+];
+
+app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Response) => {
+  const clientIp = req.headers['cf-connecting-ip'] ||
+    req.headers['x-forwarded-for'] ||
+    req.ip ||
+    req.socket.remoteAddress ||
+    'unknown';
+
+  // Validate request body
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    logError('Validation errors:', { errors: errors.array(), ip: clientIp });
+    return res.status(400).json({ error: 'Invalid request body', details: errors.array() });
+  }
+
   // Check authentication only if secret is set
   if (secret) {
     const authHeader = req.headers.authorization;
-    if (
-      !authHeader ||
-      !authHeader.startsWith("Bearer ") ||
-      authHeader.split(" ")[1] !== secret
-    ) {
-      logger.error("[chat/completions] Unauthorized request");
-      res.status(401).json({ error: "Unauthorized" });
+    if (!authHeader || !authHeader.startsWith('Bearer ') || authHeader.split(' ')[1] !== secret) {
+      logError('Unauthorized request');
+      res.status(401).json({ error: 'Unauthorized. Please provide a valid Jina API key.' });
       return;
     }
   }
 
-  const clientIp =
-    req.headers["cf-connecting-ip"] ||
-    req.headers["x-forwarded-for"] ||
-    req.ip ||
-    req.socket.remoteAddress ||
-    "unknown";
   // Log request details (excluding sensitive data)
-  logger.info("[chat/completions] Request:", {
+  logInfo('[chat/completions] Start:', {
     model: req.body.model,
     stream: req.body.stream,
     messageCount: req.body.messages?.length,
@@ -444,21 +465,12 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
   const startTime = Date.now();
 
   const body = req.body as ChatCompletionRequest;
-  if (!body.messages?.length) {
-    return res
-      .status(400)
-      .json({ error: "Messages array is required and must not be empty" });
-  }
-  const lastMessage = body.messages[body.messages.length - 1];
-  if (lastMessage.role !== "user") {
-    return res.status(400).json({ error: "Last message must be from user" });
-  }
-
-  logger.info("messages", JSON.stringify(body.messages));
 
   // clean <think> from all assistant messages
-  body.messages = body.messages?.filter((message) => {
-    if (message.role === "assistant") {
+  body.messages = body.messages?.filter(message => {
+    if (!message || !message.content) return false;
+
+    if (message.role === 'assistant') {
       // 2 cases message.content can be a string or an array
       if (typeof message.content === "string") {
         message.content = (message.content as string)
@@ -506,6 +518,18 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
     return true; // Keep other messages
   });
 
+  if (!body.messages?.length) {
+    logError('Messages array is required and must not be empty', { messages: body.messages });
+    return res.status(400).json({ error: 'Messages array is required and must not be empty' });
+  }
+  const lastMessage = body.messages[body.messages.length - 1];
+  if (lastMessage.role !== 'user') {
+    logError('Last message must be from user', { messages: body.messages });
+    return res.status(400).json({ error: 'Last message must be from user' });
+  }
+
+  logDebug('Input messages', { messages: body.messages });
+
   let { tokenBudget, maxBadAttempts } = getTokenBudgetAndMaxAttempts(
     body.reasoning_effort,
     body.max_completion_tokens
@@ -522,12 +546,10 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
   if (body.response_format) {
     // Convert JSON schema to Zod schema using a proper converter
     try {
-      console.log(body.response_format);
-      responseSchema = body.response_format;
+      responseSchema = jsonSchema(body.response_format.json_schema);
+      logDebug('Response schema', { schema: responseSchema });
     } catch (error: any) {
-      return res
-        .status(400)
-        .json({ error: `Invalid JSON schema: ${error.message}` });
+      return res.status(400).json({ error: `Invalid JSON schema: ${error.message}` });
     }
   }
 
@@ -581,15 +603,13 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
       object: "chat.completion.chunk",
       created,
       model: body.model,
-      system_fingerprint: "fp_" + requestId,
-      choices: [
-        {
-          index: 0,
-          delta: { role: "assistant", content: "<think>", type: "think" },
-          logprobs: null,
-          finish_reason: null,
-        },
-      ],
+      system_fingerprint: 'fp_' + requestId,
+      choices: [{
+        index: 0,
+        delta: { role: 'assistant', content: '<think>', type: 'think' },
+        logprobs: null,
+        finish_reason: null
+      }]
     };
     res.write(`data: ${JSON.stringify(initialChunk)}\n\n`);
 
@@ -598,25 +618,44 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
       // Add content to queue for both thinking steps and final answer
       if (step.action === "visit") {
         // emit every url in the visit action in url field
-        ((step as VisitAction).URLTargets as string[]).forEach((url) => {
+        ((step as VisitAction).URLTargets as string[])?.forEach((url) => {
           const chunk: ChatCompletionChunk = {
             id: requestId,
             object: "chat.completion.chunk",
             created,
             model: body.model,
-            system_fingerprint: "fp_" + requestId,
-            choices: [
-              {
-                index: 0,
-                delta: { type: "think", url },
-                logprobs: null,
-                finish_reason: null,
-              },
-            ],
+            system_fingerprint: 'fp_' + requestId,
+            choices: [{
+              index: 0,
+              delta: { type: 'think', url },
+              logprobs: null,
+              finish_reason: null,
+            }]
           };
           res.write(`data: ${JSON.stringify(chunk)}\n\n`);
         });
       }
+
+      if (step.action === 'search') {
+        // emit every search request in the search action in url field
+        ((step as SearchAction).searchRequests as string[])?.forEach((query) => {
+          const chunk: ChatCompletionChunk = {
+            id: requestId,
+            object: 'chat.completion.chunk',
+            created,
+            model: body.model,
+            system_fingerprint: 'fp_' + requestId,
+            choices: [{
+              index: 0,
+              delta: { type: 'think', query },
+              logprobs: null,
+              finish_reason: null,
+            }]
+          };
+          res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+        });
+      }
+
       if (step.think) {
         // if not ends with a space, add one
         const content = step.think + " ";
@@ -647,8 +686,8 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
       visitedURLs,
       readURLs,
       allURLs,
-    } = await getResponse(
-      undefined,
+      imageReferences,
+    } = await getResponse(undefined,
       tokenBudget,
       maxBadAttempts,
       context,
@@ -660,12 +699,16 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
       body.only_hostnames?.map((i) => normalizeHostName(i)),
       body.max_annotations,
       body.min_annotation_relevance,
-      body.language_code
-    );
+      body.language_code,
+      body.search_language_code,
+      body.search_provider,
+      body.with_images,
+      body.team_size
+    )
     let finalAnswer = (finalStep as AnswerAction).mdAnswer;
 
-    const annotations = (finalStep as AnswerAction).references?.map((ref) => ({
-      type: "url_citation" as const,
+    const annotations = (finalStep as AnswerAction).references?.filter(ref => ref?.url && ref?.title && ref?.exactQuote && ref?.dateTime).map(ref => ({
+      type: 'url_citation' as const,
       url_citation: {
         title: ref.title,
         exactQuote: ref.exactQuote,
@@ -701,9 +744,12 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         );
         // Use the generated object as the response content
         finalAnswer = JSON.stringify(result.object, null, 2);
-        logger.info("Generated object:", finalAnswer);
+        logInfo('Generated object:', { answer: finalAnswer });
       } catch (error) {
-        logger.error("Error processing response with schema:", error);
+        logError('Error processing response with schema:', {
+          error: error instanceof Error ? error.message : String(error),
+          schema: responseSchema
+        });
       }
     }
 
@@ -723,15 +769,13 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         object: "chat.completion.chunk",
         created,
         model: body.model,
-        system_fingerprint: "fp_" + requestId,
-        choices: [
-          {
-            index: 0,
-            delta: { content: `</think>\n\n`, type: "think" },
-            logprobs: null,
-            finish_reason: "thinking_end",
-          },
-        ],
+        system_fingerprint: 'fp_' + requestId,
+        choices: [{
+          index: 0,
+          delta: { content: `</think>\n\n`, type: 'think' },
+          logprobs: null,
+          finish_reason: 'thinking_end'
+        }]
       };
       res.write(`data: ${JSON.stringify(closeThinkChunk)}\n\n`);
 
@@ -758,6 +802,7 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         visitedURLs,
         readURLs,
         numURLs: allURLs.length,
+        relatedImages: body.with_images ? (imageReferences?.map(ref => ref.url) || []) : undefined,
       };
       res.write(`data: ${JSON.stringify(finalChunk)}\n\n`);
 
@@ -806,33 +851,23 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         visitedURLs,
         readURLs,
         numURLs: allURLs.length,
+        relatedImages: body.with_images ? (imageReferences?.map(ref => ref.url) || []) : undefined,
       };
 
-      // Structured logging for successful completion
-      apiLogger.api_request(
-        "/v1/chat/completions",
-        "POST",
-        verification_id,
-        undefined,
-        {
-          contentLength: response.choices[0].message.content.length,
-          visitedURLs: visitedURLs.length,
-          readURLs: readURLs.length,
-          totalURLs: allURLs.length,
-        },
-        200,
-        Date.now() - startTime
-      );
+      logInfo(`[chat/completions] Completed!`, {
+        model: body.model,
+        usage: context.tokenTracker.getTotalUsageSnakeCase(),
+        visitedURLs,
+        readURLs,
+        numURLs: allURLs.length,
+      });
 
       res.json(response);
     }
   } catch (error: any) {
-    // Log error details
-    logger.error("[chat/completions] Error:", {
-      message: error?.message || "An error occurred",
-      stack: error?.stack,
-      type: error?.constructor?.name,
-      requestId,
+    logError('[chat/completions] Error:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
     });
 
     // Structured logging for error
@@ -864,15 +899,13 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         object: "chat.completion.chunk",
         created,
         model: body.model,
-        system_fingerprint: "fp_" + requestId,
-        choices: [
-          {
-            index: 0,
-            delta: { content: "</think>", type: "think" },
-            logprobs: null,
-            finish_reason: "error",
-          },
-        ],
+        system_fingerprint: 'fp_' + requestId,
+        choices: [{
+          index: 0,
+          delta: { content: '</think>', type: 'think' },
+          logprobs: null,
+          finish_reason: 'error'
+        }],
         usage,
       };
       res.write(`data: ${JSON.stringify(closeThinkChunk)}\n\n`);
@@ -882,16 +915,14 @@ app.post("/v1/chat/completions", (async (req: Request, res: Response) => {
         object: "chat.completion.chunk",
         created,
         model: body.model,
-        system_fingerprint: "fp_" + requestId,
-        choices: [
-          {
-            index: 0,
-            delta: { content: errorMessage, type: "error" },
-            logprobs: null,
-            finish_reason: "error",
-          },
-        ],
-        usage,
+        system_fingerprint: 'fp_' + requestId,
+        choices: [{
+          index: 0,
+          delta: { content: errorMessage, type: 'error' },
+          logprobs: null,
+          finish_reason: 'error'
+        }],
+        usage
       };
       res.write(`data: ${JSON.stringify(errorChunk)}\n\n`);
       res.end();

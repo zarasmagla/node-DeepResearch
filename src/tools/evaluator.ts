@@ -3,9 +3,8 @@ import { AnswerAction, EvaluationResponse, EvaluationType, KnowledgeItem, Prompt
 import { ObjectGeneratorSafe } from "../utils/safe-generator";
 import { Schemas } from "../utils/schemas";
 import { getKnowledgeStr } from "../utils/text-tools";
-import { get_tools_logger } from "../utils/structured-logger";
-import { logger } from "../winston-logger";
-import { getModel } from "../config";
+import { logInfo, logError } from '../logging';
+import { getModel } from '../config';
 
 const TOOL_NAME = 'evaluator';
 
@@ -613,7 +612,6 @@ export async function evaluateQuestion(
       },
     });
 
-    logger.info('Question Evaluation:', result.object);
 
     // Always include definitive in types
     const types: EvaluationType[] = [];
@@ -622,7 +620,7 @@ export async function evaluateQuestion(
     if (result.object.needsPlurality) types.push('plurality');
     if (result.object.needsCompleteness) types.push('completeness');
 
-    logger.info('Question Metrics:', question, types);
+    logInfo(TOOL_NAME, { question, types });
     trackers?.actionTracker.trackThink(result.object.think);
 
     evaluationGeneration.end({
@@ -650,7 +648,6 @@ export async function evaluateQuestion(
     return types;
 
   } catch (error) {
-    logger.error('Error in question evaluation:', error);
 
     evaluationSpan.event({
       name: "question-evaluation-error",
@@ -743,7 +740,6 @@ export async function evaluateAnswer(
   schemaGen: Schemas,
   parentTrace?: any
 ): Promise<EvaluationResponse> {
-  const logger = get_tools_logger();
   const startTime = Date.now();
 
   // Use parent trace if provided, otherwise create a new trace using context langfuse
@@ -776,16 +772,6 @@ export async function evaluateAnswer(
       tags: ["evaluation", "answer-assessment"],
     });
 
-  logger.info("Starting answer evaluation", {
-    verification_id: trackers.verification_id,
-    operation: "evaluate_answer",
-    status: "STARTED",
-    metadata: {
-      evaluationTypes: evaluationTypes.join(","),
-      answerLength: action.answer?.length || 0,
-      hasReferences: (action.references?.length || 0) > 0,
-    }
-  });
 
   let result;
 
@@ -819,17 +805,21 @@ export async function evaluateAnswer(
         prompt = getRejectAllAnswersPrompt(question, action, allKnowledge);
         break;
       default:
-        console.error(`Unknown evaluation type: ${evaluationType}`);
+        logError(`Unknown evaluation type: ${evaluationType}`);
     }
 
     if (prompt) {
-      result = await performEvaluation(
-        evaluationType,
-        prompt,
-        trackers,
-        schemaGen,
-        evaluationTypeSpan
-      );
+      try {
+        result = await performEvaluation(
+          evaluationType,
+          prompt,
+          trackers,
+          schemaGen
+        );
+      } catch (error) {
+        logError(`Error performing ${evaluationType} evaluation`, { error });
+        return { pass: false, think: `Error ${evaluationType} immedidately return false, probably due to bad prompt?`, type: evaluationType } as EvaluationResponse
+      }
 
       evaluationTypeSpan.end({
         output: {

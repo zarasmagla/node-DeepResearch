@@ -1,58 +1,50 @@
 import { TokenTracker } from "../utils/token-tracker";
-import { SearchResponse, SERPQuery } from "../types";
+import { JinaSearchResponse, SERPQuery } from '../types';
 import { JINA_API_KEY } from "../config";
 import axiosClient from '../utils/axios-client';
-import { get_search_logger } from "../utils/structured-logger";
+import { logError, logDebug } from '../logging';
 
 export async function search(
   query: SERPQuery,
+  domain?: string,
+  num?: number,
+  meta?: string,
   tracker?: TokenTracker
-): Promise<{ response: SearchResponse }> {
-  const logger = get_search_logger();
-  const startTime = Date.now();
-
+): Promise<{ response: JinaSearchResponse }> {
   try {
-    logger.external_service_call(
-      "jina-search",
-      "search",
-      undefined,
-      query,
-      undefined,
-      undefined,
-      "STARTED"
-    );
+    if (domain !== 'arxiv') {
+      domain = undefined;  // default to general search
+    }
 
-    const { data } = await axiosClient.post<SearchResponse>(
-      `https://s.jina.ai/`,
-      query,
+    const { data } = await axiosClient.post<JinaSearchResponse>(
+      `https://svip.jina.ai/`,
+      {
+        ...query,
+        domain,
+        num,
+        meta
+      },
       {
         headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${JINA_API_KEY}`,
-          "X-Respond-With": "no-content",
-          "X-No-Cache": true,
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${JINA_API_KEY}`,
         },
         timeout: 30000,
         responseType: "json",
       }
     );
 
-    if (!data.data || !Array.isArray(data.data)) {
-      throw new Error("Invalid response format");
+    if (!data.results || !Array.isArray(data.results)) {
+      throw new Error('Invalid response format');
     }
 
-    const totalTokens = data.data.reduce(
-      (sum, item) => sum + (item.usage?.tokens || 0),
-      0
-    );
-
-    console.log("Total URLs:", data.data.length);
+    logDebug('Search results metadata:', { metadata: data.meta });
 
     const tokenTracker = tracker || new TokenTracker();
-    tokenTracker.trackUsage("search", {
-      totalTokens,
+    tokenTracker.trackUsage('search', {
+      totalTokens: data.meta.credits,
       promptTokens: query.q.length,
-      completionTokens: totalTokens,
+      completionTokens: 0
     });
 
     logger.external_service_call(
@@ -67,17 +59,7 @@ export async function search(
 
     return { response: data };
   } catch (error) {
-    logger.external_service_call(
-      "jina-search",
-      "search",
-      undefined,
-      query,
-      undefined,
-      Date.now() - startTime,
-      "ERROR",
-      error as Error
-    );
-    console.error('Error in jina search:', error);
+    logError('Search error:', { error });
     throw error;
   }
 }

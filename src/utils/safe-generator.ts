@@ -13,6 +13,7 @@ import { GoogleGenAIHelper } from "./google-genai-helper";
 import { ContentListUnion } from "@google/genai";
 import { cleanupLineBreaks, cleanupJsonString } from "./text-cleanup";
 import { Langfuse } from "langfuse";
+import { logDebug, logError, logWarning } from "../logging";
 
 interface GenerateObjectResult<T> {
   object: T;
@@ -176,13 +177,13 @@ export class ObjectGeneratorSafe {
         prompt: prompt
           ? prompt
           : (messages?.map((message: CoreMessage) => ({
-              role: message.role === "assistant" ? "model" : message.role,
-              parts: [
-                {
-                  text: message.content,
-                },
-              ],
-            })) as ContentListUnion),
+            role: message.role === "assistant" ? "model" : message.role,
+            parts: [
+              {
+                text: message.content,
+              },
+            ],
+          })) as ContentListUnion),
         systemInstruction: system,
         maxOutputTokens: getToolConfig(model).maxTokens,
         providerOptions,
@@ -270,19 +271,7 @@ export class ObjectGeneratorSafe {
         });
 
         if (numRetries > 0) {
-          logger.error(
-            `${model} failed on object generation -> manual parsing failed -> retry with ${
-              numRetries - 1
-            } retries remaining`
-          );
-
-          trace.event({
-            name: "retrying-generation",
-            metadata: {
-              retriesRemaining: numRetries - 1,
-            },
-          });
-
+          logWarning(`${model} failed on object generation -> manual parsing failed -> retry with ${numRetries - 1} retries remaining`);
           return this.generateObject({
             model,
             schema,
@@ -294,10 +283,7 @@ export class ObjectGeneratorSafe {
           });
         } else {
           // Second fallback: Try with fallback model if provided
-          logger.error(
-            `${model} failed on object generation -> manual parsing failed -> trying fallback with distilled schema`
-          );
-
+          logWarning(`${model} failed on object generation -> manual parsing failed -> trying fallback with distilled schema`);
           try {
             const fallbackSpan = trace.span({
               name: "fallback-generation",
@@ -473,20 +459,11 @@ export class ObjectGeneratorSafe {
     error: unknown
   ): Promise<GenerateObjectResult<T>> {
     if (NoObjectGeneratedError.isInstance(error)) {
-      logger.error(
-        "Object not generated according to schema, fallback to manual parsing"
-      );
-      logger.error("error", error.text);
-
-      // Clean up line breaks from the error text before parsing
-      const cleanedText = cleanupJsonString(
-        cleanupLineBreaks((error as any).text)
-      );
-
+      logWarning('Object not generated according to schema, fallback to manual parsing', { error });
       try {
         // First try standard JSON parsing
-        const partialResponse = JSON.parse(cleanedText);
-        console.log("JSON parse success!");
+        const partialResponse = JSON.parse((error as any).text);
+        logDebug('JSON parse success!');
         return {
           object: partialResponse as T,
           usage: (error as any).usage,
@@ -494,14 +471,14 @@ export class ObjectGeneratorSafe {
       } catch (parseError) {
         // Use Hjson to parse the error response for more lenient parsing
         try {
-          const hjsonResponse = Hjson.parse(cleanedText);
-          console.log("Hjson parse success!");
+          const hjsonResponse = Hjson.parse((error as any).text);
+          logDebug('Hjson parse success!');
           return {
             object: hjsonResponse as T,
             usage: (error as any).usage,
           };
         } catch (hjsonError) {
-          logger.error("Both JSON and Hjson parsing failed:", hjsonError);
+          logError('Both JSON and Hjson parsing failed:', { error: hjsonError });
           throw error;
         }
       }

@@ -12,7 +12,8 @@ import { estimateGeminiTokens } from "../utils/gemini-tools";
 export async function readUrl(
   url: string,
   withAllLinks?: boolean,
-  tracker?: TokenTracker
+  tracker?: TokenTracker,
+  withAllImages?: boolean
 ): Promise<{ response: ReadResponse }> {
   if (!url.trim()) {
     throw new Error("URL cannot be empty");
@@ -39,6 +40,12 @@ export async function readUrl(
       jinaHeaders["X-With-Links-Summary"] = "all";
     }
 
+    if (withAllImages) {
+      jinaHeaders['X-With-Images-Summary'] = 'true'
+    } else {
+      jinaHeaders['X-Retain-Images'] = 'none'
+    }
+
     const { data: jinaResponse } = await axiosClient.post<ReadResponse>(
       "https://r.jina.ai/",
       { url },
@@ -61,8 +68,7 @@ export async function readUrl(
     }
   } catch (error) {
     console.log(
-      `Jina request failed: ${
-        error instanceof Error ? error.message : String(error)
+      `Jina request failed: ${error instanceof Error ? error.message : String(error)
       }`
     );
     lastError = error instanceof Error ? error : new Error(String(error));
@@ -119,13 +125,13 @@ export async function readUrl(
           usage: {
             tokens: estimatedTokens,
           },
+          images: {},
         },
       };
       lastError = null; // Clear previous Jina error if Scrape.do succeeded
     } catch (error) {
       console.error(
-        `Scrape.do request failed: ${
-          error instanceof Error ? error.message : String(error)
+        `Scrape.do request failed: ${error instanceof Error ? error.message : String(error)
         }`
       );
       lastError = error instanceof Error ? error : new Error(String(error));
@@ -133,9 +139,8 @@ export async function readUrl(
       const jinaErrorMsg = lastError?.message
         ? `Jina Error: ${lastError.message}`
         : "Jina failed or returned unusable data.";
-      const scrapeErrorMsg = `Scrape.do Error: ${
-        error instanceof Error ? error.message : String(error)
-      }`;
+      const scrapeErrorMsg = `Scrape.do Error: ${error instanceof Error ? error.message : String(error)
+        }`;
       throw new Error(
         `Failed to read URL content. ${jinaErrorMsg}. ${scrapeErrorMsg}`
       );

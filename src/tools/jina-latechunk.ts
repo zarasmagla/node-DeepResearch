@@ -2,7 +2,7 @@ import { TrackerContext } from "../types";
 import { Schemas } from "../utils/schemas";
 import { cosineSimilarity } from "./cosine";
 import { getEmbeddings } from "./embeddings";
-import { logger } from "../winston-logger";
+import { logError, logDebug } from '../logging';
 
 // Refactored cherryPick function
 export async function cherryPick(question: string, longContext: string, options: any = {}, trackers: TrackerContext, schemaGen: Schemas, url: string) {
@@ -14,7 +14,7 @@ export async function cherryPick(question: string, longContext: string, options:
 
   if (longContext.length < snippetLength * 2) {
     // If the context is shorter than the snippet length, return the whole context
-    console.log('content is too short, dont bother');
+    logDebug('content is too short, dont bother');
     return longContext;
   }
 
@@ -24,7 +24,7 @@ export async function cherryPick(question: string, longContext: string, options:
     chunks.push(longContext.substring(i, Math.min(i + chunkSize, longContext.length)));
   }
 
-  console.log('late chunking enabled! num chunks:', chunks.length);
+  logDebug(`late chunking enabled! num chunks: ${chunks.length}`);
 
   trackers.actionTracker.trackThink('late_chunk', schemaGen.languageCode, { url });
 
@@ -62,7 +62,7 @@ export async function cherryPick(question: string, longContext: string, options:
 
     // Verify that we got embeddings for all chunks
     if (allChunkEmbeddings.length !== chunks.length) {
-      logger.error(`Got ${allChunkEmbeddings.length} embeddings for ${chunks.length} chunks`);
+      logError(`Got ${allChunkEmbeddings.length} embeddings for ${chunks.length} chunks`);
     }
 
     // Calculate cosine similarity between the question and each chunk
@@ -116,7 +116,7 @@ ${snippet}
 </snippet-${index + 1}>`.trim()).join("\n\n");
 
   } catch (error) {
-    console.error('Error in late chunking:', error);
+    logError('Error in late chunking:', { error });
     // Fallback: just return the beginning of the context up to the desired length
     return longContext.substring(0, snippetLength * numSnippets);
   }
