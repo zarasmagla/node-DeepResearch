@@ -29,8 +29,8 @@ export async function serpCluster(results: SearchSnippet[], trackers: TrackerCon
       system: prompt.system,
       prompt: prompt.user,
     });
-    trackers?.actionTracker.trackThink(result.object.think);
-    const clusters = result.object.clusters;
+    trackers?.actionTracker.trackThink((result.object as any).think);
+    const clusters = (result.object as any).clusters;
     logInfo(TOOL_NAME, { clusters });
     return clusters;
   } catch (error) {

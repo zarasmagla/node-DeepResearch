@@ -21,11 +21,15 @@ import {
   RepeatEvaluationType,
   UnNormalizedSearchSnippet,
   WebContent,
+  SearchAction,
+  ImageReference,
+  ImageObject,
 } from "./types";
 import { TrackerContext } from "./types";
 import { search } from "./tools/jina-search";
+import { get_agent_logger } from "./utils/structured-logger";
+import { Langfuse } from "langfuse";
 
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { ObjectGeneratorSafe } from "./utils/safe-generator";
 import { CodeSandbox } from "./tools/code-sandbox";
 import { serperSearch } from "./tools/serper-search";
@@ -1549,6 +1553,15 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       question,
       finalAnswerPIP
     );
+
+    // Create a span for beast mode processing
+    const beastModeSpan = agentTrace.span({
+      name: "beast-mode",
+      input: {
+        finalAnswerPIP: finalAnswerPIP.join(" | "),
+        knowledgeItems: allKnowledge.length,
+      },
+    });
 
     const beastGeneration = beastModeSpan.generation({
       name: "beast-mode-generation",

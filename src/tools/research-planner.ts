@@ -74,8 +74,8 @@ export async function researchPlan(question: string, teamSize: number, soundBite
       system: prompt.system,
       prompt: prompt.user,
     });
-    trackers?.actionTracker.trackThink(result.object.think);
-    const subproblems = result.object.subproblems;
+    trackers?.actionTracker.trackThink((result.object as any).think);
+    const subproblems = (result.object as any).subproblems;
     logInfo(TOOL_NAME, { subproblems });
     return subproblems;
   } catch (error) {

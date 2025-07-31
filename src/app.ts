@@ -10,6 +10,7 @@ import {
   Model,
   StepAction,
   VisitAction,
+  SearchAction,
 } from "./types";
 
 import { get_api_logger } from "./utils/structured-logger";

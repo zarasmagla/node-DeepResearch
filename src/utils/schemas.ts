@@ -1,6 +1,7 @@
 import { z } from "zod/v4";
 import { ObjectGeneratorSafe } from "./safe-generator";
 import { EvaluationType, PromptPair } from "../types";
+import { logDebug } from "../logging";
 
 export const MAX_URLS_PER_STEP = 5
 export const MAX_QUERIES_PER_STEP = 5
@@ -135,8 +136,8 @@ export class Schemas {
       },
     });
 
-    this.languageCode = result.object.langCode;
-    this.languageStyle = result.object.langStyle;
+    this.languageCode = (result.object as any).langCode;
+    this.languageStyle = (result.object as any).langStyle;
     logDebug(`language: ${this.languageCode} -> ${this.languageStyle}`);
   }
 

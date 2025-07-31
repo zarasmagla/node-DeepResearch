@@ -852,7 +852,7 @@ export async function evaluateAnswer(
 
   const finalResult = result?.object as EvaluationResponse;
 
-  logger.info("Completed answer evaluation", {
+  logInfo("Completed answer evaluation", {
     verification_id: trackers.verification_id,
     operation: "evaluate_answer",
     status: finalResult?.pass ? "PASSED" : "FAILED",

@@ -47,15 +47,6 @@ export async function search(
       completionTokens: 0
     });
 
-    logger.external_service_call(
-      "jina-search",
-      "search",
-      undefined,
-      query,
-      { resultCount: data.data.length, totalTokens },
-      Date.now() - startTime,
-      "SUCCESS"
-    );
 
     return { response: data };
   } catch (error) {
