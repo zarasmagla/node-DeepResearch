@@ -1,6 +1,6 @@
 import { BoostedSearchSnippet, ImageObject, KnowledgeItem, SearchSnippet, TrackerContext, VisitAction, WebContent } from "../types";
 import { getI18nText, smartMergeStrings } from "./text-tools";
-import { rerankDocuments } from "../tools/jina-rerank";
+import { rerankDocuments } from "../tools/gemini-rerank";
 import { readUrl } from "../tools/read";
 import { Schemas } from "./schemas";
 import { cherryPick } from "../tools/jina-latechunk";

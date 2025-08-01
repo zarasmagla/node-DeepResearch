@@ -357,30 +357,8 @@ export interface TrackerContext {
 
 
 
-// Interface definitions for Jina API
-export interface JinaEmbeddingRequest {
-  model: string;
-  task?: string;
-  late_chunking?: boolean;
-  dimensions?: number;
-  embedding_type?: string;
-  input: string[] | Record<string, string>[];
-  truncate?: boolean;
-}
-
-export interface JinaEmbeddingResponse {
-  model: string;
-  object: string;
-  usage: {
-    total_tokens: number;
-    prompt_tokens: number;
-  };
-  data: Array<{
-    object: string;
-    index: number;
-    embedding: number[];
-  }>;
-}
+// Google Gemini embedding types are defined within the @google/genai package
+// No additional type definitions needed for embeddings
 
 export type ImageObject = {
   url: string;
