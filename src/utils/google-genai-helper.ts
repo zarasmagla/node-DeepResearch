@@ -266,7 +266,7 @@ export class GoogleGenAIHelper {
    * Generate text using Google Gen AI
    */
   static async generateText({
-    model = "gemini-2.0-flash-lite",
+    model = "gemini-2.5-flash",
     prompt,
     systemInstruction,
     maxOutputTokens = 1000,

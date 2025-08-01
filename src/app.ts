@@ -547,7 +547,7 @@ app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Res
   if (body.response_format) {
     // Convert JSON schema to Zod schema using a proper converter
     try {
-      responseSchema = jsonSchema(body.response_format.json_schema);
+      responseSchema = body.response_format;
       logDebug('Response schema', { schema: responseSchema });
     } catch (error: any) {
       return res.status(400).json({ error: `Invalid JSON schema: ${error.message}` });

@@ -11,7 +11,7 @@ import Hjson from "hjson"; // Import Hjson library
 import { logger } from "../winston-logger";
 import { GoogleGenAIHelper } from "./google-genai-helper";
 import { ContentListUnion } from "@google/genai";
-import { cleanupLineBreaks, cleanupJsonString } from "./text-cleanup";
+
 import { Langfuse } from "langfuse";
 import { logDebug, logError, logWarning } from "../logging";
 
@@ -28,6 +28,18 @@ interface GenerateOptions {
   messages?: CoreMessage[];
   numRetries?: number;
   providerOptions?: Record<string, any>;
+}
+
+interface GenerateTextOptions {
+  model: ToolName;
+  prompt: string;
+  system?: string;
+  numRetries?: number;
+}
+
+interface GenerateTextResult {
+  text: string;
+  usage: LanguageModelUsage;
 }
 
 export class ObjectGeneratorSafe {
@@ -440,6 +452,199 @@ export class ObjectGeneratorSafe {
               throw error; // Throw original error for better debugging
             }
           }
+        }
+      }
+    }
+  }
+
+  async generateText(
+    options: GenerateTextOptions
+  ): Promise<GenerateTextResult> {
+    const {
+      model,
+      prompt,
+      system,
+      numRetries = 0,
+    } = options;
+
+    if (!model || !prompt) {
+      throw new Error("Model and prompt are required parameters");
+    }
+
+    // Create a Langfuse trace for the text generation
+    const trace = this.langfuse.trace({
+      name: "text-generation",
+      metadata: {
+        model: getModel(model),
+        numRetries,
+        hasPrompt: !!prompt,
+        hasSystem: !!system,
+      },
+      tags: ["text-generation", "safe-generator"],
+    });
+
+    try {
+      // Create a generation for the primary attempt
+      const primaryGeneration = trace.generation({
+        name: "primary-text-generation",
+        model: getModel(model),
+        input: {
+          prompt,
+          system,
+        },
+        modelParameters: {
+          maxOutputTokens: getToolConfig(model).maxTokens,
+          temperature: getToolConfig(model).temperature,
+        },
+        metadata: {
+          attempt: "primary",
+          model: getModel(model),
+        },
+      });
+
+      const result = await GoogleGenAIHelper.generateText({
+        model: getModel(model),
+        prompt,
+        systemInstruction: system,
+        maxOutputTokens: getToolConfig(model).maxTokens,
+        temperature: getToolConfig(model).temperature,
+        langfuseGeneration: primaryGeneration,
+      });
+
+      // End the generation with success
+      primaryGeneration.end({
+        output: result.text,
+        usage: {
+          promptTokens: result.usage.promptTokens,
+          completionTokens: result.usage.completionTokens,
+          totalTokens: result.usage.totalTokens,
+        },
+      });
+
+      // End the trace with success
+      trace.update({
+        output: result.text,
+        metadata: {
+          success: true,
+          finalAttempt: "primary",
+          usage: result.usage,
+        },
+      });
+
+      this.tokenTracker.trackUsage(model, result.usage);
+      return result;
+    } catch (error) {
+      // Log the primary failure
+      trace.event({
+        name: "primary-text-generation-failed",
+        level: "WARNING",
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+          errorType:
+            error instanceof Error ? error.constructor.name : "unknown",
+        },
+      });
+
+      if (numRetries > 0) {
+        logWarning(`${model} failed on text generation -> retry with ${numRetries - 1} retries remaining`);
+        return this.generateText({
+          model,
+          prompt,
+          system,
+          numRetries: numRetries - 1,
+        });
+      } else {
+        // Try with fallback model if primary fails
+        logWarning(`${model} failed on text generation -> trying fallback`);
+        try {
+          const fallbackSpan = trace.span({
+            name: "fallback-text-generation",
+            metadata: {
+              attempt: "fallback",
+              fallbackModel: "fallback",
+            },
+          });
+
+          const fallbackGeneration = fallbackSpan.generation({
+            name: "fallback-text-generation",
+            model: getModel("fallback"),
+            input: {
+              prompt,
+              system,
+            },
+            modelParameters: {
+              maxOutputTokens: getToolConfig("fallback").maxTokens,
+              temperature: getToolConfig("fallback").temperature,
+            },
+            metadata: {
+              attempt: "fallback",
+            },
+          });
+
+          const fallbackResult = await GoogleGenAIHelper.generateText({
+            model: getModel("fallback"),
+            prompt,
+            systemInstruction: system,
+            maxOutputTokens: getToolConfig("fallback").maxTokens,
+            temperature: getToolConfig("fallback").temperature,
+            langfuseGeneration: fallbackGeneration,
+          });
+
+          fallbackGeneration.end({
+            output: fallbackResult.text,
+            usage: {
+              promptTokens: fallbackResult.usage.promptTokens,
+              completionTokens: fallbackResult.usage.completionTokens,
+              totalTokens: fallbackResult.usage.totalTokens,
+            },
+          });
+
+          fallbackSpan.end({
+            output: fallbackResult.text,
+            metadata: {
+              success: true,
+              usage: fallbackResult.usage,
+            },
+          });
+
+          trace.update({
+            output: fallbackResult.text,
+            metadata: {
+              success: true,
+              finalAttempt: "fallback",
+              usage: fallbackResult.usage,
+            },
+          });
+
+          this.tokenTracker.trackUsage("fallback", fallbackResult.usage);
+          console.log("Fallback text generation success!");
+          return fallbackResult;
+        } catch (fallbackError) {
+          trace.event({
+            name: "fallback-text-generation-failed",
+            level: "ERROR",
+            metadata: {
+              error:
+                fallbackError instanceof Error
+                  ? fallbackError.message
+                  : String(fallbackError),
+              errorType:
+                fallbackError instanceof Error
+                  ? fallbackError.constructor.name
+                  : "unknown",
+            },
+          });
+
+          trace.update({
+            metadata: {
+              success: false,
+              finalAttempt: "failed",
+              allRecoveryMechanismsFailed: true,
+            },
+          });
+
+          logger.error(`Text generation failed for both primary and fallback models`);
+          throw error; // Throw original error for better debugging
         }
       }
     }

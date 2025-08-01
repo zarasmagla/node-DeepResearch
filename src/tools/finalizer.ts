@@ -1,7 +1,7 @@
 import { KnowledgeItem, PromptPair, TrackerContext } from '../types';
 import { getKnowledgeStr } from "../utils/text-tools";
-import { getModel } from "../config";
-import { generateText } from "ai";
+import { getModel, getToolConfig } from "../config";
+import { GoogleGenAIHelper } from "../utils/google-genai-helper";
 import { Schemas } from "../utils/schemas";
 import { logInfo, logError, logDebug, logWarning } from '../logging';
 
@@ -74,10 +74,12 @@ export async function finalizeAnswer(
     const prompt = getPrompt(mdContent, knowledgeItems, schema);
     trackers?.actionTracker.trackThink('finalize_answer', schema.languageCode)
 
-    const result = await generateText({
+    const result = await GoogleGenAIHelper.generateText({
       model: getModel(TOOL_NAME),
-      system: prompt.system,
+      systemInstruction: prompt.system,
       prompt: prompt.user,
+      maxOutputTokens: getToolConfig(TOOL_NAME).maxTokens,
+      temperature: getToolConfig(TOOL_NAME).temperature,
     });
 
     trackers.tokenTracker.trackUsage(TOOL_NAME, result.usage)

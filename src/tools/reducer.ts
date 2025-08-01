@@ -1,6 +1,6 @@
 import { PromptPair, TrackerContext } from '../types';
-import { getModel } from "../config";
-import { generateText } from "ai";
+import { getModel, getToolConfig } from "../config";
+import { GoogleGenAIHelper } from "../utils/google-genai-helper";
 import { Schemas } from "../utils/schemas";
 import { logError, logDebug, logWarning } from '../logging';
 
@@ -71,10 +71,12 @@ export async function reduceAnswers(
     const prompt = getPrompt(answers);
     trackers?.actionTracker.trackThink('reduce_answer', schema.languageCode)
 
-    const result = await generateText({
+    const result = await GoogleGenAIHelper.generateText({
       model: getModel(TOOL_NAME),
-      system: prompt.system,
+      systemInstruction: prompt.system,
       prompt: prompt.user,
+      maxOutputTokens: getToolConfig(TOOL_NAME).maxTokens,
+      temperature: getToolConfig(TOOL_NAME).temperature,
     });
 
     trackers.tokenTracker.trackUsage(TOOL_NAME, result.usage)

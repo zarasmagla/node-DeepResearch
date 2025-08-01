@@ -122,7 +122,7 @@ export function getModel(toolName: ToolName) {
     throw new Error('GEMINI_API_KEY not found');
   }
 
-  return createGoogleGenerativeAI({ apiKey: GEMINI_API_KEY })(config.model);
+  return config.model
 }
 
 // Validate required environment variables

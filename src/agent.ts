@@ -66,7 +66,6 @@ import { finalizeAnswer } from "./tools/finalizer";
 import { buildImageReferences, buildReferences } from "./tools/build-ref";
 import { logInfo, logError, logDebug, logWarning } from './logging';
 import { researchPlan } from './tools/research-planner';
-import { reduceAnswers } from './tools/reducer';
 import { AxiosError } from 'axios';
 import { dedupImagesWithEmbeddings, filterImages } from './utils/image-tools';
 import { serpCluster } from './tools/serp-cluster';
