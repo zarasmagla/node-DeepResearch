@@ -94,6 +94,7 @@ const languageISO6391Map: Record<string, string> = {
   'pl': 'Polish',
   'sv': 'Swedish',
   'no': 'Norwegian',
+  'ka': 'Georgian',
   'da': 'Danish',
   'fi': 'Finnish',
   'el': 'Greek',

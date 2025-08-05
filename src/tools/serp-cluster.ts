@@ -4,16 +4,40 @@ import { Schemas } from "../utils/schemas";
 import { logInfo, logError } from '../logging';
 import { SearchSnippet } from '../types';
 
+function formatSearchResults(results: SearchSnippet[]): string {
+  return results.map((result, index) => {
+    const parts = [
+      `Result ${index + 1}:`,
+      `title: "${result.title}"`,
+      `url: "${result.url}"`,
+      `description: "${result.description}"`
+    ];
+
+    if (result.weight !== undefined) {
+      parts.push(`weight: ${result.weight}`);
+    }
+
+    if (result.date) {
+      parts.push(`date: "${result.date}"`);
+    }
+
+    return parts.join('\n');
+  }).join('\n\n');
+}
+
 function getPrompt(results: SearchSnippet[]): PromptPair {
   return {
     system: `
 You are a search engine result analyzer. You look at the SERP API response and group them into meaningful cluster. 
 
-Each cluster should contain a summary of the content, key data and insights, the corresponding URLs and search advice. Respond in JSON format.
+Each cluster should contain a summary of the content, key data and insights, the corresponding URLs and search advice. 
 `,
-    user:
-      `
-${JSON.stringify(results)}
+    user: `
+Here are the search results to analyze:
+
+${formatSearchResults(results)}
+
+Please analyze these results and group them into meaningful clusters.
 `
   };
 }

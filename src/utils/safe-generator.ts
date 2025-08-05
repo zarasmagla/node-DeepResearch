@@ -142,6 +142,7 @@ export class ObjectGeneratorSafe {
       name: "object-generation",
       metadata: {
         model: getModel(model),
+        toolName: model,
         numRetries,
         hasSchema: !!schema,
         hasPrompt: !!prompt,
@@ -178,8 +179,8 @@ export class ObjectGeneratorSafe {
           maxOutputTokens: getToolConfig(model).maxTokens,
         },
         metadata: {
+          toolName: model,
           attempt: "primary",
-          model: getModel(model),
         },
       });
 
@@ -476,6 +477,7 @@ export class ObjectGeneratorSafe {
       name: "text-generation",
       metadata: {
         model: getModel(model),
+        toolName: model,
         numRetries,
         hasPrompt: !!prompt,
         hasSystem: !!system,
@@ -498,7 +500,7 @@ export class ObjectGeneratorSafe {
         },
         metadata: {
           attempt: "primary",
-          model: getModel(model),
+          toolName: model,
         },
       });
 

@@ -361,3 +361,95 @@ flowchart TD
 
     BeastMode --> FinalAnswer[Generate final answer] --> End
 ```
+
+## Troubleshooting
+
+### Google Cloud 500 Internal Server Errors
+
+If you're experiencing intermittent `500 Internal Server Error` when using Google's Gemini API for embeddings, this is a known issue affecting many users. Here are the solutions implemented in this codebase:
+
+#### The Problem
+
+- **Error Message**: `"500 Internal error encountered"` or `"An internal error has occurred"`
+- **Frequency**: Intermittent, especially during high load periods
+- **Root Causes**:
+  - Regional API endpoint overload
+  - Model capacity limitations (often shows as 503 but manifests as 500)
+  - Large payload sizes triggering server errors
+  - Problematic text characters causing tokenization issues
+
+#### Solutions Applied
+
+1. **Reduced Batch Sizes** (Line 5 in `src/tools/embeddings.ts`)
+
+   ```typescript
+   const BATCH_SIZE = 50; // Reduced from 100 to avoid 500 errors
+   ```
+
+2. **Enhanced Retry Logic with Exponential Backoff**
+
+   - Increased retries from 3 to 5 attempts
+   - Longer delays for server errors (2-30 seconds vs 1-10 seconds)
+   - Added jitter to prevent thundering herd effects
+
+3. **Text Preprocessing**
+
+   - Removes problematic Unicode characters that can cause tokenization errors
+   - Normalizes encoding issues (smart quotes, em dashes, etc.)
+   - Truncates extremely long texts (>30,000 characters)
+
+4. **Circuit Breaker Pattern**
+
+   - After 3 consecutive failures, temporarily stops API calls for 1 minute
+   - Automatically generates zero embeddings as placeholders
+   - Prevents cascading failures and API rate limiting
+
+5. **Alternative Model Fallback**
+   - Switches to `text-embedding-004` after 2 consecutive failures
+   - Provides redundancy when primary model is overloaded
+
+#### Manual Workarounds
+
+If you continue experiencing issues, try these approaches:
+
+1. **Regional Switching** (Based on [Google Cloud Community feedback](https://www.googlecloudcommunity.com/gc/AI-ML/InternalServerError-500-Internal-error-encountered/m-p/698728))
+
+   - The error is often region-specific
+   - Users report success switching from `northamerica-northeast1` to `us-central1`
+   - Add this environment variable to try different regions:
+
+   ```bash
+   export GOOGLE_AI_REGION=us-central1
+   ```
+
+2. **Reduce Payload Size**
+
+   - Further reduce `BATCH_SIZE` in `src/tools/embeddings.ts` (try 25 or 10)
+   - Implement text chunking for very long documents
+
+3. **Implement Request Queuing**
+   - Add delays between batches to reduce API load
+   - Use a queue system to serialize requests during peak hours
+
+#### Monitoring and Logging
+
+The enhanced error logging now captures:
+
+- HTTP status codes (500, 503)
+- Error type classification (server error vs overload)
+- Batch sizes that trigger errors
+- Circuit breaker status
+- Retry attempt details
+
+Look for these log patterns:
+
+```
+ERROR: Error calling Google Embeddings API (attempt X/5)
+DEBUG: Circuit breaker: X consecutive failures
+DEBUG: Using alternative model due to failures: text-embedding-004
+```
+
+#### References
+
+- [Google Cloud Community Discussion](https://www.googlecloudcommunity.com/gc/AI-ML/InternalServerError-500-Internal-error-encountered/td-p/693571)
+- [Google Developer Troubleshooting Guide](https://developers.generativeai.google/guide/troubleshooting)
