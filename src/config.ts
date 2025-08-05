@@ -128,7 +128,8 @@ export function getModel(toolName: ToolName) {
 // Validate required environment variables
 if (LLM_PROVIDER === 'gemini' && !GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not found");
 if (LLM_PROVIDER === 'openai' && !OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not found");
-if (!JINA_API_KEY) throw new Error("JINA_API_KEY not found");
+// JINA_API_KEY is optional since we now use Google Gemini for embeddings and reranking
+// It's still used by some tools like jina-search, jina-classify-spam, and read.ts
 
 // Log all configurations
 const configSummary = {
