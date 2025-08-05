@@ -85,7 +85,7 @@ export class GoogleGenAIHelper {
       if (!GEMINI_API_KEY) {
         throw new Error("GEMINI_API_KEY is not set");
       }
-      this.googleGenAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+      this.googleGenAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY, location: "global" });
     }
     return this.googleGenAI as GoogleGenAI;
   }

@@ -2,18 +2,69 @@ import { GEMINI_API_KEY } from "../config";
 import { GoogleGenAI } from "@google/genai";
 import { logError, logDebug } from '../logging';
 
-const BATCH_SIZE = 100; // Google allows larger batches
-const MAX_RETRIES = 3; // Maximum number of retries for missing embeddings
+const BATCH_SIZE = 50; // Reduced batch size to avoid 500 errors
+const MAX_RETRIES = 5; // Increased retries for 500 errors
+const BASE_DELAY_MS = 2000; // Base delay for exponential backoff
+const MAX_DELAY_MS = 30000; // Maximum delay (30 seconds)
 
 // Initialize Google GenAI client
 let genAI: GoogleGenAI | null = null;
+
+// Simple circuit breaker for consecutive failures
+let consecutiveFailures = 0;
+let lastFailureTime = 0;
+const MAX_CONSECUTIVE_FAILURES = 3;
+const CIRCUIT_BREAKER_RESET_TIME = 60000; // 1 minute
+
+// Text preprocessing to avoid API errors
+function preprocessText(text: string): string {
+  if (!text || typeof text !== "string") return text || "";
+
+  let processed = text;
+
+  // 1. Fix common encoding issues
+  processed = processed
+    .replace(/â€™/g, "'") // Smart apostrophe
+    .replace(/â€œ/g, '"') // Left smart quote
+    .replace(/â€\u009D/g, '"') // Right smart quote
+    .replace(/â€"/g, "-") // Em dash
+    .replace(/â€¦/g, "...") // Ellipsis
+    .replace(/Â/g, "") // Non-breaking space artifacts
+    .replace(/\u00A0/g, " "); // Non-breaking space to regular space
+
+  // 2. Normalize Unicode characters
+  processed = processed.normalize("NFKC");
+
+  // 3. Remove problematic characters
+  processed = processed
+    .replace(/[\u200B-\u200D\uFEFF]/g, "") // Zero-width characters
+    .replace(/[""]/g, '"') // Smart quotes
+    .replace(/['']/g, "'") // Smart apostrophes
+    .replace(/[–—]/g, "-") // Em/en dashes
+    .replace(/…/g, "..."); // Ellipsis
+
+  // 4. Handle excessive whitespace and ensure reasonable length
+  processed = processed.replace(/\s+/g, " ").trim();
+
+  // 5. Truncate extremely long texts that might cause issues
+  if (processed.length > 30000) {
+    processed = processed.substring(0, 30000) + "...";
+  }
+
+  return processed;
+}
 
 function getGenAIClient(): GoogleGenAI {
   if (!genAI) {
     if (!GEMINI_API_KEY) {
       throw new Error('GEMINI_API_KEY is not set');
     }
-    genAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+
+    // Configure with potential region override
+    const config: any = { apiKey: GEMINI_API_KEY, location: "glboal" };
+
+
+    genAI = new GoogleGenAI(config);
   }
   return genAI;
 }
@@ -55,10 +106,11 @@ export async function getEmbeddings(
     return { embeddings: [], tokens: 0 };
   }
 
-  // Convert Record<string, string>[] to string[] if needed
-  const textStrings = texts.map(text =>
-    typeof text === 'string' ? text : Object.values(text)[0]
-  );
+  // Convert Record<string, string>[] to string[] if needed and preprocess text
+  const textStrings = texts.map(text => {
+    const textContent = typeof text === 'string' ? text : Object.values(text)[0];
+    return preprocessText(textContent);
+  });
 
   // Process in batches
   const allEmbeddings: number[][] = [];
@@ -109,14 +161,39 @@ async function getBatchEmbeddingsWithRetry(
   currentBatch: number,
   batchCount: number
 ): Promise<{ batchEmbeddings: number[][], batchTokens: number }> {
+  // Check circuit breaker
+  const now = Date.now();
+  if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES &&
+    now - lastFailureTime < CIRCUIT_BREAKER_RESET_TIME) {
+    logDebug(`[embeddings] Circuit breaker engaged, skipping API call for batch ${currentBatch}`);
+
+    const defaultDimensions = options.dimensions || 768;
+    const placeholderEmbeddings = batchTexts.map((text, idx) => {
+      logError(`Creating zero embedding (circuit breaker) for text ${idx}: [${truncateInputString(text)}...]`);
+      return new Array(defaultDimensions).fill(0);
+    });
+
+    return {
+      batchEmbeddings: placeholderEmbeddings,
+      batchTokens: 0
+    };
+  }
+
   let retryCount = 0;
 
   while (retryCount < MAX_RETRIES) {
     try {
       const genAI = getGenAIClient();
 
-      // Prepare the request configuration
-      const model = options.model || "gemini-embedding-001";
+      // Prepare the request configuration with fallback model on consecutive failures
+      let model = options.model || "gemini-embedding-001";
+
+      // Use alternative model if we've had consecutive failures
+      if (consecutiveFailures >= 2 && !options.model) {
+        model = "text-embedding-004"; // Alternative model
+        logDebug(`[embeddings] Using alternative model due to failures: ${model}`);
+      }
+
       const taskType = mapTaskType(options.task);
 
       const config = {
@@ -145,6 +222,9 @@ async function getBatchEmbeddingsWithRetry(
 
       logDebug(`[embeddings] Successfully got ${batchEmbeddings.length} embeddings for batch ${currentBatch}`);
 
+      // Reset circuit breaker on success
+      consecutiveFailures = 0;
+
       return {
         batchEmbeddings,
         batchTokens: estimatedTokens
@@ -152,9 +232,29 @@ async function getBatchEmbeddingsWithRetry(
 
     } catch (error: any) {
       retryCount++;
-      logError(`Error calling Google Embeddings API (attempt ${retryCount}/${MAX_RETRIES}):`, { error });
+
+      // Enhanced error logging with status code detection
+      const isServerError = error?.status === 500 || error?.message?.includes('500') ||
+        error?.message?.includes('Internal error') || error?.message?.includes('INTERNAL');
+      const isOverloadError = error?.status === 503 || error?.message?.includes('503') ||
+        error?.message?.includes('overloaded');
+
+      logError(`Error calling Google Embeddings API (attempt ${retryCount}/${MAX_RETRIES}):`, {
+        error: error?.message || error,
+        status: error?.status,
+        isServerError,
+        isOverloadError,
+        batchSize: batchTexts.length
+      });
 
       if (retryCount >= MAX_RETRIES) {
+        // Update circuit breaker on consecutive failures
+        if (isServerError || isOverloadError) {
+          consecutiveFailures++;
+          lastFailureTime = Date.now();
+          logDebug(`[embeddings] Circuit breaker: ${consecutiveFailures} consecutive failures`);
+        }
+
         // On final retry failure, create placeholder embeddings
         logError(`Failed to get embeddings after ${MAX_RETRIES} retries, creating placeholder embeddings`);
 
@@ -170,9 +270,19 @@ async function getBatchEmbeddingsWithRetry(
         };
       }
 
-      // Wait before retrying
-      const delayMs = Math.min(1000 * Math.pow(2, retryCount - 1), 10000); // Exponential backoff, max 10s
-      logDebug(`[embeddings] Retrying in ${delayMs}ms...`);
+      // Enhanced exponential backoff with jitter for 500/503 errors
+      let delayMs: number;
+      if (isServerError || isOverloadError) {
+        // Longer delays for server errors
+        delayMs = Math.min(BASE_DELAY_MS * Math.pow(2, retryCount - 1), MAX_DELAY_MS);
+        // Add jitter to avoid thundering herd
+        delayMs += Math.random() * 1000;
+      } else {
+        // Standard exponential backoff for other errors
+        delayMs = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+      }
+
+      logDebug(`[embeddings] Retrying in ${Math.round(delayMs)}ms...`);
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
