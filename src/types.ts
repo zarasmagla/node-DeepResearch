@@ -9,7 +9,7 @@ type BaseAction = {
 // Interface definitions for Jina API
 export interface JinaEmbeddingRequest {
   model: string;
-  task: string;
+  task?: string;
   late_chunking?: boolean;
   dimensions?: number;
   embedding_type?: string;
