@@ -11,6 +11,7 @@ export const MAX_CLUSTERS = 5
 function getLanguagePrompt(question: string): PromptPair {
   return {
     system: `Identifies both the language used and the overall vibe of the question
+    
 
 <rules>
 Combine both language and emotional vibe in a descriptive phrase, considering:
@@ -18,6 +19,7 @@ Combine both language and emotional vibe in a descriptive phrase, considering:
   - Emotional tone: panic, excitement, frustration, curiosity, skepticism, etc.
   - Formality level: academic, casual, professional, etc.
   - Domain context: technical, academic, social, political, fact-checking etc.
+  - Remember that Georgia is country not a state when it's mentioned in the question.
 </rules>
 
 <examples>
