@@ -61,7 +61,7 @@ function getGenAIClient(): GoogleGenAI {
     }
 
     // Configure with potential region override
-    const config: any = { apiKey: GEMINI_API_KEY, location: "glboal" };
+    const config: any = { apiKey: GEMINI_API_KEY };
 
 
     genAI = new GoogleGenAI(config);
@@ -183,26 +183,22 @@ async function getBatchEmbeddingsWithRetry(
 
   while (retryCount < MAX_RETRIES) {
     try {
+      logDebug("getting client")
       const genAI = getGenAIClient();
-
+      logDebug("got client")
       // Prepare the request configuration with fallback model on consecutive failures
       let model = options.model || "gemini-embedding-001";
 
-      // Use alternative model if we've had consecutive failures
-      if (consecutiveFailures >= 2 && !options.model) {
-        model = "text-embedding-004"; // Alternative model
-        logDebug(`[embeddings] Using alternative model due to failures: ${model}`);
-      }
 
       const taskType = mapTaskType(options.task);
-
+      logDebug(taskType)
       const config = {
         taskType,
         ...(options.dimensions && { outputDimensionality: options.dimensions })
       };
 
       logDebug(`[embeddings] Calling Google Embeddings API for batch ${currentBatch}/${batchCount}`);
-
+      logDebug(batchTexts.join("=========="))
       const response = await genAI.models.embedContent({
         model,
         contents: batchTexts,
@@ -231,6 +227,7 @@ async function getBatchEmbeddingsWithRetry(
       };
 
     } catch (error: any) {
+      logDebug(error)
       retryCount++;
 
       // Enhanced error logging with status code detection
