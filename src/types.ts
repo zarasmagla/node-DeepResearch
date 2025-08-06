@@ -6,6 +6,30 @@ type BaseAction = {
   think: string;
 };
 
+// Interface definitions for Jina API
+export interface JinaEmbeddingRequest {
+  model: string;
+  task: string;
+  late_chunking?: boolean;
+  dimensions?: number;
+  embedding_type?: string;
+  input: string[];
+  truncate?: boolean;
+}
+
+export interface JinaEmbeddingResponse {
+  model: string;
+  object: string;
+  usage: {
+    total_tokens: number;
+    prompt_tokens: number;
+  };
+  data: Array<{
+    object: string;
+    index: number;
+    embedding: number[];
+  }>;
+}
 export type SERPQuery = {
   q: string,
   location?: string,

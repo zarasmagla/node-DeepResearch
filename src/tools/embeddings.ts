@@ -1,87 +1,11 @@
-import { GEMINI_API_KEY } from "../config";
-import { GoogleGenAI } from "@google/genai";
-import { logError, logDebug } from '../logging';
+import { JINA_API_KEY } from "../config";
+import { JinaEmbeddingRequest, JinaEmbeddingResponse } from "../types";
+import axiosClient from "../utils/axios-client";
+import { logError, logDebug, logWarning } from '../logging';
 
-const BATCH_SIZE = 50; // Reduced batch size to avoid 500 errors
-const MAX_RETRIES = 5; // Increased retries for 500 errors
-const BASE_DELAY_MS = 2000; // Base delay for exponential backoff
-const MAX_DELAY_MS = 30000; // Maximum delay (30 seconds)
-
-// Initialize Google GenAI client
-let genAI: GoogleGenAI | null = null;
-
-// Simple circuit breaker for consecutive failures
-let consecutiveFailures = 0;
-let lastFailureTime = 0;
-const MAX_CONSECUTIVE_FAILURES = 3;
-const CIRCUIT_BREAKER_RESET_TIME = 60000; // 1 minute
-
-// Text preprocessing to avoid API errors
-function preprocessText(text: string): string {
-  if (!text || typeof text !== "string") return text || "";
-
-  let processed = text;
-
-  // 1. Fix common encoding issues
-  processed = processed
-    .replace(/â€™/g, "'") // Smart apostrophe
-    .replace(/â€œ/g, '"') // Left smart quote
-    .replace(/â€\u009D/g, '"') // Right smart quote
-    .replace(/â€"/g, "-") // Em dash
-    .replace(/â€¦/g, "...") // Ellipsis
-    .replace(/Â/g, "") // Non-breaking space artifacts
-    .replace(/\u00A0/g, " "); // Non-breaking space to regular space
-
-  // 2. Normalize Unicode characters
-  processed = processed.normalize("NFKC");
-
-  // 3. Remove problematic characters
-  processed = processed
-    .replace(/[\u200B-\u200D\uFEFF]/g, "") // Zero-width characters
-    .replace(/[""]/g, '"') // Smart quotes
-    .replace(/['']/g, "'") // Smart apostrophes
-    .replace(/[–—]/g, "-") // Em/en dashes
-    .replace(/…/g, "..."); // Ellipsis
-
-  // 4. Handle excessive whitespace and ensure reasonable length
-  processed = processed.replace(/\s+/g, " ").trim();
-
-  // 5. Truncate extremely long texts that might cause issues
-  if (processed.length > 30000) {
-    processed = processed.substring(0, 30000) + "...";
-  }
-
-  return processed;
-}
-
-function getGenAIClient(): GoogleGenAI {
-  if (!genAI) {
-    if (!GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY is not set');
-    }
-
-    // Configure with potential region override
-    const config: any = { apiKey: GEMINI_API_KEY, location: "glboal" };
-
-
-    genAI = new GoogleGenAI(config);
-  }
-  return genAI;
-}
-
-// Map task types to Google's task types
-function mapTaskType(task?: string): string {
-  switch (task) {
-    case "text-matching":
-      return "SEMANTIC_SIMILARITY";
-    case "retrieval.passage":
-      return "RETRIEVAL_DOCUMENT";
-    case "retrieval.query":
-      return "RETRIEVAL_QUERY";
-    default:
-      return "SEMANTIC_SIMILARITY";
-  }
-}
+const BATCH_SIZE = 32;
+const API_URL = "https://api.jina.ai/v1/embeddings";
+const MAX_RETRIES = 3; // Maximum number of retries for missing embeddings
 
 // Modified to support different embedding tasks and dimensions
 export async function getEmbeddings(
@@ -97,8 +21,8 @@ export async function getEmbeddings(
 ): Promise<{ embeddings: number[][], tokens: number }> {
   logDebug(`[embeddings] Getting embeddings for ${texts.length} texts`);
 
-  if (!GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY is not set');
+  if (!JINA_API_KEY) {
+    throw new Error('JINA_API_KEY is not set');
   }
 
   // Handle empty input case
@@ -106,23 +30,17 @@ export async function getEmbeddings(
     return { embeddings: [], tokens: 0 };
   }
 
-  // Convert Record<string, string>[] to string[] if needed and preprocess text
-  const textStrings = texts.map(text => {
-    const textContent = typeof text === 'string' ? text : Object.values(text)[0];
-    return preprocessText(textContent);
-  });
-
   // Process in batches
   const allEmbeddings: number[][] = [];
   let totalTokens = 0;
-  const batchCount = Math.ceil(textStrings.length / BATCH_SIZE);
+  const batchCount = Math.ceil(texts.length / BATCH_SIZE);
 
-  for (let i = 0; i < textStrings.length; i += BATCH_SIZE) {
-    const batchTexts = textStrings.slice(i, i + BATCH_SIZE);
+  for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+    const batchTexts = texts.slice(i, i + BATCH_SIZE);
     const currentBatch = Math.floor(i / BATCH_SIZE) + 1;
     logDebug(`Embedding batch ${currentBatch}/${batchCount} (${batchTexts.length} texts)`);
 
-    // Get embeddings for the batch with retry logic
+    // Get embeddings for the batch with retry logic for missing indices
     const { batchEmbeddings, batchTokens } = await getBatchEmbeddingsWithRetry(
       batchTexts,
       options,
@@ -148,9 +66,9 @@ export async function getEmbeddings(
   return { embeddings: allEmbeddings, tokens: totalTokens };
 }
 
-// Helper function to get embeddings for a batch with retry logic
+// Helper function to get embeddings for a batch with retry logic for missing indices
 async function getBatchEmbeddingsWithRetry(
-  batchTexts: string[],
+  batchTexts: string[] | Record<string, string>[],
   options: {
     task?: "text-matching" | "retrieval.passage" | "retrieval.query",
     dimensions?: number,
@@ -161,134 +79,157 @@ async function getBatchEmbeddingsWithRetry(
   currentBatch: number,
   batchCount: number
 ): Promise<{ batchEmbeddings: number[][], batchTokens: number }> {
-  // Check circuit breaker
-  const now = Date.now();
-  if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES &&
-    now - lastFailureTime < CIRCUIT_BREAKER_RESET_TIME) {
-    logDebug(`[embeddings] Circuit breaker engaged, skipping API call for batch ${currentBatch}`);
-
-    const defaultDimensions = options.dimensions || 768;
-    const placeholderEmbeddings = batchTexts.map((text, idx) => {
-      logError(`Creating zero embedding (circuit breaker) for text ${idx}: [${truncateInputString(text)}...]`);
-      return new Array(defaultDimensions).fill(0);
-    });
-
-    return {
-      batchEmbeddings: placeholderEmbeddings,
-      batchTokens: 0
-    };
-  }
-
+  const batchEmbeddings: number[][] = [];
+  let batchTokens = 0;
   let retryCount = 0;
+  let textsToProcess = [...batchTexts]; // Copy the original texts
+  let indexMap = new Map<number, number>(); // Map to keep track of original indices
 
-  while (retryCount < MAX_RETRIES) {
+  // Initialize indexMap with original indices
+  textsToProcess.forEach((_, idx) => {
+    indexMap.set(idx, idx);
+  });
+
+  while (textsToProcess.length > 0 && retryCount < MAX_RETRIES) {
+    const request: JinaEmbeddingRequest = {
+      model: options.model || "jina-embeddings-v3",
+      input: textsToProcess as any,
+    };
+
+    if (request.model === "jina-embeddings-v3") {
+      request.task = options.task || "text-matching";
+      request.truncate = true;
+    }
+
+    // Add optional parameters if provided
+    if (options.dimensions) request.dimensions = options.dimensions;
+    if (options.late_chunking) request.late_chunking = options.late_chunking;
+    if (options.embedding_type) request.embedding_type = options.embedding_type;
+
     try {
-      const genAI = getGenAIClient();
-
-      // Prepare the request configuration with fallback model on consecutive failures
-      let model = options.model || "gemini-embedding-001";
-
-      // Use alternative model if we've had consecutive failures
-      if (consecutiveFailures >= 2 && !options.model) {
-        model = "text-embedding-004"; // Alternative model
-        logDebug(`[embeddings] Using alternative model due to failures: ${model}`);
-      }
-
-      const taskType = mapTaskType(options.task);
-
-      const config = {
-        taskType,
-        ...(options.dimensions && { outputDimensionality: options.dimensions })
-      };
-
-      logDebug(`[embeddings] Calling Google Embeddings API for batch ${currentBatch}/${batchCount}`);
-
-      const response = await genAI.models.embedContent({
-        model,
-        contents: batchTexts,
-        config
-      });
-
-      if (!response.embeddings || response.embeddings.length === 0) {
-        throw new Error('No embeddings returned from Google API');
-      }
-
-      // Extract embeddings and calculate tokens
-      const batchEmbeddings = response.embeddings.map(embedding => embedding.values || []);
-
-      // Google doesn't provide token usage in embeddings response, so we estimate
-      // based on text length (roughly 4 chars per token)
-      const estimatedTokens = batchTexts.reduce((total, text) => total + Math.ceil(text.length / 4), 0);
-
-      logDebug(`[embeddings] Successfully got ${batchEmbeddings.length} embeddings for batch ${currentBatch}`);
-
-      // Reset circuit breaker on success
-      consecutiveFailures = 0;
-
-      return {
-        batchEmbeddings,
-        batchTokens: estimatedTokens
-      };
-
-    } catch (error: any) {
-      retryCount++;
-
-      // Enhanced error logging with status code detection
-      const isServerError = error?.status === 500 || error?.message?.includes('500') ||
-        error?.message?.includes('Internal error') || error?.message?.includes('INTERNAL');
-      const isOverloadError = error?.status === 503 || error?.message?.includes('503') ||
-        error?.message?.includes('overloaded');
-
-      logError(`Error calling Google Embeddings API (attempt ${retryCount}/${MAX_RETRIES}):`, {
-        error: error?.message || error,
-        status: error?.status,
-        isServerError,
-        isOverloadError,
-        batchSize: batchTexts.length
-      });
-
-      if (retryCount >= MAX_RETRIES) {
-        // Update circuit breaker on consecutive failures
-        if (isServerError || isOverloadError) {
-          consecutiveFailures++;
-          lastFailureTime = Date.now();
-          logDebug(`[embeddings] Circuit breaker: ${consecutiveFailures} consecutive failures`);
+      const response = await axiosClient.post<JinaEmbeddingResponse>(
+        API_URL,
+        request,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${JINA_API_KEY}`
+          }
         }
+      );
 
-        // On final retry failure, create placeholder embeddings
-        logError(`Failed to get embeddings after ${MAX_RETRIES} retries, creating placeholder embeddings`);
+      if (!response.data.data) {
+        logError('No data returned from Jina API');
+        if (retryCount === MAX_RETRIES - 1) {
+          // On last retry, create placeholder embeddings
+          const placeholderEmbeddings = textsToProcess.map(text => {
+            logError(`Failed to get embedding after all retries: [${truncateInputString(text)}...]`);
+            return new Array(dimensionSize).fill(0);
+          });
 
-        const defaultDimensions = options.dimensions || 768; // Default Gemini embedding size
-        const placeholderEmbeddings = batchTexts.map((text, idx) => {
-          logError(`Creating zero embedding for text ${idx}: [${truncateInputString(text)}...]`);
-          return new Array(defaultDimensions).fill(0);
-        });
-
-        return {
-          batchEmbeddings: placeholderEmbeddings,
-          batchTokens: 0
-        };
+          // Add embeddings in correct order
+          for (let i = 0; i < textsToProcess.length; i++) {
+            const originalIndex = indexMap.get(i)!;
+            while (batchEmbeddings.length <= originalIndex) {
+              batchEmbeddings.push([]);
+            }
+            batchEmbeddings[originalIndex] = placeholderEmbeddings[i];
+          }
+        }
+        retryCount++;
+        continue;
       }
 
-      // Enhanced exponential backoff with jitter for 500/503 errors
-      let delayMs: number;
-      if (isServerError || isOverloadError) {
-        // Longer delays for server errors
-        delayMs = Math.min(BASE_DELAY_MS * Math.pow(2, retryCount - 1), MAX_DELAY_MS);
-        // Add jitter to avoid thundering herd
-        delayMs += Math.random() * 1000;
+      const receivedIndices = new Set(response.data.data.map(item => item.index));
+      const dimensionSize = response.data.data[0]?.embedding?.length || options.dimensions || 1024;
+
+      // Process successful embeddings
+      const successfulEmbeddings: number[][] = [];
+      const remainingTexts: (string | Record<string, string>)[] = [];
+      const newIndexMap = new Map<number, number>();
+
+      for (let idx = 0; idx < textsToProcess.length; idx++) {
+        if (receivedIndices.has(idx)) {
+          // Find the item with this index
+          const item = response.data.data.find(d => d.index === idx)!;
+
+          // Get the original index and store in the result array
+          const originalIndex = indexMap.get(idx)!;
+          while (batchEmbeddings.length <= originalIndex) {
+            batchEmbeddings.push([]);
+          }
+          batchEmbeddings[originalIndex] = item.embedding;
+          successfulEmbeddings.push(item.embedding);
+        } else {
+          // Add to retry list
+          const newIndex = remainingTexts.length;
+          newIndexMap.set(newIndex, indexMap.get(idx)!);
+          remainingTexts.push(textsToProcess[idx]);
+          logWarning(`Missing embedding for index ${idx}, will retry: [${truncateInputString(textsToProcess[idx])}...]`);
+        }
+      }
+
+      // Add tokens
+      batchTokens += response.data.usage?.total_tokens || 0;
+
+      // Update for next iteration
+      textsToProcess = remainingTexts;
+      indexMap = newIndexMap;
+
+      // If all embeddings were successfully processed, break out of the loop
+      if (textsToProcess.length === 0) {
+        break;
+      }
+
+      // Increment retry count and log
+      retryCount++;
+      logDebug(`[embeddings] Batch ${currentBatch}/${batchCount} - Retrying ${textsToProcess.length} texts (attempt ${retryCount}/${MAX_RETRIES})`);
+    } catch (error: any) {
+      logError('Error calling Jina Embeddings API:', { error });
+      if (error.response?.status === 402 || error.message.includes('InsufficientBalanceError') || error.message.includes('insufficient balance')) {
+        return { batchEmbeddings: [], batchTokens: 0 };
+      }
+
+      // On last retry, create placeholder embeddings
+      if (retryCount === MAX_RETRIES - 1) {
+        for (let idx = 0; idx < textsToProcess.length; idx++) {
+          const originalIndex = indexMap.get(idx)!;
+          logError(`Failed to get embedding after all retries for index ${originalIndex}: [${truncateInputString(textsToProcess[idx])}...]`);
+
+          while (batchEmbeddings.length <= originalIndex) {
+            batchEmbeddings.push([]);
+          }
+          batchEmbeddings[originalIndex] = new Array(options.dimensions || 1024).fill(0);
+        }
+      }
+
+      retryCount++;
+      if (retryCount < MAX_RETRIES) {
+        logDebug(`[embeddings] Batch ${currentBatch}/${batchCount} - Retry attempt ${retryCount}/${MAX_RETRIES} after error`);
+        // Wait before retrying to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 1000));
       } else {
-        // Standard exponential backoff for other errors
-        delayMs = Math.min(1000 * Math.pow(2, retryCount - 1), 10000);
+        throw error; // If we've exhausted retries, re-throw the error
       }
-
-      logDebug(`[embeddings] Retrying in ${Math.round(delayMs)}ms...`);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
 
-  // This should never be reached due to the logic above, but TypeScript wants it
-  throw new Error('Unexpected end of retry loop');
+  // Handle any remaining missing embeddings after max retries
+  if (textsToProcess.length > 0) {
+    logError(`[embeddings] Failed to get embeddings for ${textsToProcess.length} texts after ${MAX_RETRIES} retries`);
+
+    for (let idx = 0; idx < textsToProcess.length; idx++) {
+      const originalIndex = indexMap.get(idx)!;
+      logError(`Creating zero embedding for index ${originalIndex} after all retries failed`);
+
+      while (batchEmbeddings.length <= originalIndex) {
+        batchEmbeddings.push([]);
+      }
+      batchEmbeddings[originalIndex] = new Array(options.dimensions || 1024).fill(0);
+    }
+  }
+
+  return { batchEmbeddings, batchTokens };
 }
 
 function truncateInputString(input: string | Record<string, string>): string {
