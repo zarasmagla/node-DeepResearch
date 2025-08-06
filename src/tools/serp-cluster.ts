@@ -52,6 +52,13 @@ export async function serpCluster(results: SearchSnippet[], trackers: TrackerCon
       schema: schemaGen.getSerpClusterSchema(),
       system: prompt.system,
       prompt: prompt.user,
+      providerOptions: {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: 2000,
+          },
+        },
+      },
     });
     trackers?.actionTracker.trackThink((result.object as any).think);
     const clusters = (result.object as any).clusters;
