@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 import { ProxyAgent, setGlobalDispatcher } from 'undici';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI, OpenAIProviderSettings } from '@ai-sdk/openai';
 import configJson from '../config.json';
 import { logInfo, logError } from './logging';
@@ -26,6 +25,7 @@ const env: EnvConfig = { ...configJson.env };
     env[key] = process.env[key] || env[key];
   }
 });
+console.log(env)
 
 // Setup proxy if present
 if (env.https_proxy) {
