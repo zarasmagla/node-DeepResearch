@@ -2,11 +2,66 @@ import { AnswerAction, KnowledgeItem, Reference } from "../types";
 import i18nJSON from './i18n.json';
 import { JSDOM } from 'jsdom';
 import fs from "fs/promises";
-import { logInfo, logError, logDebug, logWarning } from '../logging';
+import { logInfo, logError } from '../logging';
 
 
 export function buildMdFromAnswer(answer: AnswerAction): string {
-  return repairMarkdownFootnotes(answer.answer || answer.mdAnswer || '', answer.references);
+  const base = repairMarkdownFootnotes(
+    answer.answer || answer.mdAnswer || '',
+    answer.references
+  );
+
+  const refs = (answer.references || []).filter(
+    (r) => r && typeof r.url === 'string' && r.url && typeof r.exactQuote === 'string' && r.exactQuote
+  );
+
+  if (refs.length === 0) {
+    logInfo('Final reasoning markdown prepared (no explicit references)', { markdown: base });
+    return base;
+  }
+
+  const domainOf = (url: string): string => {
+    try {
+      return new URL(url).hostname.replace('www.', '');
+    } catch {
+      return '';
+    }
+  };
+
+  const explicitList = refs
+    .map((ref) => {
+      const title = ref.title || domainOf(ref.url) || 'Source';
+      const cleanQuote = (ref.exactQuote || '')
+        .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return `- [${title}](${ref.url}) — ${cleanQuote}`;
+    })
+    .join('\n');
+
+  const referencesJson = refs.map((ref) => ({
+    url: ref.url,
+    title: ref.title || domainOf(ref.url) || undefined,
+    quote: ref.exactQuote,
+  }));
+
+  const explicitSection = [
+    '### References (Explicit)',
+    explicitList,
+    '',
+    '[REFERENCES_START]',
+    JSON.stringify(referencesJson, null, 2),
+    '[REFERENCES_END]',
+  ].join('\n');
+
+  const finalMarkdown = `${base}\n\n${explicitSection}`.trim();
+
+  logInfo('Final reasoning markdown prepared', {
+    markdown: finalMarkdown,
+    references: referencesJson,
+  });
+
+  return finalMarkdown;
 }
 
 export function repairMarkdownFootnotes(
@@ -916,7 +971,7 @@ export function extractNgrams(
 
   // Second pass: calculate PMI and filter
   const results: NgramResult[] = Array.from(ngramFreq.entries())
-    .filter(([ngram, freq]) => freq >= minFreq)
+    .filter(([, freq]) => freq >= minFreq)
     .map(([ngram, freq]) => {
       const pmi = isCJKText(ngram) ? 0 : calculatePMI(ngram, freq, wordFreq, totalNgrams);
       return { ngram, freq, pmi };
