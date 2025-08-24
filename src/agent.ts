@@ -825,11 +825,11 @@ export async function getResponse(
     } as StepAction;
 
     decisionGeneration.end({
-      output: {
-        action: thisStep.action,
-        think: thisStep.think,
+      usageDetails: {
+        input_tokens: result.usage.promptTokens,
+        output_tokens: result.usage.completionTokens,
+        total_tokens: result.usage.totalTokens,
       },
-      usage: result.usage,
     });
 
     // print allowed and chose action
@@ -1599,7 +1599,11 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
         action: thisStep.action,
         answerLength: (thisStep as AnswerAction).answer?.length || 0,
       },
-      usage: result.usage,
+      usageDetails: {
+        input_tokens: result.usage.promptTokens,
+        output_tokens: result.usage.completionTokens,
+        total_tokens: result.usage.totalTokens,
+      },
     });
 
     beastModeSpan.end({

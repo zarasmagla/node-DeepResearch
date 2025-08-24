@@ -4,6 +4,7 @@ import { getModel, getToolConfig } from "../config";
 import { GoogleGenAIHelper } from "../utils/google-genai-helper";
 import { Schemas } from "../utils/schemas";
 import { logInfo, logError, logDebug, logWarning } from '../logging';
+import { langfuse } from '../langfuse';
 
 
 function getPrompt(mdContent: string, allKnowledge: KnowledgeItem[], schema: Schemas): PromptPair {
@@ -73,6 +74,14 @@ export async function finalizeAnswer(
   try {
     const prompt = getPrompt(mdContent, knowledgeItems, schema);
     trackers?.actionTracker.trackThink('finalize_answer', schema.languageCode)
+    const generation = langfuse.generation({
+      name: "finalize-answer",
+      model: getModel(TOOL_NAME),
+      input: {
+        prompt: prompt.user,
+        system: prompt.system,
+      },
+    });
 
     const result = await GoogleGenAIHelper.generateText({
       model: getModel(TOOL_NAME),
@@ -80,6 +89,14 @@ export async function finalizeAnswer(
       prompt: prompt.user,
       maxOutputTokens: getToolConfig(TOOL_NAME).maxTokens,
       temperature: getToolConfig(TOOL_NAME).temperature,
+    });
+
+    generation.end({
+      usageDetails: {
+        input_tokens: result.usage.promptTokens,
+        output_tokens: result.usage.completionTokens,
+        total_tokens: result.usage.totalTokens,
+      },
     });
 
     trackers.tokenTracker.trackUsage(TOOL_NAME, result.usage)

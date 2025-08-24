@@ -516,7 +516,7 @@ export class ObjectGeneratorSafe {
       // End the generation with success
       primaryGeneration.end({
         output: result.text,
-        usage: {
+        usageDetails: {
           promptTokens: result.usage.promptTokens,
           completionTokens: result.usage.completionTokens,
           totalTokens: result.usage.totalTokens,
@@ -594,7 +594,7 @@ export class ObjectGeneratorSafe {
 
           fallbackGeneration.end({
             output: fallbackResult.text,
-            usage: {
+            usageDetails: {
               promptTokens: fallbackResult.usage.promptTokens,
               completionTokens: fallbackResult.usage.completionTokens,
               totalTokens: fallbackResult.usage.totalTokens,

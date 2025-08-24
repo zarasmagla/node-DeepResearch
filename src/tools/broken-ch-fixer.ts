@@ -3,6 +3,7 @@ import { getModel } from "../config";
 import { TrackerContext } from "../types";
 import { detectBrokenUnicodeViaFileIO } from "../utils/text-tools";
 import { logError, logDebug, logWarning } from '../logging';
+import { langfuse } from "../langfuse";
 
 
 /**
@@ -56,23 +57,44 @@ export async function repairUnknownChars(mdContent: string, trackers?: TrackerCo
     // Ask Gemini to guess the missing characters
     try {
 
-      const response = await GoogleGenAIHelper.generateText({
-        model: getModel("fallback"),
-
-        prompt: `
+      const prompt = `
 The corrupted text has ${unknownCount} � mush in a row.
 
 On the left of the stains: "${leftContext}"
 On the right of the stains: "${rightContext}"
 
-So what was the original text between these two contexts?`,
-        systemInstruction: `You're helping fix a corrupted scanned markdown document that has stains (represented by �). 
+So what was the original text between these two contexts?`
+
+      const systemInstruction = `You're helping fix a corrupted scanned markdown document that has stains (represented by �). 
 Looking at the surrounding context, determine the original text should be in place of the � symbols.
 
 Rules:
 1. ONLY output the exact replacement text - no explanations, quotes, or additional text
 2. Keep your response appropriate to the length of the unknown sequence
 3. Consider the document appears to be in Chinese if that's what the context suggests`,
+
+      const generation = langfuse.generation({
+        name: "repair-unknown-chars",
+        model: getModel("fallback"),
+        input: {
+          prompt,
+          systemInstruction,
+        },
+      });
+
+      const response = await GoogleGenAIHelper.generateText({
+        model: getModel("fallback"),
+        prompt,
+        systemInstruction,
+      });
+
+      generation.end({
+        output: response.text,
+        usageDetails: {
+          input_tokens: response.usage.promptTokens,
+          output_tokens: response.usage.completionTokens,
+          total_tokens: response.usage.totalTokens,
+        },
       });
 
       // Create a rough usage estimate

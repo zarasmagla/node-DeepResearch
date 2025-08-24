@@ -634,7 +634,11 @@ export async function evaluateQuestion(
           needsCompleteness: result.object.needsCompleteness,
         },
       },
-      usage: result.usage,
+      usageDetails: {
+        input_tokens: result.usage.promptTokens,
+        output_tokens: result.usage.completionTokens,
+        total_tokens: result.usage.totalTokens,
+      },
     });
 
     evaluationSpan.end({
@@ -716,7 +720,11 @@ async function performEvaluation<T>(
         passed: result.object.pass,
         reasoning: result.object.think,
       },
-      usage: result.usage,
+      usageDetails: {
+        input_tokens: result.usage.promptTokens,
+        output_tokens: result.usage.completionTokens,
+        total_tokens: result.usage.totalTokens,
+      },
     });
   }
 

@@ -3,6 +3,7 @@ import { getModel, getToolConfig } from "../config";
 import { GoogleGenAIHelper } from "../utils/google-genai-helper";
 import { Schemas } from "../utils/schemas";
 import { logError, logDebug, logWarning } from '../logging';
+import { langfuse } from '../langfuse';
 
 
 function getPrompt(answers: string[]): PromptPair {
@@ -71,6 +72,15 @@ export async function reduceAnswers(
     const prompt = getPrompt(answers);
     trackers?.actionTracker.trackThink('reduce_answer', schema.languageCode)
 
+    const generation = langfuse.generation({
+      name: "reduce-answer",
+      model: getModel(TOOL_NAME),
+      input: {
+        prompt: prompt.user,
+        system: prompt.system,
+      },
+    });
+
     const result = await GoogleGenAIHelper.generateText({
       model: getModel(TOOL_NAME),
       systemInstruction: prompt.system,
@@ -87,6 +97,14 @@ export async function reduceAnswers(
     logDebug(`${TOOL_NAME} before/after: ${totalLength} -> ${reducedLength}`, {
       answers,
       reducedContent: result.text
+    });
+
+    generation.end({
+      usageDetails: {
+        input_tokens: result.usage.promptTokens,
+        output_tokens: result.usage.completionTokens,
+        total_tokens: result.usage.totalTokens,
+      },
     });
 
 

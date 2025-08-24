@@ -15,23 +15,17 @@ import {
 
 import { get_api_logger } from "./utils/structured-logger";
 import { logger } from "./winston-logger";
-import { Langfuse } from "langfuse";
+import { langfuse } from "./langfuse";
 
 const app = express();
 
-// Create a shared Langfuse instance for the application with environment and version info
-const langfuse = new Langfuse({
-  environment: process.env.NODE_ENV || "development",
-  release: process.env.K_REVISION || "unknown",
 
-})
 
 import { TokenTracker } from "./utils/token-tracker";
 import { ActionTracker } from "./utils/action-tracker";
 import { ObjectGeneratorSafe } from "./utils/safe-generator";
-import { jsonSchema } from "ai"; // or another converter library
 import { normalizeHostName } from "./utils/url-tools";
-import { logInfo, logError, logDebug, logWarning } from './logging';
+import { logInfo, logError, logDebug } from './logging';
 import { body, validationResult } from 'express-validator';
 
 
