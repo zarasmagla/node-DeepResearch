@@ -71,7 +71,7 @@ Looking at the surrounding context, determine the original text should be in pla
 Rules:
 1. ONLY output the exact replacement text - no explanations, quotes, or additional text
 2. Keep your response appropriate to the length of the unknown sequence
-3. Consider the document appears to be in Chinese if that's what the context suggests`,
+3. Consider the document appears to be in Chinese if that's what the context suggests`
 
       const generation = langfuse.generation({
         name: "repair-unknown-chars",
