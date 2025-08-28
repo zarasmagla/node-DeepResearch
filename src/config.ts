@@ -25,7 +25,6 @@ const env: EnvConfig = { ...configJson.env };
     env[key] = process.env[key] || env[key];
   }
 });
-console.log(env)
 
 // Setup proxy if present
 if (env.https_proxy) {

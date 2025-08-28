@@ -78,15 +78,9 @@ function preprocessContentObject(item: any): any {
  * Helper class for Google Gen AI operations
  */
 export class GoogleGenAIHelper {
-  private static googleGenAI: any = null;
+  private static googleGenAI: any = new GoogleGenAI({ apiKey: GEMINI_API_KEY, vertexai: false });
 
   private static async getGoogleGenAI() {
-    if (!this.googleGenAI) {
-      if (!GEMINI_API_KEY) {
-        throw new Error("GEMINI_API_KEY is not set");
-      }
-      this.googleGenAI = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-    }
     return this.googleGenAI as GoogleGenAI;
   }
 
