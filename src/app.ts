@@ -727,7 +727,7 @@ app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Res
           providerOptions: {
             google: {
               thinkingConfig: {
-                thinkingBudget: 8192,
+                thinkingBudget: 2000,
               },
             },
           },

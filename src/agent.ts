@@ -77,6 +77,7 @@ async function wait(seconds: number) {
 
 function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
   // build user, assistant pair messages from knowledge
+  console.log('BuildMsgsFromKnowledge', knowledge);
   const messages: CoreMessage[] = [];
   knowledge.forEach((k) => {
     messages.push({ role: "user", content: k.question.trim() });
@@ -812,7 +813,7 @@ export async function getResponse(
       providerOptions: {
         google: {
           thinkingConfig: {
-            thinkingBudget: 8192, // Added thinkingBudget for Google
+            thinkingBudget: 2000, // Added thinkingBudget for Google
           },
         },
       },
@@ -1580,7 +1581,7 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       providerOptions: {
         google: {
           thinkingConfig: {
-            thinkingBudget: 24576,
+            thinkingBudget: 2000,
           },
         },
       },

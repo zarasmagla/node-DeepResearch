@@ -2,10 +2,11 @@ import { AnswerAction, KnowledgeItem, Reference } from "../types";
 import i18nJSON from './i18n.json';
 import { JSDOM } from 'jsdom';
 import fs from "fs/promises";
-import { logInfo, logError } from '../logging';
+import { logInfo, logError, logDebug } from '../logging';
 
 
 export function buildMdFromAnswer(answer: AnswerAction): string {
+  logDebug('buildMdFromAnswer', answer);
   const base = repairMarkdownFootnotes(
     answer.answer || answer.mdAnswer || '',
     answer.references

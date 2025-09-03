@@ -300,7 +300,7 @@ export class Schemas {
 
   getAgentSchema(allowReflect: boolean, allowRead: boolean, allowAnswer: boolean, allowSearch: boolean, allowCoding: boolean,
     currentQuestion?: string) {
-    const actionSchemas: Record<string, z.ZodOptional<any>> = {};
+    const actionSchemas: Record<string, z.ZodTypeAny> = {};
 
     if (allowSearch) {
       actionSchemas.search = z.object({
@@ -332,7 +332,7 @@ export class Schemas {
 
           Make sure to output in Markdown format, DO NOT USE JSON syntax!
           `)
-      }).optional();
+      }).required()
     }
 
     if (allowReflect) {
