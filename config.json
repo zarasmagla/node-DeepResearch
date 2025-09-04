@@ -7,11 +7,12 @@
     "JINA_API_KEY": "",
     "BRAVE_API_KEY": "",
     "SERPER_API_KEY": "",
+    "SPIDER_API_KEY": "",
     "DEFAULT_MODEL_NAME": "",
     "SCRAPE_DO_API_KEY": ""
   },
   "defaults": {
-    "search_provider": "jina",
+    "search_provider": "spider",
     "llm_provider": "gemini",
     "step_sleep": 1
   },

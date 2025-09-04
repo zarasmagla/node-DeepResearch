@@ -27,6 +27,7 @@ import {
 } from "./types";
 import { TrackerContext } from "./types";
 import { search } from "./tools/jina-search";
+import { spiderSearch } from "./tools/spider-search";
 import { get_agent_logger } from "./utils/structured-logger";
 import { Langfuse } from "langfuse";
 
@@ -371,11 +372,18 @@ async function executeSearchQueries(
     try {
       logDebug('Search query:', { query });
       switch (searchProvider || SEARCH_PROVIDER) {
+        case 'spider':
+          {
+            const res = (await spiderSearch(query)).response.content || [];
+            results = res as any;
+          }
+          break;
         case 'jina':
-        case 'arxiv':
+        case 'arxiv': {
           const num = meta ? undefined : 30;
           results = (await search(query, searchProvider, num, meta, context.tokenTracker)).response.results || [];
           break;
+        }
         case "duck":
           results = (
             await duckSearch(query.q, { safeSearch: SafeSearchType.STRICT })

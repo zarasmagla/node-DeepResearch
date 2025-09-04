@@ -180,6 +180,15 @@ export interface SerperSearchResponse {
   credits: number;
 }
 
+// Spider API Types
+export interface SpiderSearchResponse {
+  content: Array<{
+    title: string;
+    description: string;
+    url: string;
+  }>;
+}
+
 
 export interface ReadResponse {
   code: number;
