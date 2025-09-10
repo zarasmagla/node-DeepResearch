@@ -503,7 +503,7 @@ export async function processURLs(
         // Store normalized URL for consistent reference
         url = normalizedUrl;
 
-        const { response } = await readUrl(url, true, context.tokenTracker, withImages);
+        const { response } = await readUrl(url, true, context.tokenTracker);
         const { data } = response;
         const guessedTime = await getLastModified(url);
         if (guessedTime) {

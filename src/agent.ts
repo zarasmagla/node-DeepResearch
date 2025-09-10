@@ -736,13 +736,14 @@ export async function getResponse(
 
     if (allURLs && Object.keys(allURLs).length > 0) {
       // rerank urls
+      console.log('allURLs', allURLs);
       weightedURLs = rankURLs(
         filterURLs(allURLs, visitedURLs, badHostnames, onlyHostnames),
         {
           question: currentQuestion,
           boostHostnames
         }, context);
-
+      console.log('weightedURLs', weightedURLs);
       // improve diversity by keep top 2 urls of each hostname
       weightedURLs = keepKPerHostname(weightedURLs, 2);
       logDebug('Weighted URLs:', { count: weightedURLs.length });
@@ -837,8 +838,8 @@ export async function getResponse(
     });
 
     // print allowed and chose action
-    const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect, allowCoding].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
-    logDebug(`Step decision: ${thisStep.action} <- [${actionsStr}]`, { thisStep, currentQuestion });
+    // const actionsStr = [allowSearch, allowRead, allowAnswer, allowReflect, allowCoding].map((a, i) => a ? ['search', 'read', 'answer', 'reflect'][i] : null).filter(a => a).join(', ');
+    // logDebug(`Step decision: ${thisStep.action} <- [${actionsStr}]`, { thisStep, currentQuestion });
 
     context.actionTracker.trackAction({ totalStep, thisStep, gaps });
 
@@ -895,7 +896,7 @@ export async function getResponse(
 
       logDebug('Current question evaluation:', {
         question: currentQuestion,
-        metrics: evaluationMetrics[currentQuestion]
+        // metrics: evaluationMetrics[currentQuestion]
       });
       let evaluation: EvaluationResponse = { pass: true, think: '' };
       if (evaluationMetrics[currentQuestion].length > 0) {
@@ -1209,7 +1210,7 @@ But then you realized you have asked them before. You decided to to think out of
           // aggregate urls
           visitedURLs.push(...subproblemResponses.map(r => r.readURLs).flat());
           weightedURLs = subproblemResponses.map(r => r.allURLs.map(url => ({ url, title: '' } as BoostedSearchSnippet))).flat();
-
+          console.log('weightedURLs 2', weightedURLs);
           // break the loop, jump directly final boxing
           break;
         } else {

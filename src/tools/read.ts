@@ -1,8 +1,7 @@
 import axiosClient from "../utils/axios-client";
 import { TokenTracker } from "../utils/token-tracker";
 import { ReadResponse } from "../types";
-import { JINA_API_KEY, SCRAPE_DO_API_KEY } from "../config";
-import { isBotCheck } from "../utils/bot-detection";
+import { SCRAPE_DO_API_KEY } from "../config";
 import {
   extractDomainFromUri,
   getDomainCountry,
@@ -13,7 +12,6 @@ export async function readUrl(
   url: string,
   withAllLinks?: boolean,
   tracker?: TokenTracker,
-  withAllImages?: boolean
 ): Promise<{ response: ReadResponse }> {
   if (!url.trim()) {
     throw new Error("URL cannot be empty");
@@ -24,142 +22,77 @@ export async function readUrl(
   }
 
   let responseData: ReadResponse | null = null;
-  let lastError: Error | null = null;
 
-  // --- Try Jina First ---
   try {
-    console.log(`Attempting to read URL with Jina: ${url}`);
-    const jinaHeaders: Record<string, string> = {
-      Accept: "application/json",
-      Authorization: `Bearer ${JINA_API_KEY}`,
-      "Content-Type": "application/json",
-      "X-Retain-Images": "none",
-      "X-Md-Link-Style": "discarded",
+    console.log(`Attempting to read URL with Scrape.do: ${url}`);
+    const domain = extractDomainFromUri(url);
+    const domainDetails = await getDomainCountry(domain);
+    const geoCode = (domainDetails.country?.code || "US").toUpperCase();
+    const scrapeDoParams = {
+      token: SCRAPE_DO_API_KEY,
+      url: url,
+      geoCode: geoCode, // Scrape.do expects uppercase geoCode
+      super: true, // Enable premium proxies if needed
+      output: "markdown", // Request markdown output
+      render: true,
     };
-    if (withAllLinks) {
-      jinaHeaders["X-With-Links-Summary"] = "all";
-    }
-
-    if (withAllImages) {
-      jinaHeaders['X-With-Images-Summary'] = 'true'
-    } else {
-      jinaHeaders['X-Retain-Images'] = 'none'
-    }
-
-    const { data: jinaResponse } = await axiosClient.post<ReadResponse>(
-      "https://r.jina.ai/",
-      { url },
+    console.log('scrapeDoParams', scrapeDoParams);
+    const scrapeResponse = await axiosClient.get<string>(
+      "https://api.scrape.do",
       {
-        headers: jinaHeaders,
-        timeout: 60000, // 60 seconds timeout
-        responseType: "json",
+        params: scrapeDoParams,
+        timeout: 15000, // Longer timeout for potentially complex scrapes
       }
     );
+    console.log('scrapeResponse', scrapeResponse.data, scrapeDoParams);
 
-    if (!jinaResponse.data) {
-      console.log("Jina response data is missing.");
-      lastError = new Error("Jina response data is missing.");
-    } else if (await isBotCheck(jinaResponse)) {
-      console.log("Jina detected bot check.");
-      lastError = new Error("Jina detected bot check.");
-    } else {
-      console.log("Jina request successful.");
-      responseData = jinaResponse;
+    if (!scrapeResponse.data || scrapeResponse.data.trim().length === 0) {
+      throw new Error("Scrape.do returned empty content.");
     }
-  } catch (error) {
+
     console.log(
-      `Jina request failed: ${error instanceof Error ? error.message : String(error)
-      }`
+      `Scrape.do request successful. Content length: ${scrapeResponse.data.length}`
     );
-    lastError = error instanceof Error ? error : new Error(String(error));
-  }
 
-  // --- Fallback to Scrape.do if Jina failed or returned invalid/bot data ---
-  if (!responseData) {
-    console.log(
-      `Jina failed or returned unusable data, falling back to Scrape.do for URL: ${url}`
-    );
-    try {
-      const domain = extractDomainFromUri(url);
-      const domainDetails = await getDomainCountry(domain);
-      const scrapeResponse = await axiosClient.get<string>(
-        "https://api.scrape.do",
-        {
-          params: {
-            token: SCRAPE_DO_API_KEY,
-            url: url,
-            geoCode: domainDetails.country?.code || "us", // Default to 'us' if country code not found
-            super: true, // Enable premium proxies if needed
-            output: "markdown", // Request markdown output
-          },
-          timeout: 90000, // Longer timeout for potentially complex scrapes
-          responseType: "text", // Expecting markdown text
-        }
-      );
+    // Construct a ReadResponse object from Scrape.do data
+    const estimatedTokens = estimateGeminiTokens(scrapeResponse.data);
+    const title =
+      scrapeResponse.data
+        .split("\n")[0]
+        .replace(/^#+\s*/, "")
+        .trim() || "Content"; // Extract first line as title
 
-      if (!scrapeResponse.data || scrapeResponse.data.trim().length === 0) {
-        throw new Error("Scrape.do returned empty content.");
-      }
-
-      console.log(
-        `Scrape.do request successful. Content length: ${scrapeResponse.data.length}`
-      );
-
-      // Construct a ReadResponse object from Scrape.do data
-      const estimatedTokens = estimateGeminiTokens(scrapeResponse.data);
-      const title =
-        scrapeResponse.data
-          .split("\n")[0]
-          .replace(/^#+\s*/, "")
-          .trim() || "Content"; // Extract first line as title
-
-      responseData = {
-        code: 0, // Assuming success if we get here
-        status: 200,
-        data: {
-          url: url,
-          title: title,
-          content: scrapeResponse.data,
-          description: "", // Scrape.do doesn't provide description in this format
-          links: [], // Scrape.do doesn't provide links in this format
-          usage: {
-            tokens: estimatedTokens,
-          },
-          images: {},
+    responseData = {
+      code: 0, // Assuming success if we get here
+      status: 200,
+      data: {
+        url: url,
+        title: title,
+        content: scrapeResponse.data,
+        description: "", // Scrape.do doesn't provide description in this format
+        links: [], // Scrape.do doesn't provide links in this format
+        usage: {
+          tokens: estimatedTokens,
         },
-      };
-      lastError = null; // Clear previous Jina error if Scrape.do succeeded
-    } catch (error) {
-      console.error(
-        `Scrape.do request failed: ${error instanceof Error ? error.message : String(error)
-        }`
-      );
-      lastError = error instanceof Error ? error : new Error(String(error));
-      // If Scrape.do also fails, throw an error combining the context
-      const jinaErrorMsg = lastError?.message
-        ? `Jina Error: ${lastError.message}`
-        : "Jina failed or returned unusable data.";
-      const scrapeErrorMsg = `Scrape.do Error: ${error instanceof Error ? error.message : String(error)
-        }`;
-      throw new Error(
-        `Failed to read URL content. ${jinaErrorMsg}. ${scrapeErrorMsg}`
-      );
-    }
+        images: {},
+      },
+    };
+  } catch (error) {
+    console.error(
+      `Scrape.do request failed: ${error instanceof Error ? error.message : String(error)}`
+    );
+    throw new Error(`Failed to read URL content. Scrape.do Error: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   if (!responseData || !responseData.data) {
-    // This should ideally not be reached if error handling above is correct, but acts as a safeguard
-    throw (
-      lastError ||
-      new Error("Failed to obtain valid response data from any source.")
-    );
+    throw new Error("Failed to obtain valid response data from Scrape.do");
   }
 
   console.log("Read successful:", {
     title: responseData.data.title,
     url: responseData.data.url,
     tokens: responseData.data.usage?.tokens || 0,
-    source: lastError === null ? "Jina" : "Scrape.do", // Indicate the source
+    source: "Scrape.do",
   });
 
   const tokens = responseData.data.usage?.tokens || 0;

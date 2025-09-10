@@ -2,11 +2,11 @@ import { AnswerAction, KnowledgeItem, Reference } from "../types";
 import i18nJSON from './i18n.json';
 import { JSDOM } from 'jsdom';
 import fs from "fs/promises";
-import { logInfo, logError, logDebug } from '../logging';
+import { logError } from '../logging';
 
 
 export function buildMdFromAnswer(answer: AnswerAction): string {
-  logDebug('buildMdFromAnswer', answer);
+  // logDebug('buildMdFromAnswer', answer);
   const base = repairMarkdownFootnotes(
     answer.answer || answer.mdAnswer || '',
     answer.references
@@ -17,7 +17,7 @@ export function buildMdFromAnswer(answer: AnswerAction): string {
   );
 
   if (refs.length === 0) {
-    logInfo('Final reasoning markdown prepared (no explicit references)', { markdown: base });
+    // logInfo('Final reasoning markdown prepared (no explicit references)', { markdown: base });
     return base;
   }
 
@@ -57,10 +57,7 @@ export function buildMdFromAnswer(answer: AnswerAction): string {
 
   const finalMarkdown = `${base}\n\n${explicitSection}`.trim();
 
-  logInfo('Final reasoning markdown prepared', {
-    markdown: finalMarkdown,
-    references: referencesJson,
-  });
+
 
   return finalMarkdown;
 }
