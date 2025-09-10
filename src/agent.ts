@@ -799,7 +799,7 @@ export async function getResponse(
         ]
           .map((allowed, idx) =>
             allowed
-              ? ["reflect", "read", "answer", "search", "coding"][idx]
+              ? ["reflect", "read", "answer", "search"][idx]
               : null
           )
           .filter(Boolean),
