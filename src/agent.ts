@@ -116,6 +116,7 @@ ${k.answer}
       `.trim();
     messages.push({ role: "assistant", content: removeExtraLineBreaks(aMsg) });
   });
+  console.log('BuildMsgsFromKnowledge', messages);
   return messages;
 }
 
@@ -219,6 +220,7 @@ ${urlListStr}
 <action-search>
 - Use web search to find relevant information
 - Build a search request based on the deep intention behind the original question and the expected answer format
+- Use appropriate language based on the user input. Can be Georgian query or english queries
 - Always prefer a single search request, only add another request if the original question covers multiple aspects or elements and one query is not enough, each request focus on one specific aspect of the original question 
 ${allKeywords?.length
         ? `
@@ -373,6 +375,12 @@ async function executeSearchQueries(
       logDebug('Search query:', { query });
       switch (searchProvider || SEARCH_PROVIDER) {
         case 'spider':
+          {
+            const res = (await spiderSearch(query)).response.content || [];
+            results = res as any;
+          }
+          break;
+        case 'groq':
           {
             const res = (await spiderSearch(query)).response.content || [];
             results = res as any;
@@ -555,6 +563,8 @@ export async function getResponse(
   await SchemaGen.setLanguage(languageCode || question)
   if (searchLanguageCode) {
     SchemaGen.searchLanguageCode = searchLanguageCode;
+  } else {
+    SchemaGen.searchLanguageCode = SchemaGen.languageCode;
   }
   const context: TrackerContext = {
     tokenTracker:
@@ -1164,7 +1174,7 @@ But then you realized you have asked them before. You decided to to think out of
 
       // do first search
       const { searchedQueries, newKnowledge } = await executeSearchQueries(
-        thisStep.searchRequests.map((q) => ({ q })),
+        thisStep.searchRequests.map((q) => ({ q, country: "ge" })),
         context,
         allURLs,
         SchemaGen,

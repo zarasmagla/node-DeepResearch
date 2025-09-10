@@ -1,11 +1,10 @@
 import axios, { AxiosRequestConfig } from 'axios';
-import { logInfo, logError, logDebug, logWarning } from '../logging';
 
 // Default timeout in milliseconds  
 const DEFAULT_TIMEOUT = 30000;
 
 // Maximum content length to prevent OOM issues (10MB)  
-const MAX_CONTENT_LENGTH = 10 * 1024 * 1024;
+const MAX_CONTENT_LENGTH = 10 * 1024 * 1024 * 10;
 
 // Maximum number of redirects to follow  
 const MAX_REDIRECTS = 5;

@@ -8,11 +8,12 @@
     "BRAVE_API_KEY": "",
     "SERPER_API_KEY": "",
     "SPIDER_API_KEY": "",
+    "GROQ_API_KEY": "",
     "DEFAULT_MODEL_NAME": "",
     "SCRAPE_DO_API_KEY": ""
   },
   "defaults": {
-    "search_provider": "spider",
+    "search_provider": "groq",
     "llm_provider": "gemini",
     "step_sleep": 1
   },
@@ -39,7 +40,7 @@
           "temperature": 0.7
         },
         "evaluator": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "gemini-2.5-flash",
           "temperature": 0.6,
           "maxTokens": 200
         },
@@ -48,10 +49,10 @@
           "temperature": 0.1
         },
         "researchPlanner": {
-          "model": "gemini-2.5-flash-lite"
+          "model": "gemini-2.5-flash"
         },
         "serpCluster": {
-          "model": "gemini-2.5-flash-lite"
+          "model": "gemini-2.5-flash"
         },
         "agent": {
           "temperature": 0.7
@@ -60,15 +61,15 @@
           "temperature": 0.7
         },
         "finalizer": {
-          "model": "gemini-2.5-flash-lite"
+          "model": "gemini-2.5-flash"
         },
         "reducer": {
-          "model": "gemini-2.5-flash-lite",
+          "model": "gemini-2.5-flash",
           "maxTokens": 16000
         },
         "fallback": {
           "maxTokens": 16000,
-          "model": "gemini-2.5-flash-lite"
+          "model": "gemini-2.5-flash"
         }
       }
     },

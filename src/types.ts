@@ -34,6 +34,10 @@ export type SERPQuery = {
   q: string,
   location?: string,
   tbs?: string,
+  hl?: string,
+  gl?: string,
+  language?: string,
+  country?: string,
 }
 
 export type SearchAction = BaseAction & {

@@ -45,6 +45,7 @@ export const JINA_API_KEY = env.JINA_API_KEY;
 export const BRAVE_API_KEY = env.BRAVE_API_KEY;
 export const SERPER_API_KEY = env.SERPER_API_KEY;
 export const SPIDER_API_KEY = env.SPIDER_API_KEY as string | undefined;
+export const GROQ_API_KEY = (env as any).GROQ_API_KEY as string | undefined;
 export const SEARCH_PROVIDER = configJson.defaults.search_provider;
 export const STEP_SLEEP = configJson.defaults.step_sleep;
 export const SCRAPE_DO_API_KEY = env.SCRAPE_DO_API_KEY;

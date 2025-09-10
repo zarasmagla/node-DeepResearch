@@ -27,7 +27,7 @@
     "test:watch": "jest --watch",
     "test:docker": "jest src/__tests__/docker.test.ts --testTimeout=300000"
   },
-  "keywords": [ ],
+  "keywords": [],
   "author": "Jina AI",
   "license": "Apache-2.0",
   "description": "",
@@ -45,6 +45,8 @@
     "duck-duck-scrape": "^2.2.7",
     "express": "^4.21.2",
     "express-validator": "^7.2.1",
+    "groq": "^4.7.0",
+    "groq-sdk": "^0.32.0",
     "hjson": "^3.2.2",
     "jsdom": "^26.0.0",
     "langfuse": "^3.37.4",

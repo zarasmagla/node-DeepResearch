@@ -84,6 +84,30 @@ export class GoogleGenAIHelper {
     return this.googleGenAI as GoogleGenAI;
   }
 
+  private static async retryWithBackoff<T>(
+    operation: () => Promise<T>,
+    maxRetries: number = 4,
+    initialDelay: number = 1000
+  ): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (attempt === maxRetries) throw error;
+
+        const isOverloaded = error instanceof Error &&
+          error.message.includes("The model is overloaded");
+
+        if (!isOverloaded) throw error;
+
+        const delay = initialDelay * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        logger.warn(`Retrying after model overload (attempt ${attempt}/${maxRetries})`);
+      }
+    }
+    throw new Error("Max retries exceeded");
+  }
+
   /**
    * Generate structured JSON object using Google Gen AI
    */
@@ -169,10 +193,12 @@ export class GoogleGenAIHelper {
         });
       }
 
-      const response = await ai.models.generateContent({
-        model,
-        contents: processedPrompt,
-        config,
+      const response = await this.retryWithBackoff(async () => {
+        return ai.models.generateContent({
+          model,
+          contents: processedPrompt,
+          config,
+        });
       });
 
       const responseText = response.text || "{}";
@@ -305,10 +331,12 @@ export class GoogleGenAIHelper {
         });
       }
 
-      const response = await ai.models.generateContent({
-        model,
-        contents: processedPrompt,
-        config,
+      const response = await this.retryWithBackoff(async () => {
+        return ai.models.generateContent({
+          model,
+          contents: processedPrompt,
+          config,
+        });
       });
 
       const responseText = response.text || "";

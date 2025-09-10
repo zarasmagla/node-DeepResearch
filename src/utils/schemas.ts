@@ -111,7 +111,7 @@ const languageISO6391Map: Record<string, string> = {
 }
 
 export class Schemas {
-  public languageStyle: string = 'formal English';
+  public languageStyle: string = 'formal English or Georgian';
   public languageCode: string = 'en';
   public searchLanguageCode: string | undefined = undefined;
 
@@ -119,7 +119,7 @@ export class Schemas {
   async setLanguage(query: string) {
     if (languageISO6391Map[query]) {
       this.languageCode = query;
-      this.languageStyle = `formal ${languageISO6391Map[query]}`;
+      this.languageStyle = `formal ${languageISO6391Map[query]} or Georgian`;
       return;
     }
     const generator = new ObjectGeneratorSafe();
@@ -223,8 +223,12 @@ export class Schemas {
       queries: z.array(
         z.object({
           tbs: z.enum(['qdr:h', 'qdr:d', 'qdr:w', 'qdr:m', 'qdr:y']).describe('time-based search filter, must use this field if the search request asks for latest info. qdr:h for past hour, qdr:d for past 24 hours, qdr:w for past week, qdr:m for past month, qdr:y for past year. Choose exactly one.'),
-          location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the city level in order to simulate a real user\'s search.').optional(),
-          q: z.string().describe(`keyword-based search query, 2-3 words preferred, total length < 30 characters. ${this.searchLanguageCode ? `Must in ${this.searchLanguageCode}` : ''}`).max(50),
+          location: z.string().describe('defines from where you want the search to originate. It is recommended to specify location at the country level like Country of Georgia, Armenia, Moldova etc., United States, Canada, United Kingdom').optional(),
+          hl: z.string().describe('host language code (ISO, e.g., en, ka, de). When targeting specific regional results.').optional(),
+          gl: z.string().describe('geolocation / country code (ISO 3166-1 alpha-2, e.g., US, GE, DE).').optional(),
+          language: z.string().describe('search language code for providers requiring it (ISO 639-1, e.g., en, ka).').optional(),
+          country: z.string().describe('search country code for providers requiring it (ISO 3166-1 alpha-2 lowercase, e.g., us, ge).').optional(),
+          q: z.string().describe(`keyword-based search query, 2-3 words preferred, total length < 30 characters. Prefer the user’s detected language based on topic input etc. When the topic naturally has an authoritative regional language, include an additional query using that language.`).max(50),
         }))
         .describe(`'Array of search keywords queries, orthogonal to each other. Maximum ${MAX_QUERIES_PER_STEP} queries allowed.'`)
     });
@@ -307,9 +311,9 @@ export class Schemas {
         searchRequests: z.array(
           z.string()
             .min(1)
-            .describe(`A Google search query. Based on the deep intention behind the original question and the expected answer format. Maximum 30 characters.`))
+            .describe(`A Google search query based on appropriate language, could be Georgian if it is Georgian question. Based on the deep intention behind the original question and the expected answer format. Maximum 30 characters. Use appropriate language based on the user input. Can be Georgian query or english queries`))
           .describe(`Required when action='search'. Always prefer a single search query, only add another search query if the original question covers multiple aspects or elements and one search request is definitely not enough, each request focus on one specific aspect of the original question. Minimize mutual information between each query. Maximum ${MAX_QUERIES_PER_STEP} search queries.`)
-      }).optional();
+      })
     }
 
     if (allowCoding) {

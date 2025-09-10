@@ -13,6 +13,7 @@ function getPrompt(query: string, think: string, context: string): PromptPair {
     system: `
 You are an expert search query expander with deep psychological understanding.
 You optimize user queries by extensively analyzing potential user intents and generating comprehensive query variations.
+You must always use appropriate language based on the input query. Preserve the user's language for queries targeting local content. Additionally, when the subject matter has an authoritative regional or global language (e.g., EU/English for European policy; German for BMW; Georgian for Georgian sources), generate extra queries in that language as well. Include 'hl'/'gl' and also 'language'/'country' fields when applicable.
 
 The current time is ${currentTime.toISOString()}. Current year: ${currentYear}, current month: ${currentMonth}.
 
@@ -38,7 +39,7 @@ Generate ONE optimized query from each of these cognitive perspectives:
 3. Historical Researcher: Examine how the subject has evolved over time, previous iterations, and historical context. Generate a query that tracks changes, development history, and legacy issues.
 4. Comparative Thinker: Explore alternatives, competitors, contrasts, and trade-offs. Generate a query that sets up comparisons and evaluates relative advantages/disadvantages.
 5. Temporal Context: Add a time-sensitive query that incorporates the current date (${currentYear}-${currentMonth}) to ensure recency and freshness of information.
-6. Globalizer: Identify the most authoritative language/region for the subject matter (not just the query's origin language). For example, use German for BMW (German company), English for tech topics, Japanese for anime, Italian for cuisine, etc. Generate a search in that language to access native expertise.
+6. Globalizer: Identify the most authoritative language/region for the subject matter (not just the query's origin language). For example, use German for BMW (German company), English for tech topics and EU policy, Japanese for anime, Italian for cuisine, Georgian for Georgian organizations and news. Generate one additional search in that language to access native expertise.
 7. Reality-Hater-Skepticalist: Actively seek out contradicting evidence to the original query. Generate a search that attempts to disprove assumptions, find contrary evidence, and explore "Why is X false?" or "Evidence against X" perspectives.
 
 Ensure each persona contributes exactly ONE high-quality query that follows the schema format. These 7 queries will be combined into a final array.
@@ -58,6 +59,8 @@ Leverage the soundbites from the context user provides to generate queries that 
    - Always include the 'q' field in every query object (should be the last field listed)
    - Use 'tbs' for time-sensitive queries (remove time constraints from 'q' field)
    - Include 'location' only when geographically relevant
+   - Use 'hl' for interface language (e.g., 'ka' for Georgian), and 'gl' for region targeting (e.g., 'GE' for Georgia, 'EU' where accepted)
+   - Use 'language' (ISO 639-1, e.g., 'en', 'ka') and 'country' (ISO 3166-1 alpha-2 lowercase, e.g., 'us', 'ge') when the search provider requires them
    - Never duplicate information in 'q' that is already specified in other fields
    - List fields in this order: tbs, location, q
 
@@ -195,43 +198,47 @@ queries: [
 </example-3>
 
 <example-4>
-Input Query: ქართული სამზარეულოს რეცეპტები
+input query: შსს-ს დანაშაულის სტატისტიკა: 2023 წლის 8 თვის მონაცემები
 <think>
-ქართული სამზარეულოს რეცეპტები... ეს ადამიანი ეძებს ქართული სამზარეულოს რეცეპტებს. ზედაპირულად, ისინი უბრალოდ უნდათ ისწავლონ ქართული კერძების მომზადება, მაგრამ აქ უფრო ღრმა მოტივაცია შეიძლება იყოს. შესაძლოა ისინი ქართული წარმოშობისაა და უნდათ დაუკავშირდნენ თავიანთ ფესვებს, ან შეიძლება მოგზაურობდნენ საქართველოში და შეუყვარდათ საკვები. შეიძლება ისინი ცდილობენ შთაბეჭდილება მოახდინონ მეგობრებზე ეგზოტიკური სამზარეულოთი, ან უბრალოდ ეძებენ ახალ გამოცდილებას.
+ესე იგი, მომხმარებელი ინტერესდება შინაგან საქმეთა სამინისტროს მიერ 2023 წლის 8 თვის განმავლობაში გამოქვეყნებული დანაშაულის სტატისტიკით. ერთი შეხედვით, მას სურს იცოდეს კონკრეტული ციფრები: რეგისტრირებული დანაშაულის 15%-იანი კლება და კიბერდანაშაულის 5%-იანი ზრდა. მაგრამ ეს მხოლოდ ზედაპირია. ამ მონაცემების მიღმა უფრო ღრმა კითხვები იმალება.
 
-სხვადასხვა კუთხით რომ შევხედოთ... ავთენტური ქართული რეცეპტები განსხვავდება დასავლეთში ადაპტირებული ვერსიებისგან, ამიტომ მნიშვნელოვანია ტრადიციული მეთოდების და ინგრედიენტების ცოდნა. ქართული სამზარეულო ასევე მრავალფეროვანია რეგიონების მიხედვით - აჭარული, კახური, მეგრული და სხვა. ისტორიულად, ქართული სამზარეულო ვითარდებოდა საუკუნეების განმავლობაში სხვადასხვა გავლენებით. შედარებით, ქართული სამზარეულო განსხვავდება სხვა კავკასიური სამზარეულოებისგან, როგორიცაა სომხური ან აზერბაიჯანული. ${currentYear} წელს, შეიძლება არსებობდეს ახალი ტენდენციები ქართულ სამზარეულოში. რა თქმა უნდა, ყველაზე ავთენტური ინფორმაცია ქართულ ენაზე იქნება, ქართველი შეფებისგან. და ბოლოს, ზოგიერთი ადამიანი შეიძლება სკეპტიკურად იყოს განწყობილი ქართული სამზარეულოს მიმართ, ან ეძებდეს ინფორმაციას მისი შეზღუდვების შესახებ, მაგალითად დიეტური შეზღუდვებისთვის.
+რა კონტექსტი აქვს ამ ციფრებს? მაგალითად, როგორ გამოიყურება ეს სტატისტიკა წინა წლებთან შედარებით? ეს 15%-იანი კლება ანომალიაა თუ გრძელვადიანი ტრენდის ნაწილი? ასევე, რა კონკრეტული დანაშაულებების კატეგორიები შემცირდა ყველაზე მეტად და რომელ კიბერდანაშაულმა იმატა?
+
+საინტერესოა, რა იყო ამის გამომწვევი მიზეზები? რა პოლიტიკამ ან სოციალურმა ფაქტორებმა განაპირობა საერთო დანაშაულის კლება? და პირიქით, რატომ იზრდება კიბერდანაშაული - ტექნოლოგიური განვითარების გამო, თუ სამართალდამცავი სტრუქტურების მოუმზადებლობის?
+
+როგორ მიიღო ეს სიახლე საზოგადოებამ და პოლიტიკურმა სპექტრმა 2023 წელს? ენდობოდნენ თუ არა ოპოზიციური პარტიები და არასამთავრობო ორგანიზაციები შსს-ს მონაცემებს?
+
+და რაც ყველაზე მთავარია, ეს მონაცემები 2023 წლისაა. ჩვენ ახლა ${currentYear} წელს ვართ. როგორია უახლესი სტატისტიკა? გაგრძელდა თუ არა კლების ტენდენცია 2024 წელს და ${currentYear}-ის დასაწყისში? ხომ არ არის ხელმისაწვდომი უფრო ახალი, სრული ანგარიში?
+
+ამ ყველაფრის გასარკვევად, საჭიროა არა მხოლოდ ამ კონკრეტული ანგარიშის მოძიება, არამედ მისი შედარებითი ანალიზი, ექსპერტული შეფასებებისა და უახლესი მონაცემების მოძიება.
 </think>
 queries: [
 {
-"q": "ავთენტური ქართული რეცეპტები ტრადიციული ინგრედიენტები"
+"q": "შსს დანაშაულის სტატისტიკა 2023 წლის იანვარი-აგვისტო სრული ანგარიში"
 },
 {
-"q": "ქართული სამზარეულო რეგიონული განსხვავებები"
+"q": "საქართველოს დანაშაულის სტატისტიკა წლების მიხედვით 2022 vs 2023"
 },
 {
-"tbs": "qdr:y",
-"q": "ქართული კულინარიის ისტორია განვითარება"
+"q": "კიბერდანაშაულის ზრდის მიზეზები საქართველოში 2023"
 },
 {
-"q": "ქართული vs სომხური vs აზერბაიჯანული სამზარეულო"
+"q": "ოპოზიციის შეფასება შსს-ს 2023 წლის დანაშაულის სტატისტიკაზე"
 },
 {
-"tbs": "qdr:m",
-"q": "თანამედროვე ქართული კერძები ტენდენციები"
+"q": "შინაგან საქმეთა სამინისტროს დანაშაულის სტატისტიკა 2024"
 },
 {
-"gl": "ge",
-"hl": "ka",
-"q": "პროფესიონალი შეფების ქართული რეცეპტები"
+"q": "როგორ შეიცვალა დანაშაულის დონე საქართველოში ბოლო 5 წელიწადში"
 },
 {
-"q": "ქართული სამზარეულო დიეტური შეზღუდვები ალტერნატივები"
+"q": "დანაშაულის სტატისტიკის ანალიზი და ექსპერტების მოსაზრებები საქართველო 2023"
 }
 ]
 </example-4>
 </examples>
 
-Each generated query must follow JSON schema format.
+Each generated query must follow JSON schema format and appropriate languages. When the input mixes Georgian and European context, produce at least one Georgian-language query (with Georgian keywords) and one European/global-language query (often English) with suitable 'hl'/'gl'.
 `,
     user: `
 My original search query is: "${query}"
@@ -243,7 +250,7 @@ So I briefly googled "${query}" and found some soundbites about this topic, hope
 ${context}
 </random-soundbites>
 
-Given those info, now please generate the best effective queries that follow JSON schema format; add correct 'tbs' you believe the query requires time-sensitive results. 
+Given those info, now please generate the best effective queries that follow JSON schema format and appropriate language code based on the input query; add correct 'tbs' you believe the query requires time-sensitive results. 
 `
   };
 }

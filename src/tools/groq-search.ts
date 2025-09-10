@@ -1,0 +1,100 @@
+import Groq from "groq-sdk";
+import { GROQ_API_KEY } from "../config";
+import { SpiderSearchResponse, SERPQuery } from "../types";
+import { logDebug } from "../logging";
+
+
+interface GroqSearchResult {
+    title: string;
+    url: string;
+    content: string;
+    score: number;
+}
+
+interface GroqSearchResponse {
+    results: GroqSearchResult[];
+}
+
+interface GroqExecutedTool {
+    index: number;
+    type: string;
+    arguments: string;
+    output: string;
+    search_results: {
+        results: GroqSearchResult[];
+    };
+}
+
+interface GroqMessage {
+    role: "assistant";
+    content: string;
+    reasoning: string;
+    executed_tools: GroqExecutedTool[];
+}
+
+// Groq Compound web search wrapper that normalizes to SpiderSearchResponse shape
+export async function groqSearch(query: SERPQuery): Promise<{ response: SpiderSearchResponse }> {
+    if (!GROQ_API_KEY) {
+        throw new Error("GROQ_API_KEY not found");
+    }
+
+    const groq = new Groq({ apiKey: GROQ_API_KEY });
+
+    // Map SERPQuery -> Groq search_settings
+    const countryMap: Record<string, string> = {
+        'US': 'united states',
+        'GB': 'united kingdom',
+        'CA': 'canada',
+        'AU': 'australia',
+        'DE': 'germany',
+        'FR': 'france',
+        'JP': 'japan',
+        'IN': 'india',
+        'BR': 'brazil',
+        'RU': 'russia',
+        'CN': 'china',
+        'IT': 'italy',
+        'ES': 'spain',
+        'MX': 'mexico',
+        'KR': 'south korea',
+        'GE': 'georgia'
+    };
+
+    const country = ((query.country || query.gl || "").toString().toUpperCase() || undefined);
+    const mappedCountry = country ? countryMap[country] : undefined;
+
+    // Build a concise prompt; model will decide to invoke web search
+    const userPrompt = query.q;
+
+    let data;
+    try {
+        data = await groq.chat.completions.create({
+            model: "groq/compound",
+            messages: [
+                { role: "user", content: "Search information on the web for query: " + userPrompt }
+            ],
+            // Pass search settings if available
+            ...(mappedCountry ? { search_settings: { country: mappedCountry } as any } : {})
+        } as any);
+    } catch (err) {
+        // Surface a clean error
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`Groq web search failed: ${message}`);
+    }
+
+    // Extract search results from executed tool calls
+    const choice = data?.choices?.[0] || {};
+    const msg: GroqMessage = choice.message as GroqMessage;
+
+    const executedTools = msg.executed_tools[0].search_results
+    // Some versions may nest tools differently; attempt a couple of fallbacks
+    const allResults = executedTools.results as GroqSearchResult[];
+    // Normalize into SpiderSearchResponse.content
+    const content = (allResults || []).map((r) => {
+        const title = r.title || r.url || "";
+        const url = r.url || "";
+        const description = r.content || "";
+        return { title, url, description };
+    }).filter((r) => r.url);
+    return { response: { content } as SpiderSearchResponse };
+}
