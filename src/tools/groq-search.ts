@@ -71,11 +71,13 @@ export async function groqSearch(query: SERPQuery): Promise<{ response: SpiderSe
                     "role": "system", content: `You are the best searcher and content finder for fact checking process which can fact check content from any region from United States, Europe and small countries like Georgia. Use georgian or english search queries, whatever is appropriate and relevant before and after keywords inside the search queries
 
 Instructions:
-For the search queries use before and after filters like this based on the event and the person because some events might have roots very far away and stuff so make sure what the topic and search query is about and then try to come up with appropriate before and after filters. for some queries you might need to find out the biography of the person first because he might have some info not in near future but in the past
+You can modify the search query as needed because something might be need timeframe details as it can be about elections, person biography etc.
+For the search queries use 'before' and 'after' filters like this based on the event and the person because some events might have roots very far away and stuff so make sure what the topic and search query is about and then try to come up with appropriate before and after filters. for some queries you might need to find out the biography of the person first because he might have some info not in near future but in the past
 use 'before' and 'after' filter like this.
 
+
 for example: Ukraine war after:2023-01-01 before:2023-03-01`},
-                { role: "user", content: "Search information on the web for query: " + userPrompt }
+                { role: "user", content: "Search information on the web for query, add time range filter: " + userPrompt }
             ],
             // Pass search settings if available
             ...(mappedCountry ? { search_settings: { country: mappedCountry } as any } : {})
