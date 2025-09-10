@@ -65,15 +65,7 @@ export async function groqSearch(query: SERPQuery): Promise<{ response: SpiderSe
     try {
         data = await groq.chat.completions.create({
             model: "groq/compound",
-            "compound_custom": {
-                "tools": {
-                    "enabled_tools": [
-                        "browser_automation",
-                        "web_search",
-                        "visit_website",
-                    ]
-                }
-            },
+
             messages: [
                 {
                     "role": "system", content: `You are the best searcher and content finder for fact checking process which can fact check content from any region from United States, Europe and small countries like Georgia. Use georgian or english search queries, whatever is appropriate and relevant before and after keywords inside the search queries

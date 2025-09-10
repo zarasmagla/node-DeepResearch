@@ -739,7 +739,6 @@ app.post('/v1/chat/completions', validationRules, (async (req: Request, res: Res
         );
         // Use the generated object as the response content
         finalAnswer = JSON.stringify(result.object, null, 2);
-        logInfo('Generated object:', { answer: finalAnswer });
       } catch (error) {
         logError('Error processing response with schema:', {
           error: error instanceof Error ? error.message : String(error),

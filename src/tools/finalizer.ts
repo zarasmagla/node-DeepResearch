@@ -102,7 +102,6 @@ export async function finalizeAnswer(
     trackers.tokenTracker.trackUsage(TOOL_NAME, result.usage)
 
 
-    logInfo(TOOL_NAME, { text: result.text });
     logDebug(`finalized answer before/after: ${mdContent.length} -> ${result.text.length}`);
 
     if (result.text.length < mdContent.length * 0.85) {

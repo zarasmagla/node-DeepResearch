@@ -13,8 +13,8 @@ export async function buildReferences(
   context: TrackerContext,
   schema: Schemas,
   minChunkLength: number = 80,
-  maxRef: number = 10,
-  minRelScore: number = 0.7,
+  maxRef: number = 40,
+  minRelScore: number = 0.60,
   onlyHostnames: string[] = []
 ): Promise<{ answer: string, references: Array<Reference> }> {
   logDebug(`[buildReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);
@@ -377,7 +377,7 @@ export async function buildImageReferences(
   context: TrackerContext,
   schema: Schemas,
   minChunkLength: number = 80,
-  maxRef: number = 10,
+  maxRef: number = 40,
   minRelScore: number = 0.35
 ): Promise<Array<ImageReference>> {
   logDebug(`[buildImageReferences] Starting with maxRef=${maxRef}, minChunkLength=${minChunkLength}, minRelScore=${minRelScore}`);

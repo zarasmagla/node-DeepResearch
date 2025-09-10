@@ -77,46 +77,31 @@ async function wait(seconds: number) {
 }
 
 function BuildMsgsFromKnowledge(knowledge: KnowledgeItem[]): CoreMessage[] {
-  // build user, assistant pair messages from knowledge
-  console.log('BuildMsgsFromKnowledge', knowledge);
   const messages: CoreMessage[] = [];
-  knowledge.forEach((k) => {
-    messages.push({ role: "user", content: k.question.trim() });
+  knowledge.forEach(k => {
+    messages.push({ role: 'user', content: k.question.trim() });
+
+    const refs = k.type === 'url' && Array.isArray(k.references)
+      ? (k.references as string[]).slice(0, 3)
+      : [];
+
+    const urlsBlock = refs.length
+      ? `<urls>\n${refs.map(u => `- ${u}`).join('\n')}\n</urls>\n`
+      : '';
+
     const aMsg = `
-${k.updated && (k.type === "url" || k.type === "side-info")
-        ? `
+${k.updated && (k.type === 'url' || k.type === 'side-info') ? `
 <answer-datetime>
 ${k.updated}
 </answer-datetime>
-`
-        : ""
-      }
+` : ''}
 
-${k.references && (k.type === "url" || k.type === "side-info")
-        ? `
-<references>
-${k.references
-          .map(
-            (ref) => `
-{
-  "url": "${ref.url}",
-  "title": "${ref.title || ""}",
-  "exactQuote": "${ref.exactQuote || ""}",
-}
-`
-          )
-          .join(",")}
-</references>
-`
-        : ""
-      }
-
-
+${urlsBlock}
 ${k.answer}
-      `.trim();
-    messages.push({ role: "assistant", content: removeExtraLineBreaks(aMsg) });
+    `.trim();
+
+    messages.push({ role: 'assistant', content: removeExtraLineBreaks(aMsg) });
   });
-  console.log('BuildMsgsFromKnowledge', messages);
   return messages;
 }
 
@@ -525,8 +510,8 @@ export async function getResponse(
   boostHostnames: string[] = [],
   badHostnames: string[] = [],
   onlyHostnames: string[] = [],
-  maxRef: number = 10,
-  minRelScore: number = 0.80,
+  maxRef: number = 40,
+  minRelScore: number = 0.60,
   languageCode: string | undefined = undefined,
   searchLanguageCode?: string,
   searchProvider?: string,
@@ -869,7 +854,7 @@ export async function getResponse(
       // // normalize all references urls, add title to it
       // await updateReferences(thisStep, allURLs)
 
-      if (totalStep === 1 && !noDirectAnswer) {
+      if (totalStep === 1 && !noDirectAnswer && weightedURLs.length === 0) {
         // LLM is so confident and answer immediately, skip all evaluations
         // however, if it does give any reference, it must be evaluated, case study: "How to configure a timeout when loading a huggingface dataset with python?"
         thisStep.isFinal = true;
@@ -1334,6 +1319,8 @@ You decided to think out of the box or cut from a completely different angle.
 
       // we should disable answer immediately after search to prevent early use of the snippets
       allowAnswer = false;
+      // nudge the agent to visit URLs next
+      allowReflect = false;
     } else if (
       thisStep.action === "visit" &&
       thisStep.URLTargets?.length &&
@@ -1665,6 +1652,29 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
       )
     );
 
+    // Ensure we have full text content available: if nothing was read, bulk-visit top URLs before building references
+    try {
+      if (visitedURLs.length === 0 && weightedURLs.length > 0) {
+        const topTargets = Array.from(new Set(weightedURLs.map(r => r.url!).filter(Boolean))).slice(0, MAX_URLS_PER_STEP);
+        const { success } = await processURLs(
+          topTargets,
+          context,
+          allKnowledge,
+          allURLs,
+          visitedURLs,
+          badURLs,
+          imageObjects,
+          SchemaGen,
+          question,
+          allWebContents,
+          withImages
+        );
+        logDebug('Pre-finalization bulk visit executed', { urlsAttempted: topTargets.length, success });
+      }
+    } catch (error) {
+      logWarning('Pre-finalization bulk visit failed', { error });
+    }
+
     const { answer, references } = await buildReferences(
       answerStep.answer,
       allWebContents,
@@ -1710,8 +1720,6 @@ But unfortunately, you failed to solve the issue. You need to think out of the b
     },
   });
 
-  console.log("mdAnswer", answerStep.mdAnswer);
-  console.log("answer", question, thisStep);
 
   // Update the agent trace with final results
   agentTrace.update({
