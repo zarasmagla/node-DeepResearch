@@ -1,7 +1,6 @@
 import Groq from "groq-sdk";
 import { GROQ_API_KEY } from "../config";
 import { SpiderSearchResponse, SERPQuery } from "../types";
-import { logDebug } from "../logging";
 
 
 interface GroqSearchResult {
@@ -9,10 +8,6 @@ interface GroqSearchResult {
     url: string;
     content: string;
     score: number;
-}
-
-interface GroqSearchResponse {
-    results: GroqSearchResult[];
 }
 
 interface GroqExecutedTool {
@@ -70,7 +65,24 @@ export async function groqSearch(query: SERPQuery): Promise<{ response: SpiderSe
     try {
         data = await groq.chat.completions.create({
             model: "groq/compound",
+            "compound_custom": {
+                "tools": {
+                    "enabled_tools": [
+                        "browser_automation",
+                        "web_search",
+                        "visit_website",
+                    ]
+                }
+            },
             messages: [
+                {
+                    "role": "system", content: `You are the best searcher and content finder for fact checking process which can fact check content from any region from United States, Europe and small countries like Georgia. Use georgian or english search queries, whatever is appropriate and relevant before and after keywords inside the search queries
+
+Instructions:
+For the search queries use before and after filters like this based on the event and the person because some events might have roots very far away and stuff so make sure what the topic and search query is about and then try to come up with appropriate before and after filters. for some queries you might need to find out the biography of the person first because he might have some info not in near future but in the past
+use 'before' and 'after' filter like this.
+
+for example: Ukraine war after:2023-01-01 before:2023-03-01`},
                 { role: "user", content: "Search information on the web for query: " + userPrompt }
             ],
             // Pass search settings if available
