@@ -42,11 +42,11 @@ export async function rerankDocuments(
         // Use RETRIEVAL_QUERY task for the query and RETRIEVAL_DOCUMENT for documents
         const [queryEmbeddingResult, documentsEmbeddingResult] = await Promise.all([
             getEmbeddings([query], tracker, {
-                task: "retrieval.query",
+                task: "RETRIEVAL_QUERY",
                 model: "gemini-embedding-001"
             }),
             getEmbeddings(documents, tracker, {
-                task: "retrieval.passage",
+                task: "RETRIEVAL_DOCUMENT",
                 model: "gemini-embedding-001"
             })
         ]);

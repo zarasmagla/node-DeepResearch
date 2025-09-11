@@ -5,7 +5,6 @@ import { getEmbeddings } from "./embeddings";
 
 const SIMILARITY_THRESHOLD = 0.86; // Adjustable threshold for cosine similarity
 
-
 export async function dedupQueries(
   newQueries: string[],
   existingQueries: string[],
@@ -21,7 +20,13 @@ export async function dedupQueries(
 
     // Get embeddings for all queries in one batch
     const allQueries = [...newQueries, ...existingQueries];
-    const { embeddings: allEmbeddings } = await getEmbeddings(allQueries, tracker);
+    const { embeddings: allEmbeddings } = await getEmbeddings(
+      allQueries,
+      tracker,
+      {
+        task: "SEMANTIC_SIMILARITY",
+      }
+    );
 
     // If embeddings is empty (due to 402 error), return all new queries
     if (!allEmbeddings.length) {
@@ -43,7 +48,10 @@ export async function dedupQueries(
 
       // Check against existing queries
       for (let j = 0; j < existingQueries.length; j++) {
-        const similarity = cosineSimilarity(newEmbeddings[i], existingEmbeddings[j]);
+        const similarity = cosineSimilarity(
+          newEmbeddings[i],
+          existingEmbeddings[j]
+        );
         if (similarity >= SIMILARITY_THRESHOLD) {
           isUnique = false;
           break;
@@ -53,7 +61,10 @@ export async function dedupQueries(
       // Check against already accepted queries
       if (isUnique) {
         for (const usedIndex of usedIndices) {
-          const similarity = cosineSimilarity(newEmbeddings[i], newEmbeddings[usedIndex]);
+          const similarity = cosineSimilarity(
+            newEmbeddings[i],
+            newEmbeddings[usedIndex]
+          );
           if (similarity >= SIMILARITY_THRESHOLD) {
             isUnique = false;
             break;
@@ -67,12 +78,12 @@ export async function dedupQueries(
         usedIndices.add(i);
       }
     }
-    logInfo('Dedup:', { uniqueQueries });
+    logInfo("Dedup:", { uniqueQueries });
     return {
       unique_queries: uniqueQueries,
     };
   } catch (error) {
-    logError('Error in deduplication analysis:', { error });
+    logError("Error in deduplication analysis:", { error });
 
     // return all new queries if there is an error
     return {

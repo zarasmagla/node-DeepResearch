@@ -2,35 +2,49 @@ import { TrackerContext } from "../types";
 import { Schemas } from "../utils/schemas";
 import { cosineSimilarity } from "./cosine";
 import { getEmbeddings } from "./embeddings";
-import { logError, logDebug } from '../logging';
+import { logError, logDebug } from "../logging";
 
 // Refactored cherryPick function
-export async function cherryPick(question: string, longContext: string, options: any = {}, trackers: TrackerContext, schemaGen: Schemas, url: string) {
+export async function cherryPick(
+  question: string,
+  longContext: string,
+  options: any = {},
+  trackers: TrackerContext,
+  schemaGen: Schemas,
+  url: string
+) {
   const {
-    snippetLength = 6000,  // char length of each snippet
-    numSnippets = Math.max(2, Math.min(5, Math.floor(longContext.length / snippetLength))),
-    chunkSize = 300,  // char length of each chunk
+    snippetLength = 10000, // char length of each snippet
+    numSnippets = Math.max(
+      2,
+      Math.min(5, Math.floor(longContext.length / snippetLength))
+    ),
+    chunkSize = 300, // char length of each chunk
   } = options;
 
   if (longContext.length < snippetLength * 2) {
     // If the context is shorter than the snippet length, return the whole context
-    logDebug('content is too short, dont bother');
+    logDebug("content is too short, dont bother");
     return longContext;
   }
 
   // Split the longContext into chunks of chunkSize
   const chunks: string[] = [];
   for (let i = 0; i < longContext.length; i += chunkSize) {
-    chunks.push(longContext.substring(i, Math.min(i + chunkSize, longContext.length)));
+    chunks.push(
+      longContext.substring(i, Math.min(i + chunkSize, longContext.length))
+    );
   }
 
   logDebug(`late chunking enabled! num chunks: ${chunks.length}`);
 
-  trackers.actionTracker.trackThink('late_chunk', schemaGen.languageCode, { url });
+  trackers.actionTracker.trackThink("late_chunk", schemaGen.languageCode, {
+    url,
+  });
 
   try {
     if (question.trim().length === 0) {
-      throw new Error('Empty question, returning full context');
+      throw new Error("Empty question, returning full context");
     }
 
     // Get embeddings for all chunks using the new getEmbeddings function
@@ -38,10 +52,7 @@ export async function cherryPick(question: string, longContext: string, options:
       chunks,
       trackers.tokenTracker,
       {
-        task: "retrieval.passage",
-        dimensions: 1024,
-        late_chunking: true,
-        embedding_type: "float"
+        task: "RETRIEVAL_DOCUMENT",
       }
     );
 
@@ -52,9 +63,7 @@ export async function cherryPick(question: string, longContext: string, options:
       [question],
       trackers.tokenTracker,
       {
-        task: "retrieval.query",
-        dimensions: 1024,
-        embedding_type: "float"
+        task: "FACT_VERIFICATION",
       }
     );
 
@@ -62,7 +71,9 @@ export async function cherryPick(question: string, longContext: string, options:
 
     // Verify that we got embeddings for all chunks
     if (allChunkEmbeddings.length !== chunks.length) {
-      logError(`Got ${allChunkEmbeddings.length} embeddings for ${chunks.length} chunks`);
+      logError(
+        `Got ${allChunkEmbeddings.length} embeddings for ${chunks.length} chunks`
+      );
     }
 
     // Calculate cosine similarity between the question and each chunk
@@ -88,7 +99,9 @@ export async function cherryPick(question: string, longContext: string, options:
       for (let j = 0; j <= similarities.length - chunksPerSnippet; j++) {
         // Calculate the average similarity for the current window
         const windowScores = similaritiesCopy.slice(j, j + chunksPerSnippet);
-        const windowScore = windowScores.reduce((sum, score) => sum + score, 0) / windowScores.length;
+        const windowScore =
+          windowScores.reduce((sum, score) => sum + score, 0) /
+          windowScores.length;
 
         if (windowScore > bestScore) {
           bestScore = windowScore;
@@ -102,21 +115,28 @@ export async function cherryPick(question: string, longContext: string, options:
       snippets.push(longContext.substring(startIndex, endIndex));
 
       // Mark the used chunks with a very low score to avoid reusing them
-      for (let k = bestStartIndex; k < bestStartIndex + chunksPerSnippet && k < similaritiesCopy.length; k++) {
+      for (
+        let k = bestStartIndex;
+        k < bestStartIndex + chunksPerSnippet && k < similaritiesCopy.length;
+        k++
+      ) {
         similaritiesCopy[k] = -Infinity;
       }
     }
 
     // wrap with <snippet-index> tag
-    return snippets.map((snippet, index) => `
+    return snippets
+      .map((snippet, index) =>
+        `
 <snippet-${index + 1}>
 
 ${snippet}
 
-</snippet-${index + 1}>`.trim()).join("\n\n");
-
+</snippet-${index + 1}>`.trim()
+      )
+      .join("\n\n");
   } catch (error) {
-    logError('Error in late chunking:', { error });
+    logError("Error in late chunking:", { error });
     // Fallback: just return the beginning of the context up to the desired length
     return longContext.substring(0, snippetLength * numSnippets);
   }

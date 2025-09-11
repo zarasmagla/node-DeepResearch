@@ -68,26 +68,18 @@ function getGenAIClient(): GoogleGenAI {
   return genAI;
 }
 
-// Map task types to Google's task types
-function mapTaskType(task?: string): string {
-  switch (task) {
-    case "text-matching":
-      return "SEMANTIC_SIMILARITY";
-    case "retrieval.passage":
-      return "RETRIEVAL_DOCUMENT";
-    case "retrieval.query":
-      return "RETRIEVAL_QUERY";
-    default:
-      return "SEMANTIC_SIMILARITY";
-  }
-}
-
 // Modified to support different embedding tasks and dimensions
 export async function getEmbeddings(
   texts: string[] | Record<string, string>[],
   tokenTracker?: any,
   options: {
-    task?: "text-matching" | "retrieval.passage" | "retrieval.query";
+    task?:
+      | "SEMANTIC_SIMILARITY"
+      | "RETRIEVAL_QUERY"
+      | "RETRIEVAL_DOCUMENT"
+      | "QUESTION_ANSWERING"
+      | "FACT_VERIFICATION"
+      | "CLASSIFICATION";
     dimensions?: number;
     late_chunking?: boolean;
     embedding_type?: string;
@@ -158,7 +150,13 @@ export async function getEmbeddings(
 async function getBatchEmbeddingsWithRetry(
   batchTexts: string[],
   options: {
-    task?: "text-matching" | "retrieval.passage" | "retrieval.query";
+    task?:
+      | "SEMANTIC_SIMILARITY"
+      | "RETRIEVAL_QUERY"
+      | "RETRIEVAL_DOCUMENT"
+      | "QUESTION_ANSWERING"
+      | "FACT_VERIFICATION"
+      | "CLASSIFICATION";
     dimensions?: number;
     late_chunking?: boolean;
     embedding_type?: string;
@@ -217,11 +215,10 @@ async function getBatchEmbeddingsWithRetry(
       // Prepare the request configuration with fallback model on consecutive failures
       const model = options.model || "gemini-embedding-001";
 
-      const taskType = mapTaskType(options.task);
+      const taskType = options.task || "SEMANTIC_SIMILARITY";
       logDebug(taskType);
       const config = {
-        taskType,
-        ...(options.dimensions && { outputDimensionality: options.dimensions }),
+        taskType: taskType,
       };
 
       logDebug(
