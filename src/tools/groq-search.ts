@@ -1,6 +1,7 @@
 import Groq from "groq-sdk";
 import { GROQ_API_KEY } from "../config";
 import { SpiderSearchResponse, SERPQuery } from "../types";
+import { logError } from "../logging";
 
 
 interface GroqSearchResult {
@@ -99,6 +100,7 @@ export async function groqSearch(query: SERPQuery): Promise<{ response: SpiderSe
             ...(mappedCountry ? { search_settings: { country: mappedCountry } as any } : {})
         } as any);
     } catch (err) {
+        logError("Groq web search failed", { err });
         // Surface a clean error
         const message = err instanceof Error ? err.message : String(err);
         throw new Error(`Groq web search failed: ${message}`);
