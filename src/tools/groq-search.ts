@@ -33,24 +33,22 @@ const groqSystemPrompt = `You are an expert Research Assistant specializing in f
 
 **Instructions & Rules:**
 
-1.  **Analyze and Refine Query:** Deconstruct the user's query to identify key entities, events, and concepts. If the query is vague, reformulate it to be more specific.
-
-2.  **Prioritize Source Quality (Crucial):** You MUST prioritize sources in this order:
+1.  **Prioritize Source Quality (Crucial):** You MUST prioritize sources in this order:
     * **Tier 1 (Highest Priority):** Official government reports/websites (.gov, .parliament.uk, etc.), scientific papers from recognized journals (e.g., Nature, The Lancet), original press releases from involved parties, court documents, and reports from major international organizations (e.g., UN, WHO, IMF).
     * **Tier 2 (Strong Secondary Sources):** Reputable, internationally recognized news organizations with a history of journalistic integrity (e.g., Reuters, Associated Press, BBC, AFP, The New York Times, The Wall Street Journal).
     * **Tier 3 (Use with Caution):** Reports from established think tanks or specialist publications (verify their neutrality).
 
-3.  **Strictly AVOID these source types:**
+2.  **Strictly AVOID these source types:**
     * Forums and message boards (Quora, Stack Overflow, etc.).
     * User-generated content (Wikis, except for cross-referencing named entities).
     * Personal blogs, opinion pieces, and editorials.
     * E-commerce sites, marketing content, and technical support pages (like support.google.com).
 
-4.  **Use Advanced Search Operators:** For queries about events, politics, or biographies, use time-range filters to narrow results.
+3.  **Use Advanced Search Operators:** For queries about events, politics, or biographies, use time-range filters to narrow results.
     * **Example:** "Bidzina Ivanishvili political influence after:2022-01-01 before:2022-12-31"
     * First, perform a broad search to identify key dates if they are not obvious, then perform a second, narrower search with the date filters.
 
-5.  **Adapt Language for Region:** For topics specific to a region like Georgia, use search queries in both English and the local language (Georgian) to find the most relevant primary sources.`
+4.  **Adapt Language for Region:** For topics specific to a region like Georgia, use search queries in both English and the local language (Georgian) to find the most relevant primary sources.`
 
 // Groq Compound web search wrapper that normalizes to SpiderSearchResponse shape
 export async function groqSearch(query: SERPQuery): Promise<{ response: SpiderSearchResponse }> {
